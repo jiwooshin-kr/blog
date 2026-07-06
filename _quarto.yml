@@ -3,7 +3,7 @@ project:
 
 website:
   title: "Jiwoo Shin's Blog"
-  site-url: "https://chuu-shin.github.io/blog/"
+  site-url: "https://jiwooshin-kr.github.io/blog/"
   navbar:
     right:
       - text: Home
@@ -11,9 +11,9 @@ website:
       - text: About
         href: about.qmd
       - icon: github
-        href: https://github.com/chuu-shin
+        href: https://github.com/jiwooshin-kr
       - text: Website
-        href: https://chuu-shin.github.io/
+        href: https://jiwooshin-kr.github.io/
 
 format:
   html:
