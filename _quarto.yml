@@ -20,8 +20,3 @@ format:
     theme: cosmo
     css: styles.css
     toc: true
-
-categories:
-  - paper review
-  - diffusion models
-  - alignment
