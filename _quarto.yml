@@ -1,0 +1,27 @@
+project:
+  type: website
+
+website:
+  title: "Jiwoo Shin's Blog"
+  site-url: "https://chuu-shin.github.io/blog/"
+  navbar:
+    right:
+      - text: Home
+        href: index.qmd
+      - text: About
+        href: about.qmd
+      - icon: github
+        href: https://github.com/chuu-shin
+      - text: Website
+        href: https://chuu-shin.github.io/
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+
+categories:
+  - paper review
+  - diffusion models
+  - alignment
