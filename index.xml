@@ -6,15 +6,15 @@
       version="2.0">
 <channel>
 <title>Jiwoo Shin&#39;s Blog</title>
-<link>https://chuu-shin.github.io/blog/</link>
-<atom:link href="https://chuu-shin.github.io/blog/index.xml" rel="self" type="application/rss+xml"/>
+<link>https://jiwooshin-kr.github.io/blog/</link>
+<atom:link href="https://jiwooshin-kr.github.io/blog/index.xml" rel="self" type="application/rss+xml"/>
 <description></description>
 <generator>quarto-1.9.38</generator>
 <lastBuildDate>Mon, 06 Jul 2026 15:00:00 GMT</lastBuildDate>
 <item>
   <title>Post With Code</title>
   <dc:creator>Harlow Malloc</dc:creator>
-  <link>https://chuu-shin.github.io/blog/posts/post-with-code/</link>
+  <link>https://jiwooshin-kr.github.io/blog/posts/post-with-code/</link>
   <description><![CDATA[ 
 
 
@@ -32,14 +32,14 @@
   <category>news</category>
   <category>code</category>
   <category>analysis</category>
-  <guid>https://chuu-shin.github.io/blog/posts/post-with-code/</guid>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/post-with-code/</guid>
   <pubDate>Mon, 06 Jul 2026 15:00:00 GMT</pubDate>
-  <media:content url="https://chuu-shin.github.io/blog/posts/post-with-code/image.jpg" medium="image" type="image/jpeg"/>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/post-with-code/image.jpg" medium="image" type="image/jpeg"/>
 </item>
 <item>
   <title>Welcome To My Blog</title>
   <dc:creator>Tristan O&#39;Malley</dc:creator>
-  <link>https://chuu-shin.github.io/blog/posts/welcome/</link>
+  <link>https://jiwooshin-kr.github.io/blog/posts/welcome/</link>
   <description><![CDATA[ 
 
 
@@ -47,7 +47,7 @@
 
 
 <p>This is the first post in a Quarto blog. Welcome!</p>
-<p><img src="https://chuu-shin.github.io/blog/posts/welcome/thumbnail.jpg" class="img-fluid"></p>
+<p><img src="https://jiwooshin-kr.github.io/blog/posts/welcome/thumbnail.jpg" class="img-fluid"></p>
 <p>Since this post doesn’t specify an explicit <code>image</code>, the first image in the post will be used in the listing page of posts.</p>
 
 
@@ -57,7 +57,7 @@
   <category>diffusion models</category>
   <category>alignment</category>
   <category>news</category>
-  <guid>https://chuu-shin.github.io/blog/posts/welcome/</guid>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/welcome/</guid>
   <pubDate>Fri, 03 Jul 2026 15:00:00 GMT</pubDate>
 </item>
 </channel>
