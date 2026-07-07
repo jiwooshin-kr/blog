@@ -6,3 +6,18 @@ freeze: true
 
 # Enable banner style title blocks
 title-block-banner: true
+
+# giscus comments (GitHub Discussions) on every post
+comments:
+  giscus:
+    repo: jiwooshin-kr/blog
+    category: Announcements
+    category-id: DIC_kwDOTPVNps4DAq0B
+    reactions-enabled: true
+    loading: lazy
+    mapping: pathname
+
+# prev/next + related posts footer on every post
+format:
+  html:
+    include-after-body: ../_postnav.html

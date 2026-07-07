@@ -1,0 +1,65 @@
+<script>
+/* GoatCounter: visitor tracking + footer counter (Total / Today / Yesterday).
+   Setup: sign up at goatcounter.com, then put your site code below.
+   Also enable "Allow adding visitor counts on your website" in
+   GoatCounter Settings so the counter API is publicly readable. */
+(function () {
+  var GC_CODE = "jiwooshin";
+  if (GC_CODE.indexOf("GOATCOUNTER") === 0) return; // not configured yet
+  var site = "https://" + GC_CODE + ".goatcounter.com";
+
+  // tracking snippet
+  var s = document.createElement("script");
+  s.async = true;
+  s.src = "https://gc.zgo.at/count.js";
+  s.setAttribute("data-goatcounter", site + "/count");
+  document.head.appendChild(s);
+
+  // footer counter: runs after the DOM is ready (this script is injected
+  // before the footer markup exists)
+  var run = function () {
+    var footer = document.querySelector(".nav-footer");
+    if (!footer) return;
+    var slot = footer.querySelector(".nav-footer-right");
+    if (!slot) {
+      slot = document.createElement("div");
+      slot.className = "nav-footer-right";
+      footer.appendChild(slot);
+    }
+    var el = document.createElement("span");
+    el.className = "visitor-stats";
+    slot.appendChild(el);
+    var d2s = function (d) {
+      var p = function (n) { return String(n).padStart(2, "0"); };
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    };
+    var today = d2s(new Date());
+    var yest = d2s(new Date(Date.now() - 864e5));
+    var get = function (qs) {
+      return fetch(site + "/counter/TOTAL.json" + qs)
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j) return null;
+          // unique visitors (sessions), not raw pageviews
+          var n = j.count_unique != null ? j.count_unique : j.count;
+          return String(n).trim();
+        })
+        .catch(function () { return null; });
+    };
+    Promise.all([
+      get(""),
+      get("?start=" + today),
+      get("?start=" + yest + "&end=" + yest),
+    ]).then(function (v) {
+      if (v[0] == null) return;
+      el.textContent =
+        "Total " + v[0] + " · Today " + (v[1] || "0") + " · Yesterday " + (v[2] || "0");
+    });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
+</script>

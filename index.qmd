@@ -1,18 +1,67 @@
 ---
-title: "blog"
+title: "Notes to Self"
+pagetitle: "Blog | Jiwoo Shin"
 listing:
   contents: posts
   feed: true
   sort: "date desc"
   type: default
   categories: true
+  page-size: 10
   sort-ui: false
   filter-ui: false
+  fields: [date, author, reading-time, title, description, categories, image]
 page-layout: full
 title-block-banner: false
 toc: false
 ---
 
-::: {.blog-hero}
-# blog
+<script>
+(() => {
+  const setTitle = () => {
+    document.title = "Blog | Jiwoo Shin";
+  };
+  const setPostCount = () => {
+    const listing = window["quarto-listings"] && window["quarto-listings"]["listing-listing"];
+    const count = listing && listing.items
+      ? listing.items.length
+      : document.querySelectorAll(".quarto-listing-default .quarto-post").length;
+    const countEl = document.querySelector("#post-count-number");
+    if (countEl) {
+      countEl.textContent = String(count);
+    }
+  };
+  const moveAbout = () => {
+    const about = document.getElementById("sidebar-about");
+    const sidebar = document.getElementById("quarto-margin-sidebar");
+    if (about && sidebar) {
+      sidebar.insertBefore(about, sidebar.firstChild);
+    }
+  };
+  setTitle();
+  document.addEventListener("DOMContentLoaded", () => {
+    setPostCount();
+    moveAbout();
+  });
+  window.addEventListener("load", () => {
+    setTitle();
+    setPostCount();
+  });
+})();
+</script>
+
+::: {.post-count}
+Total posts <span id="post-count-number"></span>
+:::
+
+::: {#sidebar-about .sidebar-about}
+![](profile.jpg){.sidebar-about-photo}
+
+**Jiwoo Shin**
+
+Incoming M.S. student at KAIST Graduate School of AI.
+
+Notes on AI research, papers, and everyday things I want to remember.
+
+[More about me →](https://jiwooshin-kr.github.io/)
 :::

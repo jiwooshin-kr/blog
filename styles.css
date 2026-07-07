@@ -1,19 +1,965 @@
-/* css styles */
+/* ==========================================================================
+   Jiwoo Shin — blog theme
+   Editorial, typography-first. One white canvas, hairline dividers,
+   a single accent color. No boxes, no shadows, no magic-number layout.
+   ========================================================================== */
 
-.blog-hero {
-  background: #f8f9fa;
-  margin: 0 0 2.25rem;
-  padding: 2rem 1.5rem;
-  width: 100%;
+:root {
+  --ink: #1b2836;        /* headings, strong text */
+  --ink-2: #3e4f63;      /* body-adjacent text */
+  --muted: #64748b;      /* meta, labels */
+  --line: #e4eaf1;       /* hairline dividers */
+  --line-strong: #cfdae6;
+  --tint: #f2f6fa;       /* soft band / code background */
+  --surface: #ffffff;
+  --nav-bg: rgba(255, 255, 255, 0.94);
+  --accent: #2f7fa7;
+  --accent-ink: #24647f;
+  --page-max: 66rem;
+  --rail: 14rem;      /* right rail (categories / TOC) */
+  --rail-gap: 4.5rem; /* gap between article column and rail */
 }
 
-body:has(.blog-hero) #title-block-header {
+/* dark palette — Quarto's toggle puts .quarto-dark on <body> */
+body.quarto-dark {
+  --ink: #e6ecf3;
+  --ink-2: #c3cedb;
+  --muted: #8b99ab;
+  --line: #232e3c;
+  --line-strong: #2f3c4d;
+  --tint: #171f2a;
+  --surface: #10161f;
+  --nav-bg: rgba(16, 22, 31, 0.94);
+  --accent: #5aa7cd;
+  --accent-ink: #7fb8d8;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--accent-ink);
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+   Navbar — flat white, hairline bottom
+   -------------------------------------------------------------------------- */
+
+.navbar {
+  background: var(--nav-bg);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+  padding-block: 0.55rem;
+}
+
+.navbar .navbar-container {
+  margin-inline: auto;
+  padding-inline: 0;
+  width: min(100% - 3rem, var(--page-max));
+}
+
+.navbar .navbar-brand-container {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.navbar .navbar-brand {
+  padding-block: 0;
+}
+
+.navbar .navbar-title {
+  color: var(--ink) !important;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.navbar .nav-link {
+  color: var(--ink-2) !important;
+  font-weight: 600;
+  padding-block: 0.35rem !important;
+  padding-inline: 0.75rem !important;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+  background: none;
+  color: var(--accent) !important;
+}
+
+.navbar .quarto-search-button {
+  color: var(--ink-2) !important;
+}
+
+/* no hamburger on mobile: its two links (Home / About Me) are covered by
+   the brand link and the sidebar profile's "More about me" */
+.navbar .navbar-toggler {
+  display: none !important;
+}
+
+/* dark-mode toggle: moon in light mode, sun in dark mode
+   (Quarto's default pill-toggle icon is not intuitive) */
+.quarto-color-scheme-toggle i.bi::before {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="rgb(62,79,99)"><path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/></svg>') !important;
+}
+
+body.quarto-dark .quarto-color-scheme-toggle i.bi::before {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="rgb(195,206,219)"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>') !important;
+}
+
+/* --------------------------------------------------------------------------
+   Listing page — two columns: post list + categories
+   -------------------------------------------------------------------------- */
+
+body:has(#listing-listing) #title-block-header {
   display: none;
 }
 
-.blog-hero h1 {
+body:has(#listing-listing) #quarto-content {
+  align-content: start;
+  align-items: start;
+  column-gap: var(--rail-gap) !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) var(--rail);
+  grid-template-rows: auto;
+  margin-inline: auto;
+  padding-top: 3rem;
+  width: min(100% - 3rem, var(--page-max));
+}
+
+body:has(#listing-listing) main.content {
+  display: flex;
+  flex-direction: column;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  margin-top: 0;
+  max-width: none;
+  min-width: 0;
+  padding: 0;
+  width: 100%;
+}
+
+body:has(#listing-listing) #quarto-margin-sidebar {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
   margin: 0;
-  color: #5a5a5a;
-  font-size: 2rem;
+  min-width: 0;
+  padding: 0;
+  position: sticky;
+  top: 4.5rem;
+  width: 100%;
+}
+
+/* Shared small-caps label: "TOTAL POSTS n" and "CATEGORIES".
+   Identical metrics on both columns → tops align by construction. */
+.post-count,
+#quarto-margin-sidebar .quarto-listing-category-title {
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin: 0;
+  padding-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+.post-count {
+  order: 1;
+  width: 100%;
+}
+
+.post-count p {
+  margin: 0;
+}
+
+.post-count span {
+  color: var(--accent);
+}
+
+.quarto-listing-container-default {
+  margin: 0;
+  order: 2;
+  padding: 0;
+}
+
+/* ---- post rows ---- */
+
+/* posts without a thumbnail: reclaim the reserved right column */
+.quarto-listing-default .quarto-post:not(:has(.thumbnail)) {
+  min-height: 0;
+  padding-right: 0;
+}
+
+/* text (title / pills / meta) is a centered flex column; the thumbnail is
+   absolutely positioned so it can't skew the text spacing */
+.quarto-listing-default .quarto-post {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  justify-content: center;
+  margin: 0;
+  min-height: 10rem; /* 7rem thumbnail + 3rem padding */
+  padding: 1.5rem calc(10.5rem + 2.25rem) 1.5rem 0;
+  position: relative;
+}
+
+.quarto-listing-default .quarto-post .metadata {
+  border: 0;
+  color: var(--muted);
+  flex: 0 0 auto; /* Quarto default is flex-basis: 33% */
+  font-size: 0.82rem;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.quarto-listing-default .quarto-post .metadata a {
+  color: inherit;
+  column-gap: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  text-decoration: none;
+}
+
+.quarto-listing-default .quarto-post .metadata a > div + div::before {
+  color: var(--line-strong);
+  content: "\00B7";
+  margin-right: 0.55rem;
+}
+
+.quarto-listing-default .quarto-post .body {
+  display: flex;
+  flex: 0 0 auto; /* Quarto default is flex-basis: 45% */
+  flex-direction: column;
+  gap: 0.6rem;
+  justify-content: flex-start; /* Quarto's default bottom-aligns this */
+  min-width: 0;
+}
+
+.quarto-listing-default .listing-title {
+  font-size: clamp(1.15rem, 1.8vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.quarto-listing-default .listing-title a {
+  color: var(--ink);
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+
+.quarto-listing-default .quarto-post:hover .listing-title a {
+  color: var(--accent);
+}
+
+.quarto-listing-default .listing-description {
+  color: var(--muted);
+  display: -webkit-box;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* keep rows tidy: max two lines */
+}
+
+.quarto-listing-default .listing-description a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.quarto-listing-default .thumbnail {
+  margin: 0;
+  min-width: 0;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10.5rem;
+}
+
+.quarto-listing-default .thumbnail-image {
+  aspect-ratio: 3 / 2;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* ---- category pills (in rows) ---- */
+
+.listing-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.listing-category {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.16rem 0.6rem;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.listing-category:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---- about block (moved into the sidebar by index.qmd script) ---- */
+
+.sidebar-about {
+  display: none; /* only shown once inside the sidebar */
+}
+
+#quarto-margin-sidebar .sidebar-about {
+  display: block;
+  margin-bottom: 2.25rem;
+}
+
+#quarto-margin-sidebar .sidebar-about::before {
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  content: "About";
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+#quarto-margin-sidebar .sidebar-about p {
+  margin: 0 0 0.5rem;
+}
+
+#quarto-margin-sidebar .sidebar-about .sidebar-about-photo {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  height: 4.5rem;
+  object-fit: cover;
+  width: 4.5rem;
+}
+
+#quarto-margin-sidebar .sidebar-about strong {
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
+#quarto-margin-sidebar .sidebar-about {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+#quarto-margin-sidebar .sidebar-about a {
+  color: var(--accent-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#quarto-margin-sidebar .sidebar-about a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ---- categories sidebar ---- */
+
+/* ID-scoped: Quarto's own "#quarto-margin-sidebar .quarto-listing-category"
+   rule sets padding-top: 0 and would win otherwise */
+#quarto-margin-sidebar .quarto-listing-category.category-default {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.45rem;
+}
+
+.quarto-listing-category .category {
+  align-items: baseline;
+  background: none;
+  border: 0;
+  color: var(--ink-2);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 600;
+  justify-content: space-between;
+  padding: 0.34rem 0;
+  transition: color 140ms ease;
+}
+
+.quarto-listing-category .category:hover {
+  color: var(--accent);
+}
+
+.quarto-listing-category .category.active {
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.quarto-category-count {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+/* ---- pagination: "PAGE 1 2 3" ---- */
+
+.listing-pagination {
+  margin-top: 1.5rem;
+}
+
+.listing-pagination .pagination {
+  align-items: baseline;
+  display: flex;
+  gap: 0.85rem;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0;
+}
+
+.listing-pagination .pagination::before {
+  color: var(--muted);
+  content: "Page";
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin-right: 0.15rem;
+  text-transform: uppercase;
+}
+
+.listing-pagination .page-item {
+  margin: 0;
+}
+
+.listing-pagination .page-item .page-link {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.05rem 0.15rem;
+}
+
+.listing-pagination .page-item .page-link:hover {
+  color: var(--accent);
+}
+
+.listing-pagination .page-item.active .page-link,
+.listing-pagination .page-item .page-link.active {
+  background: none;
+  color: var(--accent);
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Post pages — same container and visual language as the home page:
+   white canvas, hairline under the header, content + TOC rail grid.
+   -------------------------------------------------------------------------- */
+
+#title-block-header.quarto-title-block {
+  display: block;
+  margin: 0;
+}
+
+/* ID-scoped: must out-rank Quarto's "body .page-columns" grid rules */
+#title-block-header .quarto-title-banner {
+  background: none;
+  border: 0;
+  color: inherit;
+  display: block;
+  margin: 0;
+  padding: 3rem 0 0;
+}
+
+/* title block constrained to the same container as the navbar */
+#title-block-header .quarto-title-banner .quarto-title {
+  margin-inline: auto;
+  max-width: none;
+  padding: 0;
+  width: min(100% - 3rem, var(--page-max));
+}
+
+.quarto-title-banner .quarto-title .title {
+  color: var(--ink);
+  font-size: clamp(1.7rem, 3.5vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.quarto-title-banner .quarto-categories {
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+}
+
+.quarto-title-banner .quarto-category {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 1;
+  padding: 0.16rem 0.6rem;
+}
+
+/* author · date as one quiet line, hairline underneath closes the header.
+   Selector mirrors Quarto's own (grid) rule so ours wins by source order. */
+#title-block-header.quarto-title-block.default .quarto-title-meta {
+  align-items: baseline;
+  column-gap: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  margin-inline: auto;
+  margin-top: 0.9rem;
+  padding-bottom: 1.4rem;
+  position: relative;
+  width: min(100% - 3rem, var(--page-max));
+}
+
+/* hairline spans the article column only, matching the lines below it */
+#title-block-header.quarto-title-block.default .quarto-title-meta::after {
+  background: var(--line);
+  bottom: 0;
+  content: "";
+  height: 1px;
+  left: 0;
+  position: absolute;
+  width: calc(100% - (var(--rail) + var(--rail-gap)));
+}
+
+#title-block-header.quarto-title-block.default .quarto-title-meta > div {
+  align-items: baseline;
+  display: flex;
+}
+
+#title-block-header.quarto-title-block.default .quarto-title-meta-heading {
+  display: none;
+}
+
+#title-block-header.quarto-title-block.default .quarto-title-meta > div + div::before {
+  color: var(--line-strong);
+  content: "\00B7";
+  margin-right: 0.6rem;
+}
+
+.quarto-title-meta-contents {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.quarto-title-meta-contents p {
+  margin: 0;
+}
+
+/* content grid: article column + TOC rail, same geometry as home */
+body:has(.quarto-title-banner) #quarto-content {
+  align-content: start;
+  align-items: start;
+  column-gap: var(--rail-gap) !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) var(--rail);
+  grid-template-rows: auto;
+  margin-inline: auto;
+  padding-top: 2.25rem;
+  width: min(100% - 3rem, var(--page-max));
+}
+
+body:has(.quarto-title-banner) main.content {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  margin-top: 0;
+  max-width: none;
+  min-width: 0;
+  padding: 0;
+  width: 100%;
+}
+
+body:has(.quarto-title-banner) #quarto-margin-sidebar {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  position: sticky;
+  top: 4.5rem;
+  width: 100%;
+}
+
+/* giscus comments: injected as a direct child of #quarto-content —
+   pin it under the article column */
+body:has(.quarto-title-banner) #quarto-content > .giscus {
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: 3.5rem;
+}
+
+/* ---- prev/next + related posts (built client-side from the listing) ---- */
+
+.post-footer-nav {
+  margin-top: 3.5rem;
+}
+
+.post-nav {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 1fr 1fr;
+  padding-top: 1.4rem;
+}
+
+.post-nav-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.post-nav-next {
+  text-align: right;
+}
+
+.post-nav-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.post-nav-title {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.post-nav-item:hover .post-nav-title {
+  color: var(--accent);
+}
+
+.related-posts {
+  margin-top: 3rem;
+}
+
+.related-posts-title {
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  padding-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+.related-posts-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 1.4rem;
+}
+
+.related-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.related-card-image {
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.related-card-title {
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.related-card:hover .related-card-title {
+  color: var(--accent);
+}
+
+.related-card-date {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ---- article body ---- */
+
+#quarto-document-content {
+  line-height: 1.75;
+}
+
+/* scoped to post pages so listing h3 titles are unaffected */
+body:has(.quarto-title-banner) #quarto-document-content h2 {
+  border-bottom: 1px solid var(--line);
+  font-weight: 700;
+  margin-top: 2.4rem;
+  padding-bottom: 0.45rem;
+}
+
+body:has(.quarto-title-banner) #quarto-document-content h3,
+body:has(.quarto-title-banner) #quarto-document-content h4 {
+  font-weight: 700;
+  margin-top: 1.9rem;
+}
+
+#quarto-document-content p code,
+#quarto-document-content li code,
+#quarto-document-content td code {
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink-2);
+  padding: 0.1em 0.3em;
+}
+
+#quarto-document-content div.sourceCode {
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 1.2rem 0;
+}
+
+#quarto-document-content pre.sourceCode {
+  padding: 1rem 1.15rem;
+}
+
+#quarto-document-content blockquote {
+  background: var(--tint);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  color: var(--ink-2);
+  margin: 1.4rem 0;
+  padding: 0.8rem 1.1rem;
+}
+
+#quarto-document-content img {
+  border-radius: 8px;
+  max-width: 100%;
+}
+
+/* ---- table of contents (post right rail) ---- */
+
+#quarto-margin-sidebar #toc-title {
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin: 0 0 0.45rem;
+  padding-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+nav[role="doc-toc"] .nav-link {
+  border-left: 2px solid transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+nav[role="doc-toc"] .nav-link.active {
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+   Footer — copyright left, visitor counter right
+   -------------------------------------------------------------------------- */
+
+body .nav-footer {
+  align-items: baseline;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  display: flex;
+  font-size: 0.85rem;
+  justify-content: space-between;
+  margin-top: 3.5rem;
+  min-height: 0;
+  padding: 1.2rem max(1.5rem, calc((100% - var(--page-max)) / 2));
+}
+
+.nav-footer p {
+  margin: 0;
+}
+
+.nav-footer a {
+  color: var(--muted);
+}
+
+.visitor-stats {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 991.98px) {
+  /* navbar contents align with the page content edge
+     (out-ranks Quarto's "#quarto-header>nav" 1em padding) */
+  #quarto-header > nav.navbar {
+    padding-inline: 0;
+  }
+
+  .navbar .navbar-container {
+    width: min(100% - 2.5rem, var(--page-max));
+  }
+
+  body:has(#listing-listing) #quarto-content,
+  body:has(.quarto-title-banner) #quarto-content {
+    display: block !important;
+    padding-top: 2rem;
+    width: min(100% - 2.5rem, var(--page-max));
+  }
+
+  .quarto-title-banner {
+    padding-top: 2rem;
+  }
+
+  .quarto-title-banner .quarto-title,
+  #title-block-header .quarto-title-meta {
+    width: min(100% - 2.5rem, var(--page-max));
+  }
+
+  /* single column below 992px: hairline spans full width again */
+  #title-block-header.quarto-title-block.default .quarto-title-meta::after {
+    width: 100%;
+  }
+
+  body:has(#listing-listing) #quarto-margin-sidebar {
+    display: block !important;
+    margin-bottom: 2rem;
+    position: static !important;
+  }
+
+  /* stacked layout: compact horizontal profile (photo left, text right) */
+  #quarto-margin-sidebar .sidebar-about {
+    column-gap: 1rem;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    margin-bottom: 2rem;
+  }
+
+  #quarto-margin-sidebar .sidebar-about::before {
+    grid-column: 1 / -1;
+  }
+
+  #quarto-margin-sidebar .sidebar-about p {
+    grid-column: 2;
+    margin: 0 0 0.35rem;
+  }
+
+  #quarto-margin-sidebar .sidebar-about p:first-of-type {
+    grid-column: 1;
+    grid-row: 2 / span 3;
+  }
+
+  #quarto-margin-sidebar .sidebar-about .sidebar-about-photo {
+    height: 3.75rem;
+    width: 3.75rem;
+  }
+
+  /* categories become a horizontal chip row */
+  #quarto-margin-sidebar .quarto-listing-category.category-default {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    padding-top: 1.1rem;
+  }
+
+  .quarto-listing-category .category {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    gap: 0.4rem;
+    padding: 0.28rem 0.8rem;
+  }
+
+  .quarto-listing-category .category.active {
+    border-color: var(--accent);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .quarto-listing-default .quarto-post {
+    gap: 0.55rem;
+    min-height: 0;
+    padding: 1.25rem 0;
+  }
+
+  /* thumbnail back in flow, full width on top (DOM order: thumb, body, meta) */
+  .quarto-listing-default .thumbnail {
+    position: static;
+    transform: none;
+    width: 100%;
+  }
+
+  .quarto-listing-default .thumbnail-image {
+    aspect-ratio: 16 / 9;
+  }
+
+  .post-nav {
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+
+  .post-nav-next {
+    text-align: left;
+  }
+
+  .related-posts-grid {
+    grid-template-columns: 1fr;
+  }
 }

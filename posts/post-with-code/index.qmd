@@ -1,5 +1,6 @@
 ---
 title: "Post With Code"
+description: "A short summary of the post shows up here — write it as `description` in the front matter."
 author: "Harlow Malloc"
 date: "2026-07-07"
 categories: [news, code, analysis]

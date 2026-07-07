@@ -2,21 +2,29 @@ project:
   type: website
 
 website:
-  title: "Jiwoo Shin's Blog"
+  title: "Jiwoo Shin"
+  description: "AI research notes and paper reviews by Jiwoo Shin"
   site-url: "https://jiwooshin-kr.github.io/blog/"
+  image: profile.jpg
+  favicon: favicon.png
+  open-graph: true
+  twitter-card: true
   navbar:
+    title: "Notes to Self"
     right:
       - text: Home
         href: index.qmd
-      - text: About
-        href: about.qmd
-      - icon: github
-        href: https://github.com/jiwooshin-kr
-      - text: Website
+      - text: About Me
         href: https://jiwooshin-kr.github.io/
+  page-footer:
+    left: "© 2026 Jiwoo Shin"
 
 format:
   html:
-    theme: cosmo
+    respect-user-color-scheme: true
+    theme:
+      light: cosmo
+      dark: [cosmo, theme-dark.scss]
     css: styles.css
     toc: true
+    include-after-body: _goatcounter.html
