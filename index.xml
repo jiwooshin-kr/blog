@@ -5,10 +5,15 @@
       xmlns:dc="http://purl.org/dc/elements/1.1/" 
       version="2.0">
 <channel>
-<title>Jiwoo Shin&#39;s Blog</title>
+<title>Jiwoo Shin</title>
 <link>https://jiwooshin-kr.github.io/blog/</link>
 <atom:link href="https://jiwooshin-kr.github.io/blog/index.xml" rel="self" type="application/rss+xml"/>
-<description></description>
+<description>AI research notes and paper reviews by Jiwoo Shin</description>
+<image>
+<url>https://jiwooshin-kr.github.io/blog/profile.jpg</url>
+<title>Jiwoo Shin</title>
+<link>https://jiwooshin-kr.github.io/blog/</link>
+</image>
 <generator>quarto-1.9.38</generator>
 <lastBuildDate>Mon, 06 Jul 2026 15:00:00 GMT</lastBuildDate>
 <item>
@@ -16,6 +21,7 @@
   <dc:creator>Harlow Malloc</dc:creator>
   <link>https://jiwooshin-kr.github.io/blog/posts/post-with-code/</link>
   <description><![CDATA[ 
+
 
 
 
@@ -38,6 +44,7 @@
   <dc:creator>Harlow Malloc</dc:creator>
   <link>https://jiwooshin-kr.github.io/blog/posts/welcome/</link>
   <description><![CDATA[ 
+
 
 
 
