@@ -106,7 +106,7 @@ The bigger question the paper leaves open is whether reference-based negative gu
 
 ## Peer review at a glance
 
-SAD was accepted as a **Poster** at ICML 2026. The scores (via [Paper Copilot's open dataset](https://github.com/papercopilot/paperlists); ICML review text is not publicly posted, and [OpenReview](https://openreview.net/forum?id=dw5BM3OQfZ) now requires sign-in):
+SAD was accepted as a **Poster** at ICML 2026, reviewed by four reviewers. The scores below are from [Paper Copilot's open dataset](https://github.com/papercopilot/paperlists); the review text is not publicly available (ICML does not post reviews, and [OpenReview](https://openreview.net/forum?id=dw5BM3OQfZ) requires sign-in), so they are reproduced here without interpretation.
 
 | | Recommendation | Confidence | Soundness | Significance | Originality | Presentation |
 |---|---|---|---|---|---|---|
@@ -115,8 +115,6 @@ SAD was accepted as a **Poster** at ICML 2026. The scores (via [Paper Copilot's 
 | Reviewer pAtC | 4 | 2 | 2 | 3 | 2 | 2 |
 | Reviewer ddgR | 4 | 3 | 3 | 3 | 3 | 3 |
 | **Average** | **4.0** | 2.75 | 2.75 | 3.25 | 2.5 | 2.75 |
-
-My reading of the numbers (the text itself isn't public, so this is interpretation): the mirror image of its sibling paper [SGF's divisive 4-to-10 spread](../safety-guided-flow/#peer-review-at-a-glance) — a perfectly uniform consensus accept, with no champion and no detractor. Reviewers rated **significance** (3.25) clearly above **originality** (2.5), which matches my own read: the safety problem in text diffusion is real and timely, but the method is a careful transplant of an existing theorem to a new domain rather than a new idea. Consensus-without-a-champion is the classic profile of a solid poster.
 
 ## Related papers
 
