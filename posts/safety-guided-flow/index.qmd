@@ -111,7 +111,7 @@ The unification also quietly raises the standard for future work: a new negative
 
 ## Peer review at a glance
 
-SGF was accepted as an **Oral** at ICLR 2026 — the tier reserved for a small fraction of accepted papers. The scores (via [Paper Copilot's open dataset](https://github.com/papercopilot/paperlists); full review text on [OpenReview](https://openreview.net/forum?id=EA80Zib9UI) requires sign-in since OpenReview added a verification wall):
+SGF was accepted as an **Oral** at ICLR 2026 — the tier reserved for a small fraction of accepted papers — after an unusually divisive review round: ratings of 4/6/6/10. Scores via [Paper Copilot](https://github.com/papercopilot/paperlists), review text via a [public mirror of the OpenReview data](https://huggingface.co/datasets/davidheineman/iclr-2026) (the [forum itself](https://openreview.net/forum?id=EA80Zib9UI) now requires sign-in):
 
 | | Rating | Confidence | Soundness | Contribution | Presentation |
 |---|---|---|---|---|---|
@@ -121,7 +121,23 @@ SGF was accepted as an **Oral** at ICLR 2026 — the tier reserved for a small f
 | Reviewer h63Q | 10 | 5 | 3 | 4 | 3 |
 | **Average** | **6.5** | 3.75 | 2.75 | 2.75 | 2.75 |
 
-My reading of the numbers (the text itself isn't public, so this is interpretation): this was a *divisive* paper — a 4-to-10 spread is unusually wide. The dissenting reviewer wrote by far the longest weaknesses section (~580 words, versus 64–120 for the others) and scored soundness/contribution/presentation at 2s, while the champion gave a rare 10 at maximum confidence. The final Oral decision means the area chairs sided decisively with the champion. That pattern — one detailed skeptic versus one enthusiastic expert — fits the paper's profile: the CBF analysis rests on strong assumptions a careful reviewer would push on (see my weaknesses #1), while the unification result is exactly the kind of conceptual contribution that wins champions.
+### What the reviewers raised — and how the authors answered
+
+The rebuttal threads themselves aren't in the public mirror, so the "answers" below are what's verifiable in the camera-ready paper plus the outcome; where I'm inferring, I say so.
+
+**The make-or-break objection (Reviewer UsAs, rating 4).** The skeptic's central challenge: *"wouldn't standard gradient guidance with the control-barrier function work just as well? … If the authors can successfully argue why MMD (or really any probability distance) is more useful for the end goal of safe generation than just using standard gradient guidance with the control-barrier function I will raise my score, otherwise I will retain a **reject**."* In other words: if you have $h$, why bother with MMD? The answer implicit in the paper's own setup — and presumably the rebuttal's core — is that $h$ is *not available* in data-driven safety: the unsafe region is defined only by examples, and the barrier function exists purely as an analysis device (Section 4.4 introduces it "only for theoretical clarity"). The MMD potential is the thing you can actually compute from a negation set; Assumption 1 is precisely the bridge asserting its gradient behaves like $\nabla h$ near the boundary. Whatever the authors argued, it worked: the paper went from this reviewer's reject to an Oral. Notably, the camera-ready's limitation paragraph cites exactly the two theory works this reviewer demanded engagement with ([D-Flow](https://arxiv.org/abs/2402.14017) and [Blasingame & Liu](https://openreview.net/pdf?id=s14pdQgoLb)) and names "quantifying guidance mismatch" as future work — a visible trace of the exchange.
+
+**"Isn't the window still heuristic?" (also UsAs).** How do you pick $s_c$ — isn't this Safe Denoiser's hand-tuned interval all over again? The paper's answer: Theorem 2 doesn't hand you $s_c$ in closed form, but it converts the choice from a free two-parameter schedule into a one-directional rule (earlier strictly dominates at fixed budget), and the equal-budget ablation (Figure 4b) validates that rule empirically. Partial credit is fair here — my weaknesses section makes a related point.
+
+**Compute cost of the MMD gradient (also UsAs).** How expensive is this as $\mathcal{D}^-$ grows? The camera-ready answers with measurements: Table 4 shows +0.10s/image at $N{=}515$ and +0.48s at $N{=}3{,}200$ on top of a 4.22s SAFREE baseline, with the adaptive-bandwidth procedure (Appendix D.1) identified as the cost driver.
+
+**"Theory without pragmatic novelty" (Reviewer TunD, rating 6).** *"The resulting parametric form of the guidance model itself is effectively identical to SafeDenoiser… the critical time window theory provides why a certain stopping parameter is better, but this can be empirically chosen without theory."* This is the honest deflationary read, and the paper largely accepts it — its contribution is explanatory unification, not a new mechanism. The counterargument (which I find persuasive) is the equal-budget ablation: knowing *why* early guidance wins tells you how to spend a fixed guidance budget, which pure empiricism only discovers by sweeping.
+
+**Assumption 1(b) and the non-monotonic ablation (Reviewer ATH6, rating 6).** Two sharp technical questions: how does the weak-base-drift assumption hold away from the final time, and why does ASR dip then rise across shifted windows when Theorem 2 suggests monotonicity? The paper's justification for Assumption 1(b) (drift reaching the unsafe region implies near-final time, where the denoiser force is small) is stated but acknowledged as strong — this became the paper's own listed limitation, and it's my weaknesses #1.
+
+**The champion (Reviewer h63Q, rating 10, confidence 5)** called it *"outstanding theoretical contribution… the first formal safety guarantees for generative flows"* with *"empirical alignment with theory."* Even this review's mild criticisms converge with the others: discuss the weak-drift assumption's generality, and extend beyond visual safety to semantic concepts like copyright and bias — the same blind spot I flag in weaknesses #2 and #4.
+
+What I take from the round: all four reviewers, from reject to rare 10, agreed on the *same* pressure points — the strength of Assumption 1 and the question of what the theory buys in practice. The disagreement was about how much those matter relative to the unification. The area chairs' Oral decision is a strong endorsement of the "conceptual contribution first" view.
 
 ## Related papers
 
