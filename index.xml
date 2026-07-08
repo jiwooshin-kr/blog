@@ -254,7 +254,7 @@ Figure&nbsp;3: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a
 <ul>
 <li><strong>The paper:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></li>
 <li><strong>The two methods it unifies:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers.</em> NeurIPS 2025 — <a href="https://openreview.net/forum?id=QQS7TudonJ">OpenReview</a> · Kirchhof et al.&nbsp;<em>Shielded Diffusion (SPELL).</em> ICML 2025 — <a href="https://proceedings.mlr.press/v267/kirchhof25a.html">PMLR</a></li>
-<li><strong>The mechanism deployed on text diffusion:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="../safety-aware-denoiser/">my review</a></li>
+<li><strong>Follow-up work (published two months later, cites this paper):</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — deploys this line of negative guidance on text diffusion — <a href="../safety-aware-denoiser/">my review</a></li>
 </ul>
 
 
