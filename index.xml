@@ -139,9 +139,9 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
   <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" medium="image" type="image/png" height="80" width="144"/>
 </item>
 <item>
-  <title>Quarto Basics</title>
-  <dc:creator>Harlow Malloc</dc:creator>
-  <link>https://jiwooshin-kr.github.io/blog/posts/welcome/</link>
+  <title>[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/</link>
   <description><![CDATA[ 
 
 
@@ -149,89 +149,113 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 
 
 
-<p>For a demonstration of a line plot on a polar axis, see Figure&nbsp;1.</p>
-<div id="cell-fig-polar" class="cell" data-execution_count="1">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> np</span>
-<span id="cb1-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> plt</span>
-<span id="cb1-3"></span>
-<span id="cb1-4">r <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> np.arange(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.01</span>)</span>
-<span id="cb1-5">theta <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span> np.pi <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span> r</span>
-<span id="cb1-6">fig, ax <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> plt.subplots(</span>
-<span id="cb1-7">  subplot_kw <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'projection'</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'polar'</span>} </span>
-<span id="cb1-8">)</span>
-<span id="cb1-9">ax.plot(theta, r)</span>
-<span id="cb1-10">ax.set_rticks([<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.5</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.5</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>])</span>
-<span id="cb1-11">ax.grid(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb1-12">plt.show()</span></code></pre></div></div>
-</details>
-<div class="cell-output cell-output-display">
-<div id="fig-polar" class="quarto-float quarto-figure quarto-figure-center anchored">
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Mingyu Kim, Young-Heon Kim, Mijung Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>How do you make a diffusion or flow model generate <strong>safe content</strong> without retraining it? Recent training-free answers — Shielded Diffusion (SPELL) and Safe Denoiser — both push samples away from a set of known-unsafe examples during denoising, but each with its own ad-hoc force and an empirically hand-tuned schedule.</p>
+<p>This paper, <strong>Safety-Guided Flow (SGF)</strong>, gives that whole family a single principled foundation. It defines an energy landscape over the sample space using the <strong>Maximum Mean Discrepancy (MMD)</strong> to a negation set of unsafe examples, and steers generation <em>uphill</em> on that energy — away from everything unsafe. Both SPELL and Safe Denoiser fall out as special cases of this one gradient field. It then uses <strong>control barrier function (CBF)</strong> analysis to prove what previous work only observed empirically: safety guidance is only effective inside a <em>critical time window early in denoising</em>, and should be switched off afterwards. Plugged into SAFREE on Stable Diffusion, SGF drops the nudity attack success rate on Ring-A-Bell from 27.8% to <strong>5.1%</strong> with essentially no image-quality cost, and the same mechanism mitigates memorization (95th-percentile train similarity 0.437 → 0.328 while FID <em>improves</em>).</p>
+<p>If you read my <a href="../safety-aware-denoiser/">review of the Safety-Aware Denoiser (SAD)</a> — SAD’s text-diffusion guidance is built directly on the Safe Denoiser this paper generalizes, and SAD’s “early time window” heuristic is exactly what SGF proves. This is the theory piece of that research line.</p>
+</section>
+<section id="why-this-problem-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
+<p>Diffusion and flow models are deployed in places where unsafe outputs have real consequences — NSFW or biased images, regurgitated private training data, unsafe robot trajectories. Two research communities converged on the same instinct from opposite directions:</p>
+<ul>
+<li><strong>Robot planning</strong> uses control barrier functions to keep generated trajectories out of geometrically-defined obstacle regions at every denoising step — rigorous, but built for low-dimensional states and engineered constraints, with no probabilistic view of data.</li>
+<li><strong>Image generation</strong> uses data-driven negative guidance (SPELL’s radial repulsion, Safe Denoiser’s denoiser decomposition) — practical and training-free, but heuristic: neither says <em>when</em> guidance is actually necessary, and always-on guidance is known to wreck sample quality.</li>
+</ul>
+<p>SGF’s contribution is to merge the two: a probabilistic repulsive force (from the image line) with a formal reach-avoid analysis of its timing (from the control line).</p>
+</section>
+<section id="the-core-mechanism-how-sgf-generates-safe-content" class="level2">
+<h2 class="anchored" data-anchor-id="the-core-mechanism-how-sgf-generates-safe-content">The core mechanism: how SGF generates safe content</h2>
+<p>This is the heart of the paper, so let me walk through the full pipeline of how a sample ends up safe.</p>
+<p><strong>Step 1 — Define “unsafe” by example, not by rule.</strong> You curate a negation set <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D%5E-%20=%20%5C%7By_i%5C%7D_%7Bi=1%7D%5EN"> of concrete unsafe examples: 515 nudity images from I2P, copyrighted works, or the training set itself (for memorization). No classifier, no fine-tuning, no text rules — unsafety is defined extensionally, by what you show it.</p>
+<p><strong>Step 2 — Turn the negation set into an energy landscape.</strong> SGF defines a potential at the current sample <img src="https://latex.codecogs.com/png.latex?x_t"> as the squared MMD between a point mass at <img src="https://latex.codecogs.com/png.latex?x_t"> and the negation set, under an RBF kernel <img src="https://latex.codecogs.com/png.latex?k_%5Csigma">:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0AE(x_t)%20%5Cequiv%20%5Cwidehat%7B%5Cmathrm%7BMMD%7D%7D%5E2_%7Bk_%5Csigma%7D%5C!%5Cleft(%5C%7Bx_t%5C%7D,%20%5Cmathcal%7BD%7D%5E-%5Cright)%0A"></p>
+<p>This energy is <em>low</em> when <img src="https://latex.codecogs.com/png.latex?x_t"> resembles unsafe examples and <em>high</em> when it is far from all of them. “Safe” is literally the high-energy region of this landscape.</p>
+<p><strong>Step 3 — Steer generation uphill.</strong> The flow-matching ODE gets one extra term:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cdot%7Bx%7D_t%20=%20f_%5Ctheta(x_t,%20t)%20+%20%5Clambda(t)%5C,%20%5Cnabla_x%20E(x_t)%0A"></p>
+<p>The gradient has a beautifully interpretable closed form:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cnabla_%7Bx_t%7D%20E%20%5Cpropto%20%5C;%20x_t%20-%20%5Csum_%7Bi=1%7D%5E%7BN%7D%20w_i(x_t)%5C,%20y_i,%20%5Cqquad%20w_i(x_t)%20%5Cpropto%20k_%5Csigma(x_t,%20y_i)%0A"></p>
+<p>That is: compute a kernel-weighted average of the unsafe examples <em>nearest to where the sample is currently heading</em>, and push directly away from it. Samples drifting toward unsafe territory feel a strong shove; samples already far away feel almost nothing (the RBF weights vanish). Safety is enforced <em>during</em> generation — the trajectory itself is bent around unsafe regions, rather than unsafe outputs being caught after the fact.</p>
+<p><strong>Step 4 — Apply the force early, then turn it off.</strong> The guidance schedule <img src="https://latex.codecogs.com/png.latex?%5Clambda(t)"> is strong only during a critical window at the start of denoising and decays to zero afterwards. Early steps decide the coarse semantics of the output (is this image nude or not?); late steps only refine details. Push early and you cheaply redirect the sample to a safe mode; push late and you can no longer change the semantics — you just smear the details and degrade quality.</p>
+<p><strong>Why this is safe <em>by construction</em>, not by luck.</strong> Section 4.4 formalizes step 4 with control barrier functions. Model the safe set as <img src="https://latex.codecogs.com/png.latex?S%20=%20%5C%7Bh%20%5Cgeq%200%5C%7D"> for a barrier function <img src="https://latex.codecogs.com/png.latex?h">, and assume the MMD gradient aligns with <img src="https://latex.codecogs.com/png.latex?%5Cnabla%20h"> near the safe/unsafe boundary. Theorem 2 then gives a <em>sufficient condition</em> for the sample to reach a <img src="https://latex.codecogs.com/png.latex?%5Cdelta">-margin inside the safe set by deadline <img src="https://latex.codecogs.com/png.latex?s_c"> — and because the weighting term in that condition decays over time, <strong>moving a fixed guidance budget earlier strictly improves the safety bound</strong>. After the deadline, if the unguided flow keeps the safe set invariant (reasonable near the end of denoising, when the drift only refines details), guidance can be set to zero with safety preserved and fidelity improved. In short: <em>earlier is provably better, and off-at-the-end is provably fine.</em></p>
+<div id="fig-toy" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Four-panel 2D toy example showing a pretrained flow with negative data points, the velocity field with negative-guidance direction, and samples generated with full versus early-stopped negative guidance">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-polar-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://jiwooshin-kr.github.io/blog/posts/welcome/index_files/figure-html/fig-polar-output-1.png" width="450" height="439" class="figure-img">
+<div aria-describedby="fig-toy-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig2-toy.png" class="img-fluid figure-img" alt="Four-panel 2D toy example showing a pretrained flow with negative data points, the velocity field with negative-guidance direction, and samples generated with full versus early-stopped negative guidance">
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-polar-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: A line plot on a polar axis
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-toy-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 2 of the paper: the mechanism on a 2D toy flow. The learned velocity field (arrows) is combined with the MMD-gradient repulsion away from the negative data (orange). Full-time guidance (c) distorts modes near the unsafe set; early-stopped guidance (d) both avoids the unsafe region and matches the target distribution better (W² 0.937 vs 1.009). (Kim et al., 2026)
 </figcaption>
 </figure>
 </div>
-</div>
-</div>
+</section>
+<section id="unification-spell-and-safe-denoiser-are-the-same-force" class="level2">
+<h2 class="anchored" data-anchor-id="unification-spell-and-safe-denoiser-are-the-same-force">Unification: SPELL and Safe Denoiser are the same force</h2>
+<p>The “unified framework” claim is made precise in two propositions:</p>
+<ul>
+<li><strong>Proposition 1 (Safe Denoiser):</strong> evaluating the MMD gradient at the predicted clean sample <img src="https://latex.codecogs.com/png.latex?z_t%20=%20%5Cmathbb%7BE%7D%5Bx_0%20%5Cmid%20x_t%5D"> with a fixed bandwidth recovers Safe Denoiser’s weighted-kernel repellency, up to a positive scale. Safe Denoiser’s softmax weighting over unsafe references <em>is</em> the MMD gradient’s kernel weighting.</li>
+<li><strong>Proposition 2 (SPELL):</strong> SPELL’s thresholded radial push of radius <img src="https://latex.codecogs.com/png.latex?r"> matches the single-point Gaussian MMD force at any prescribed distance, via an explicit radius–bandwidth correspondence (closed form through the Lambert <img src="https://latex.codecogs.com/png.latex?W"> function). SPELL is a radius-thresholded instance of the same gradient field.</li>
+</ul>
+<p>So two methods published as unrelated mechanisms are one repulsive field with different kernel/threshold choices — and their shared empirical quirk (“guidance must start strong and fade”) is now a theorem rather than folklore.</p>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>All on text-to-image Stable Diffusion variants, with the same negation sets as prior work for fairness:</p>
+<p><strong>Safe generation against adversarial nudity prompts (Ring-A-Bell, UnlearnDiff, MMA-Diffusion; NudeNet as judge).</strong> SGF is a plug-in on top of negative-prompt methods. On SAFREE, swapping Safe Denoiser for SGF cuts ASR from 12.7% → <strong>5.1%</strong> (Ring-A-Bell), 20.7% → 16.4% (UnlearnDiff), 46.9% → 42.3% (MMA-Diffusion) — versus 27.8/35.3/60.1% for SAFREE alone and 79.7/80.9/96.2% for raw SD-v1.4. COCO image quality barely moves (FID 23.7, CLIP 30.4). Notably, the training-free stack beats the fine-tuned unlearning baselines (ESD, RECE) on the safety–quality Pareto front.</p>
+<p><strong>Memorization (SD-v2.1 deliberately overfit on ImageNette).</strong> Using the <em>training images themselves</em> as the negation set, SGF shifts the generated-to-train similarity distribution down: 95th-percentile similarity drops 0.437 → 0.328 (−24.7%), and with early stopping FID actually <em>improves</em> from 41.19 → 32.44 — pushing away from memorized modes apparently frees the model to generate more diverse, higher-quality samples.</p>
+<p><strong>Diversity (class-to-image on ImageNet, SD-v3).</strong> Against SPELL: at matched settings, SGF with early stop keeps FID at 31.8 (vs SPELL’s 48.5 at λ=1.0) while still improving Vendi diversity over the baseline. Early stopping is what rescues the quality.</p>
+<p><strong>The ablation that proves the point (Figure 4).</strong> Across three scheduling strategies — equal per-step strength, equal total budget <img src="https://latex.codecogs.com/png.latex?%5Cint%20%5Clambda(t)dt">, and a shifted fixed-length window — the lowest ASR always comes from windows at the <em>earliest</em> denoising steps (<img src="https://latex.codecogs.com/png.latex?%5B1.0,%200.8%5D"> or <img src="https://latex.codecogs.com/png.latex?%5B1.0,%200.6%5D">). Even with the total guidance budget held constant, spending it late is strictly worse. This is exactly what Theorem 2 predicts.</p>
+<p><strong>Cost.</strong> On SAFREE, SGF adds 0.10s/image with N=515 negatives (baseline 4.22s) — the guidance is cheaper than the safety framework it plugs into.</p>
+</section>
+<section id="strengths" class="level2">
+<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<ol type="1">
+<li><strong>It answers the question the prior methods dodged: <em>when</em>.</strong> Every negative-guidance paper (including SAD in text) hand-tunes a time window. SGF derives the critical window from a reach-avoid argument and validates it with a budget-controlled ablation. “Earlier is better” is now a design principle with a proof sketch behind it, not a hyperparameter accident.</li>
+<li><strong>Genuine unification.</strong> The two propositions aren’t decorative — they show one gradient field underlies methods from separate papers, which means improvements to the potential (kernel choice, bandwidth adaptation) propagate to the whole family.</li>
+<li><strong>Safety without a safety tax.</strong> The consistent finding across all three tasks is that <em>early-stopped</em> guidance improves safety while preserving — sometimes improving — quality and diversity. The memorization result (safety metric down 25%, FID down 21%) is the standout.</li>
+<li><strong>Composability.</strong> Like SAD in the text domain, SGF is a plug-in: it stacks on SLD and SAFREE and improves both, rather than competing with them.</li>
+</ol>
+</section>
+<section id="weaknesses-open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
+<ol type="1">
+<li><strong>The alignment assumption does heavy lifting.</strong> Theorem 2 assumes the MMD gradient aligns with the ideal barrier field near the safe/unsafe boundary (<img src="https://latex.codecogs.com/png.latex?%5Cnabla%20h%20%5Ccdot%20%5Cnabla%20E%20%5Cgeq%20%5Cmu">), and that the base drift is weak there. The authors acknowledge this is strong; if the negation set poorly covers the boundary of the true unsafe region, the alignment can fail exactly where it matters. Quantifying guidance mismatch is left to future work.</li>
+<li><strong>Same blind spot as all reference-based methods.</strong> Unsafety is defined by kernel proximity to finitely many examples in pixel/feature space. Semantically unsafe content that is far from every reference — a novel unsafe composition, a style transfer of an unsafe concept — feels no repulsion. The 42.3% residual ASR on MMA-Diffusion hints at this ceiling.</li>
+<li><strong>Bandwidth sensitivity is under-discussed.</strong> The RBF bandwidth <img src="https://latex.codecogs.com/png.latex?%5Csigma"> controls the reach of the repulsion, and the adaptive procedure (pairwise-distance sorting) is both the cost driver at large N and a place where the theory-practice gap could hide. A sensitivity study would strengthen the claims.</li>
+<li><strong>Scope of the safety evaluation.</strong> Safety here means nudity + memorization on Stable Diffusion. Broader harm categories (violence, bias) and modern larger backbones are untested — though the mechanism is generic.</li>
+</ol>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>If SAD (my previous review) was the “apply it” paper, this is the “understand it” paper — and reading them together is more valuable than either alone. What I like most is that SGF converts the single most mysterious knob in this whole line of work — the guidance time window — from folklore into a theorem, and then shows in a controlled-budget ablation that the theorem’s prediction holds. That’s the right shape for a safety paper: the mechanism for generating safe content is not “we filter bad outputs” but <em>the sampling dynamics themselves are bent away from unsafe regions, at the moment when the sample’s coarse semantics are being decided, and left alone afterwards</em>. Safety becomes a property of the trajectory, not a patch on the output.</p>
+<p>The unification also quietly raises the standard for future work: a new negative-guidance method now needs to either be a new potential (not just a new force heuristic) or improve the schedule beyond “early and decaying.” And the open problems are well-defined — semantic kernels for the blind-spot issue, and relaxing the boundary-alignment assumption, which is exactly the gap between “provably safe under assumptions” and “provably safe.”</p>
+<p><strong>Verdict:</strong> the theoretical backbone of training-free safe generation — read it to understand <em>why</em> early negative guidance works, then read SAD to see it deployed on text diffusion.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Kim, Kim, Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></li>
+<li>Kim et al.&nbsp;<em>Training-free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025.</li>
+<li>Kirchhof et al.&nbsp;<em>Shielded Diffusion (SPELL): Generating Novel and Diverse Images using Sparse Repellency.</em> ICML 2025.</li>
+<li>Yoon et al.&nbsp;<em>SAFREE.</em> 2024. · Schramowski et al.&nbsp;<em>Safe Latent Diffusion (SLD).</em> 2023.</li>
+<li>Xiao et al.&nbsp;<em>SafeDiffuser.</em> 2025. · Dai et al.&nbsp;<em>Safe Flow Matching.</em> 2025.</li>
+<li>Yusuf, Jiang, Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="../safety-aware-denoiser/">my review</a>.</li>
+</ul>
 
 
+</section>
 
  ]]></description>
-  <category>news</category>
-  <category>code</category>
-  <category>analysis</category>
-  <category>study</category>
-  <guid>https://jiwooshin-kr.github.io/blog/posts/welcome/</guid>
-  <pubDate>Mon, 06 Jul 2026 15:00:00 GMT</pubDate>
-  <media:content url="https://jiwooshin-kr.github.io/blog/posts/welcome/thumbnail.jpg" medium="image" type="image/jpeg"/>
+  <category>Paper-Review</category>
+  <category>Diffusion</category>
+  <category>Safety</category>
+  <category>Flow-Matching</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/</guid>
+  <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig2-toy.png" medium="image" type="image/png" height="41" width="144"/>
 </item>
 </channel>
 </rss>

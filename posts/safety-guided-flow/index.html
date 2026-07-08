@@ -6,8 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-07-08">
+<meta name="description" content="An energy-based framework (MMD potential + control barrier functions) that explains how and when to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.">
 
-<title>Blog | Jiwoo Shin – Jiwoo Shin</title>
+<title>[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -26,30 +29,28 @@ ul.task-list li input[type="checkbox"] {
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<link href="./favicon.png" rel="icon" type="image/png">
-<script src="site_libs/quarto-listing/list.min.js"></script>
-<script src="site_libs/quarto-listing/quarto-listing.js"></script>
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -77,35 +78,6 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
-<script>
-
-  window.document.addEventListener("DOMContentLoaded", function (_event) {
-    const listingTargetEl = window.document.querySelector('#listing-listing .list');
-    if (!listingTargetEl) {
-      // No listing discovered, do not attach.
-      return; 
-    }
-
-    const options = {
-      valueNames: ['listing-date','listing-author','listing-reading-time','listing-title','listing-description','listing-categories','listing-image',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-file-modified-sort'] }],
-      
-      searchColumns: ["listing-date","listing-title","listing-author","listing-image","listing-description","listing-categories"],
-    };
-
-    window['quarto-listings'] = window['quarto-listings'] || {};
-    window['quarto-listings']['listing-listing'] = new List('listing-listing', options);
-
-    if (window['quarto-listing-loaded']) {
-      window['quarto-listing-loaded']();
-    }
-  });
-
-  window.addEventListener('hashchange',() => {
-    if (window['quarto-listing-loaded']) {
-      window['quarto-listing-loaded']();
-    }
-  })
-  </script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -137,12 +109,18 @@ window.Quarto = {
 };
 </script>
 
-<link rel="stylesheet" href="styles.css">
-<link rel="alternate" type="application/rss+xml" title="Jiwoo Shin" href="index.xml" data-external="1"><meta property="og:title" content="Blog | Jiwoo Shin">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/profile.jpg">
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation – Jiwoo Shin">
+<meta property="og:description" content="An energy-based framework (MMD potential + control barrier functions) that explains how and when to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig2-toy.png">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta name="twitter:title" content="Blog | Jiwoo Shin">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/profile.jpg">
+<meta property="og:image:height" content="323">
+<meta property="og:image:width" content="1146">
+<meta name="twitter:title" content="[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation – Jiwoo Shin">
+<meta name="twitter:description" content="An energy-based framework (MMD potential + control barrier functions) that explains how and when to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig2-toy.png">
+<meta name="twitter:image-height" content="323">
+<meta name="twitter:image-width" content="1146">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -320,11 +298,11 @@ window.Quarto = {
   </script>
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">Notes to Self</span>
     </a>
   </div>
@@ -335,7 +313,7 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="../../index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
@@ -351,160 +329,179 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation</h1>
+                  <div>
+        <div class="description">
+          An energy-based framework (MMD potential + control barrier functions) that explains <em>how</em> and <em>when</em> to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Paper-Review</div>
+                <div class="quarto-category">Diffusion</div>
+                <div class="quarto-category">Safety</div>
+                <div class="quarto-category">Flow-Matching</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Jiwoo Shin </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 8, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-    <h5 class="quarto-listing-category-title">Categories</h5><div class="quarto-listing-category category-default"><div class="category" data-category="">All <span class="quarto-category-count">(2)</span></div><div class="category" data-category="RGlmZnVzaW9u">Diffusion <span class="quarto-category-count">(2)</span></div><div class="category" data-category="Rmxvdy1NYXRjaGluZw==">Flow-Matching <span class="quarto-category-count">(1)</span></div><div class="category" data-category="TExN">LLM <span class="quarto-category-count">(1)</span></div><div class="category" data-category="UGFwZXItUmV2aWV3">Paper-Review <span class="quarto-category-count">(2)</span></div><div class="category" data-category="U2FmZXR5">Safety <span class="quarto-category-count">(2)</span></div></div></div>
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#why-this-problem-matters" id="toc-why-this-problem-matters" class="nav-link" data-scroll-target="#why-this-problem-matters">Why this problem matters</a></li>
+  <li><a href="#the-core-mechanism-how-sgf-generates-safe-content" id="toc-the-core-mechanism-how-sgf-generates-safe-content" class="nav-link" data-scroll-target="#the-core-mechanism-how-sgf-generates-safe-content">The core mechanism: how SGF generates safe content</a></li>
+  <li><a href="#unification-spell-and-safe-denoiser-are-the-same-force" id="toc-unification-spell-and-safe-denoiser-are-the-same-force" class="nav-link" data-scroll-target="#unification-spell-and-safe-denoiser-are-the-same-force">Unification: SPELL and Safe Denoiser are the same force</a></li>
+  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a></li>
+  <li><a href="#strengths" id="toc-strengths" class="nav-link" data-scroll-target="#strengths">Strengths</a></li>
+  <li><a href="#weaknesses-open-questions" id="toc-weaknesses-open-questions" class="nav-link" data-scroll-target="#weaknesses-open-questions">Weaknesses / open questions</a></li>
+  <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  </ul>
+</nav>
+    </div>
 <!-- main -->
-<main class="content column-page-left" id="quarto-document-content">
+<main class="content quarto-banner-title-block" id="quarto-document-content">
 
 
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">Notes to Self</h1>
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Mingyu Kim, Young-Heon Kim, Mijung Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>How do you make a diffusion or flow model generate <strong>safe content</strong> without retraining it? Recent training-free answers — Shielded Diffusion (SPELL) and Safe Denoiser — both push samples away from a set of known-unsafe examples during denoising, but each with its own ad-hoc force and an empirically hand-tuned schedule.</p>
+<p>This paper, <strong>Safety-Guided Flow (SGF)</strong>, gives that whole family a single principled foundation. It defines an energy landscape over the sample space using the <strong>Maximum Mean Discrepancy (MMD)</strong> to a negation set of unsafe examples, and steers generation <em>uphill</em> on that energy — away from everything unsafe. Both SPELL and Safe Denoiser fall out as special cases of this one gradient field. It then uses <strong>control barrier function (CBF)</strong> analysis to prove what previous work only observed empirically: safety guidance is only effective inside a <em>critical time window early in denoising</em>, and should be switched off afterwards. Plugged into SAFREE on Stable Diffusion, SGF drops the nudity attack success rate on Ring-A-Bell from 27.8% to <strong>5.1%</strong> with essentially no image-quality cost, and the same mechanism mitigates memorization (95th-percentile train similarity 0.437 → 0.328 while FID <em>improves</em>).</p>
+<p>If you read my <a href="../safety-aware-denoiser/">review of the Safety-Aware Denoiser (SAD)</a> — SAD’s text-diffusion guidance is built directly on the Safe Denoiser this paper generalizes, and SAD’s “early time window” heuristic is exactly what SGF proves. This is the theory piece of that research line.</p>
+</section>
+<section id="why-this-problem-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
+<p>Diffusion and flow models are deployed in places where unsafe outputs have real consequences — NSFW or biased images, regurgitated private training data, unsafe robot trajectories. Two research communities converged on the same instinct from opposite directions:</p>
+<ul>
+<li><strong>Robot planning</strong> uses control barrier functions to keep generated trajectories out of geometrically-defined obstacle regions at every denoising step — rigorous, but built for low-dimensional states and engineered constraints, with no probabilistic view of data.</li>
+<li><strong>Image generation</strong> uses data-driven negative guidance (SPELL’s radial repulsion, Safe Denoiser’s denoiser decomposition) — practical and training-free, but heuristic: neither says <em>when</em> guidance is actually necessary, and always-on guidance is known to wreck sample quality.</li>
+</ul>
+<p>SGF’s contribution is to merge the two: a probabilistic repulsive force (from the image line) with a formal reach-avoid analysis of its timing (from the control line).</p>
+</section>
+<section id="the-core-mechanism-how-sgf-generates-safe-content" class="level2">
+<h2 class="anchored" data-anchor-id="the-core-mechanism-how-sgf-generates-safe-content">The core mechanism: how SGF generates safe content</h2>
+<p>This is the heart of the paper, so let me walk through the full pipeline of how a sample ends up safe.</p>
+<p><strong>Step 1 — Define “unsafe” by example, not by rule.</strong> You curate a negation set <span class="math inline">\(\mathcal{D}^- = \{y_i\}_{i=1}^N\)</span> of concrete unsafe examples: 515 nudity images from I2P, copyrighted works, or the training set itself (for memorization). No classifier, no fine-tuning, no text rules — unsafety is defined extensionally, by what you show it.</p>
+<p><strong>Step 2 — Turn the negation set into an energy landscape.</strong> SGF defines a potential at the current sample <span class="math inline">\(x_t\)</span> as the squared MMD between a point mass at <span class="math inline">\(x_t\)</span> and the negation set, under an RBF kernel <span class="math inline">\(k_\sigma\)</span>:</p>
+<p><span class="math display">\[
+E(x_t) \equiv \widehat{\mathrm{MMD}}^2_{k_\sigma}\!\left(\{x_t\}, \mathcal{D}^-\right)
+\]</span></p>
+<p>This energy is <em>low</em> when <span class="math inline">\(x_t\)</span> resembles unsafe examples and <em>high</em> when it is far from all of them. “Safe” is literally the high-energy region of this landscape.</p>
+<p><strong>Step 3 — Steer generation uphill.</strong> The flow-matching ODE gets one extra term:</p>
+<p><span class="math display">\[
+\dot{x}_t = f_\theta(x_t, t) + \lambda(t)\, \nabla_x E(x_t)
+\]</span></p>
+<p>The gradient has a beautifully interpretable closed form:</p>
+<p><span class="math display">\[
+\nabla_{x_t} E \propto \; x_t - \sum_{i=1}^{N} w_i(x_t)\, y_i, \qquad w_i(x_t) \propto k_\sigma(x_t, y_i)
+\]</span></p>
+<p>That is: compute a kernel-weighted average of the unsafe examples <em>nearest to where the sample is currently heading</em>, and push directly away from it. Samples drifting toward unsafe territory feel a strong shove; samples already far away feel almost nothing (the RBF weights vanish). Safety is enforced <em>during</em> generation — the trajectory itself is bent around unsafe regions, rather than unsafe outputs being caught after the fact.</p>
+<p><strong>Step 4 — Apply the force early, then turn it off.</strong> The guidance schedule <span class="math inline">\(\lambda(t)\)</span> is strong only during a critical window at the start of denoising and decays to zero afterwards. Early steps decide the coarse semantics of the output (is this image nude or not?); late steps only refine details. Push early and you cheaply redirect the sample to a safe mode; push late and you can no longer change the semantics — you just smear the details and degrade quality.</p>
+<p><strong>Why this is safe <em>by construction</em>, not by luck.</strong> Section 4.4 formalizes step 4 with control barrier functions. Model the safe set as <span class="math inline">\(S = \{h \geq 0\}\)</span> for a barrier function <span class="math inline">\(h\)</span>, and assume the MMD gradient aligns with <span class="math inline">\(\nabla h\)</span> near the safe/unsafe boundary. Theorem 2 then gives a <em>sufficient condition</em> for the sample to reach a <span class="math inline">\(\delta\)</span>-margin inside the safe set by deadline <span class="math inline">\(s_c\)</span> — and because the weighting term in that condition decays over time, <strong>moving a fixed guidance budget earlier strictly improves the safety bound</strong>. After the deadline, if the unguided flow keeps the safe set invariant (reasonable near the end of denoising, when the drift only refines details), guidance can be set to zero with safety preserved and fidelity improved. In short: <em>earlier is provably better, and off-at-the-end is provably fine.</em></p>
+<div id="fig-toy" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Four-panel 2D toy example showing a pretrained flow with negative data points, the velocity field with negative-guidance direction, and samples generated with full versus early-stopped negative guidance">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-toy-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="fig2-toy.png" class="img-fluid figure-img" alt="Four-panel 2D toy example showing a pretrained flow with negative data points, the velocity field with negative-guidance direction, and samples generated with full versus early-stopped negative guidance">
 </div>
-
-
-
-<div class="quarto-title-meta column-page-left">
-
-    
-  
-    
-  </div>
-  
-
-
-</header>
-
-
-<script>
-(() => {
-  const setTitle = () => {
-    document.title = "Blog | Jiwoo Shin";
-  };
-  const setPostCount = () => {
-    const listing = window["quarto-listings"] && window["quarto-listings"]["listing-listing"];
-    const count = listing && listing.items
-      ? listing.items.length
-      : document.querySelectorAll(".quarto-listing-default .quarto-post").length;
-    const countEl = document.querySelector("#post-count-number");
-    if (countEl) {
-      countEl.textContent = String(count);
-    }
-  };
-  const moveAbout = () => {
-    const about = document.getElementById("sidebar-about");
-    const sidebar = document.getElementById("quarto-margin-sidebar");
-    if (about && sidebar) {
-      sidebar.insertBefore(about, sidebar.firstChild);
-    }
-  };
-  setTitle();
-  document.addEventListener("DOMContentLoaded", () => {
-    setPostCount();
-    moveAbout();
-  });
-  window.addEventListener("load", () => {
-    setTitle();
-    setPostCount();
-  });
-})();
-</script>
-<div class="post-count">
-<p>Total posts <span id="post-count-number"></span></p>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-toy-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 2 of the paper: the mechanism on a 2D toy flow. The learned velocity field (arrows) is combined with the MMD-gradient repulsion away from the negative data (orange). Full-time guidance (c) distorts modes near the unsafe set; early-stopped guidance (d) both avoids the unsafe region and matches the target distribution better (W² 0.937 vs 1.009). (Kim et al., 2026)
+</figcaption>
+</figure>
 </div>
-<div id="sidebar-about" class="sidebar-about">
-<p><img src="profile.jpg" class="sidebar-about-photo img-fluid"></p>
-<p><strong>Jiwoo Shin</strong></p>
-<p>Incoming M.S. student at KAIST Graduate School of AI.</p>
-<p>Notes on AI research, papers, and everyday things I want to remember.</p>
-<p><a href="https://jiwooshin-kr.github.io/">More about me →</a></p>
-</div>
+</section>
+<section id="unification-spell-and-safe-denoiser-are-the-same-force" class="level2">
+<h2 class="anchored" data-anchor-id="unification-spell-and-safe-denoiser-are-the-same-force">Unification: SPELL and Safe Denoiser are the same force</h2>
+<p>The “unified framework” claim is made precise in two propositions:</p>
+<ul>
+<li><strong>Proposition 1 (Safe Denoiser):</strong> evaluating the MMD gradient at the predicted clean sample <span class="math inline">\(z_t = \mathbb{E}[x_0 \mid x_t]\)</span> with a fixed bandwidth recovers Safe Denoiser’s weighted-kernel repellency, up to a positive scale. Safe Denoiser’s softmax weighting over unsafe references <em>is</em> the MMD gradient’s kernel weighting.</li>
+<li><strong>Proposition 2 (SPELL):</strong> SPELL’s thresholded radial push of radius <span class="math inline">\(r\)</span> matches the single-point Gaussian MMD force at any prescribed distance, via an explicit radius–bandwidth correspondence (closed form through the Lambert <span class="math inline">\(W\)</span> function). SPELL is a radius-thresholded instance of the same gradient field.</li>
+</ul>
+<p>So two methods published as unrelated mechanisms are one repulsive field with different kernel/threshold choices — and their shared empirical quirk (“guidance must start strong and fade”) is now a theorem rather than folklore.</p>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>All on text-to-image Stable Diffusion variants, with the same negation sets as prior work for fairness:</p>
+<p><strong>Safe generation against adversarial nudity prompts (Ring-A-Bell, UnlearnDiff, MMA-Diffusion; NudeNet as judge).</strong> SGF is a plug-in on top of negative-prompt methods. On SAFREE, swapping Safe Denoiser for SGF cuts ASR from 12.7% → <strong>5.1%</strong> (Ring-A-Bell), 20.7% → 16.4% (UnlearnDiff), 46.9% → 42.3% (MMA-Diffusion) — versus 27.8/35.3/60.1% for SAFREE alone and 79.7/80.9/96.2% for raw SD-v1.4. COCO image quality barely moves (FID 23.7, CLIP 30.4). Notably, the training-free stack beats the fine-tuned unlearning baselines (ESD, RECE) on the safety–quality Pareto front.</p>
+<p><strong>Memorization (SD-v2.1 deliberately overfit on ImageNette).</strong> Using the <em>training images themselves</em> as the negation set, SGF shifts the generated-to-train similarity distribution down: 95th-percentile similarity drops 0.437 → 0.328 (−24.7%), and with early stopping FID actually <em>improves</em> from 41.19 → 32.44 — pushing away from memorized modes apparently frees the model to generate more diverse, higher-quality samples.</p>
+<p><strong>Diversity (class-to-image on ImageNet, SD-v3).</strong> Against SPELL: at matched settings, SGF with early stop keeps FID at 31.8 (vs SPELL’s 48.5 at λ=1.0) while still improving Vendi diversity over the baseline. Early stopping is what rescues the quality.</p>
+<p><strong>The ablation that proves the point (Figure 4).</strong> Across three scheduling strategies — equal per-step strength, equal total budget <span class="math inline">\(\int \lambda(t)dt\)</span>, and a shifted fixed-length window — the lowest ASR always comes from windows at the <em>earliest</em> denoising steps (<span class="math inline">\([1.0, 0.8]\)</span> or <span class="math inline">\([1.0, 0.6]\)</span>). Even with the total guidance budget held constant, spending it late is strictly worse. This is exactly what Theorem 2 predicts.</p>
+<p><strong>Cost.</strong> On SAFREE, SGF adds 0.10s/image with N=515 negatives (baseline 4.22s) — the guidance is cheaper than the safety framework it plugs into.</p>
+</section>
+<section id="strengths" class="level2">
+<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<ol type="1">
+<li><strong>It answers the question the prior methods dodged: <em>when</em>.</strong> Every negative-guidance paper (including SAD in text) hand-tunes a time window. SGF derives the critical window from a reach-avoid argument and validates it with a budget-controlled ablation. “Earlier is better” is now a design principle with a proof sketch behind it, not a hyperparameter accident.</li>
+<li><strong>Genuine unification.</strong> The two propositions aren’t decorative — they show one gradient field underlies methods from separate papers, which means improvements to the potential (kernel choice, bandwidth adaptation) propagate to the whole family.</li>
+<li><strong>Safety without a safety tax.</strong> The consistent finding across all three tasks is that <em>early-stopped</em> guidance improves safety while preserving — sometimes improving — quality and diversity. The memorization result (safety metric down 25%, FID down 21%) is the standout.</li>
+<li><strong>Composability.</strong> Like SAD in the text domain, SGF is a plug-in: it stacks on SLD and SAFREE and improves both, rather than competing with them.</li>
+</ol>
+</section>
+<section id="weaknesses-open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
+<ol type="1">
+<li><strong>The alignment assumption does heavy lifting.</strong> Theorem 2 assumes the MMD gradient aligns with the ideal barrier field near the safe/unsafe boundary (<span class="math inline">\(\nabla h \cdot \nabla E \geq \mu\)</span>), and that the base drift is weak there. The authors acknowledge this is strong; if the negation set poorly covers the boundary of the true unsafe region, the alignment can fail exactly where it matters. Quantifying guidance mismatch is left to future work.</li>
+<li><strong>Same blind spot as all reference-based methods.</strong> Unsafety is defined by kernel proximity to finitely many examples in pixel/feature space. Semantically unsafe content that is far from every reference — a novel unsafe composition, a style transfer of an unsafe concept — feels no repulsion. The 42.3% residual ASR on MMA-Diffusion hints at this ceiling.</li>
+<li><strong>Bandwidth sensitivity is under-discussed.</strong> The RBF bandwidth <span class="math inline">\(\sigma\)</span> controls the reach of the repulsion, and the adaptive procedure (pairwise-distance sorting) is both the cost driver at large N and a place where the theory-practice gap could hide. A sensitivity study would strengthen the claims.</li>
+<li><strong>Scope of the safety evaluation.</strong> Safety here means nudity + memorization on Stable Diffusion. Broader harm categories (violence, bias) and modern larger backbones are untested — though the mechanism is generic.</li>
+</ol>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>If SAD (my previous review) was the “apply it” paper, this is the “understand it” paper — and reading them together is more valuable than either alone. What I like most is that SGF converts the single most mysterious knob in this whole line of work — the guidance time window — from folklore into a theorem, and then shows in a controlled-budget ablation that the theorem’s prediction holds. That’s the right shape for a safety paper: the mechanism for generating safe content is not “we filter bad outputs” but <em>the sampling dynamics themselves are bent away from unsafe regions, at the moment when the sample’s coarse semantics are being decided, and left alone afterwards</em>. Safety becomes a property of the trajectory, not a patch on the output.</p>
+<p>The unification also quietly raises the standard for future work: a new negative-guidance method now needs to either be a new potential (not just a new force heuristic) or improve the schedule beyond “early and decaying.” And the open problems are well-defined — semantic kernels for the blind-spot issue, and relaxing the boundary-alignment assumption, which is exactly the gap between “provably safe under assumptions” and “provably safe.”</p>
+<p><strong>Verdict:</strong> the theoretical backbone of training-free safe generation — read it to understand <em>why</em> early negative guidance works, then read SAD to see it deployed on text diffusion.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Kim, Kim, Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></li>
+<li>Kim et al.&nbsp;<em>Training-free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025.</li>
+<li>Kirchhof et al.&nbsp;<em>Shielded Diffusion (SPELL): Generating Novel and Diverse Images using Sparse Repellency.</em> ICML 2025.</li>
+<li>Yoon et al.&nbsp;<em>SAFREE.</em> 2024. · Schramowski et al.&nbsp;<em>Safe Latent Diffusion (SLD).</em> 2023.</li>
+<li>Xiao et al.&nbsp;<em>SafeDiffuser.</em> 2025. · Dai et al.&nbsp;<em>Safe Flow Matching.</em> 2025.</li>
+<li>Yusuf, Jiang, Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="../safety-aware-denoiser/">my review</a>.</li>
+</ul>
 
 
+</section>
 
-
-<div class="quarto-listing quarto-listing-container-default" id="listing-listing">
-<div class="list quarto-listing-default">
-<div class="quarto-post image-right" data-index="0" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDTExN" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783506755909" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="9" data-listing-word-count-sort="1745">
-<div class="thumbnail"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/safety-aware-denoiser/fig1-tradeoff.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('U2FmZXR5'); return false;">Safety</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<p>A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<div class="listing-date">
-Jul 8, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">9 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="1" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDRmxvdy1NYXRjaGluZw==" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783507138704" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="11" data-listing-word-count-sort="2024">
-<div class="thumbnail"><a href="./posts/safety-guided-flow/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/safety-guided-flow/fig2-toy.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/safety-guided-flow/index.html" class="no-external">[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('U2FmZXR5'); return false;">Safety</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('Rmxvdy1NYXRjaGluZw=='); return false;">Flow-Matching</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/safety-guided-flow/index.html" class="no-external">
-<p>An energy-based framework (MMD potential + control barrier functions) that explains <em>how</em> and <em>when</em> to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/safety-guided-flow/index.html" class="no-external">
-<div class="listing-date">
-Jul 8, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">11 min</div>
-</a>
-</div>
-</div>
-</div>
-<div class="listing-no-matching d-none">No matching items</div>
-</div></main> <!-- /main -->
+</main> <!-- /main -->
 <script>
 /* GoatCounter: visitor tracking + footer counter (Total / Today / Yesterday).
    Setup: sign up at goatcounter.com, then put your site code below.
@@ -578,6 +575,106 @@ Jiwoo Shin
   } else {
     run();
   }
+})();
+</script>
+<script>
+/* Prev/next + related posts, built from the home listing.
+   Runs on every post page; new posts are picked up automatically. */
+(async () => {
+  const offsetMeta = document.querySelector('meta[name="quarto:offset"]');
+  if (!offsetMeta) return;
+  const indexUrl = new URL(offsetMeta.content + "index.html", window.location.href);
+
+  let doc;
+  try {
+    const res = await fetch(indexUrl.href);
+    if (!res.ok) return;
+    doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  } catch (e) {
+    return;
+  }
+
+  const norm = (p) => p.replace(/index\.html$/, "");
+  const here = norm(window.location.pathname);
+
+  // listing is already sorted date-desc
+  const items = [...doc.querySelectorAll(".quarto-listing-default .quarto-post")]
+    .map((el) => {
+      const a = el.querySelector(".listing-title a");
+      if (!a) return null;
+      const url = new URL(a.getAttribute("href"), indexUrl);
+      let cats = [];
+      try {
+        cats = decodeURIComponent(atob(el.dataset.categories || "")).split(",").filter(Boolean);
+      } catch (e) {}
+      const img = el.querySelector(".thumbnail-image");
+      const dateEl = el.querySelector(".listing-date");
+      return {
+        href: url.href,
+        path: norm(url.pathname),
+        title: a.textContent.trim(),
+        date: dateEl ? dateEl.textContent.trim() : "",
+        image: img ? new URL(img.getAttribute("src"), indexUrl).href : null,
+        cats: cats,
+      };
+    })
+    .filter(Boolean);
+
+  const idx = items.findIndex((it) => it.path === here);
+  if (idx === -1 || items.length < 2) return;
+  const current = items[idx];
+  const newer = idx > 0 ? items[idx - 1] : null;
+  const older = idx < items.length - 1 ? items[idx + 1] : null;
+
+  // related: most shared categories first; ties keep date order
+  const related = items
+    .filter((_, i) => i !== idx)
+    .map((it) => ({ it, s: it.cats.filter((c) => current.cats.includes(c)).length }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 3)
+    .map((x) => x.it);
+
+  const esc = (s) =>
+    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const navItem = (post, cls, label) =>
+    post
+      ? `<a class="post-nav-item ${cls}" href="${post.href}">
+           <span class="post-nav-label">${label}</span>
+           <span class="post-nav-title">${esc(post.title)}</span>
+         </a>`
+      : `<span></span>`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "post-footer-nav";
+  wrap.innerHTML = `
+    <nav class="post-nav">
+      ${navItem(older, "post-nav-prev", "&larr; Older")}
+      ${navItem(newer, "post-nav-next", "Newer &rarr;")}
+    </nav>
+    ${
+      related.length
+        ? `<section class="related-posts">
+             <div class="related-posts-title">Related posts</div>
+             <div class="related-posts-grid">
+               ${related
+                 .map(
+                   (r) => `
+                 <a class="related-card" href="${r.href}">
+                   ${r.image ? `<img class="related-card-image" src="${r.image}" alt="">` : ""}
+                   <span class="related-card-title">${esc(r.title)}</span>
+                   <span class="related-card-date">${esc(r.date)}</span>
+                 </a>`
+                 )
+                 .join("")}
+             </div>
+           </section>`
+        : ""
+    }
+  `;
+
+  const main = document.getElementById("quarto-document-content");
+  if (main) main.appendChild(wrap);
 })();
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
@@ -993,6 +1090,38 @@ Jiwoo Shin
     }
   });
   </script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      if (authorPrefersDark) {
+          [baseTheme, altTheme] = [altTheme, baseTheme];
+      }
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "jiwooshin-kr/blog";
+    script.dataset.repoId = "R_kgDOTPVNpg";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDOTPVNps4DAq0B";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
