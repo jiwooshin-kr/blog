@@ -1,0 +1,113 @@
+---
+title: "[Paper Review] Training-Free Safe Denoisers for Safe Use of Diffusion Models"
+description: "The origin paper of the safe-denoiser research line: an exact Bayes decomposition showing that the *safe* denoiser equals the pretrained denoiser plus an adaptively-weighted push away from an unsafe one — turning a folder of unsafe images into training-free safety guidance for Stable Diffusion."
+author: "Jiwoo Shin"
+date: "2026-07-08"
+categories: [Paper-Review, Diffusion, Safety, Text-to-Image]
+image: "fig-scream.png"
+---
+
+> **Paper:** Mingyu Kim*, Dongjun Kim*, Amman Yusuf, Stefano Ermon, Mijung Park. *Training-Free Safe Denoisers for Safe Use of Diffusion Models.* NeurIPS 2025 (Poster). [arXiv:2502.08011](https://arxiv.org/abs/2502.08011) · [OpenReview](https://openreview.net/forum?id=QQS7TudonJ)
+
+## TL;DR
+
+This is the paper that started the research line I've been reviewing — the [Safety-Guided Flow](../safety-guided-flow/) theory paper generalizes it, and the [Safety-Aware Denoiser](../safety-aware-denoiser/) ports it to text diffusion. The question it asks: can you make a *frozen* diffusion model avoid generating specific content — NSFW imagery, a copyrighted painting, a person who asked to be forgotten — given nothing but a folder of examples of that content?
+
+The answer is a single exact identity (**Theorem 3.2**). Split the data distribution into safe and unsafe parts; then the denoiser of the safe part can be written *exactly* as the pretrained model's denoiser plus a correction term that points away from the *unsafe* denoiser, weighted by how likely the current noisy sample is to have come from the unsafe region. The unsafe denoiser is the only unknown, and it is cheaply approximated as a kernel-weighted average of the unsafe examples — no retraining, no fine-tuning, no classifier, no text prompts. Plugged into [SAFREE](https://arxiv.org/abs/2410.12761) on Stable Diffusion v1.4, it cuts the nudity attack success rate on [Ring-A-Bell](https://arxiv.org/abs/2310.10012) from 27.8% to **12.7%** — while FID on COCO *improves* (25.29 → 22.55) — and the same mechanism erases a class from ImageNet, suppresses Munch's style without ever being told the word "Munch," and mitigates memorization of individuals' photos.
+
+## Why this problem matters
+
+The mainstream tools for keeping diffusion models safe all have structural problems:
+
+- **Text-based negative guidance** ([SLD](https://arxiv.org/abs/2211.05105), negative prompts, SAFREE) can only negate what can be *named*. Adversarial prompts like [MMA-Diffusion](https://arxiv.org/abs/2311.17516)'s are white-box-optimized to contain no explicit unsafe words — and there, SLD leaves 88.1% of generations unsafe. Worse, some content has no textual handle at all: a model can reproduce *The Scream*'s style from the prompt "If Barbie were the face of the world's most famous paintings," which mentions neither Munch nor the painting.
+- **Unlearning by fine-tuning** ([ESD](https://arxiv.org/abs/2303.07345), [RECE](https://arxiv.org/abs/2407.12383)) is expensive, risks catastrophic forgetting, and must be redone for every new concept and every model checkpoint.
+- **Post-hoc filters** act after an unsafe image already exists, and adversarial prompt engineering is precisely the art of getting past them.
+
+The gap is a mechanism that (a) defines "unsafe" by *examples* rather than words, (b) acts *inside* the sampling loop, and (c) touches no weights. That's what this paper builds.
+
+## The core idea: safety is a Bayes identity, not a heuristic
+
+Define indicator functions that partition the data: every $x$ in the support of $p_\text{data}$ is either safe or unsafe, so $p_\text{safe}(x) \propto \mathbb{1}_\text{safe}(x)\,p_\text{data}(x)$. Each distribution has its own denoiser (posterior mean of clean data given the noisy sample $x_t$). The paper's central result:
+
+$$
+\mathbb{E}_\text{safe}[x \mid x_t] \;=\; \mathbb{E}_\text{data}[x \mid x_t] \;+\; \beta^*(x_t)\Big(\mathbb{E}_\text{data}[x \mid x_t] - \mathbb{E}_\text{unsafe}[x \mid x_t]\Big)
+$$
+
+with the weight
+
+$$
+\beta^*(x_t) \;=\; \frac{Z_\text{unsafe}\, p_{\text{unsafe},t}(x_t)}{Z_\text{safe}\, p_{\text{safe},t}(x_t)}.
+$$
+
+Two things make this beautiful. First, it has exactly the *shape* of classifier-free guidance — denoiser plus a scaled difference of denoisers — so it drops into any existing sampler as one extra term. Second, the weight is *adaptive in the right direction*: $\beta^*(x_t)$ grows when the current trajectory looks like it originated from the unsafe set and vanishes when it's safely far away. SLD has an adaptive weight too, but heuristically constructed; here the weight is what Bayes' rule says it must be. A 2D toy ablation (Figure 3 of the paper) makes the calibration point vividly: run the guidance at *half* the theoretical weight and samples leak into the unsafe region; at the theoretical weight they avoid it while still covering the entire safe distribution; at *double* the weight they over-avoid, vacating the unsafe set's whole neighborhood and losing coverage.
+
+**Making it computable.** The pretrained model already gives $\mathbb{E}_\text{data}[x \mid x_t]$. The two remaining quantities are approximated from a negation set $\{x^{(n)}\}_{n=1}^N$ of unsafe examples (515 nudity images from I2P, four photographs of *The Scream*, a person's photos…):
+
+- **The unsafe denoiser** becomes a softmax-weighted mixture of the negation set, $\hat{\mathbb{E}}_\text{unsafe}[x \mid x_t] = \sum_n x^{(n)}\, \frac{q_t(x_t \mid x^{(n)})}{\sum_m q_t(x_t \mid x^{(m)})}$, where $q_t$ is the (Gaussian) forward kernel. Intuitively: "which unsafe examples could this noisy sample have come from?" — no gradients, no auxiliary network.
+- **The weight** $\beta^*$ is intractable exactly (its denominator integrates over the *entire safe distribution* — billions of LAION images), so it's approximated by $\eta \cdot \frac{1}{N}\sum_n q_t(x_t \mid x^{(n)})$: keep the numerator's trend, replace the denominator with a tunable constant $\eta$.
+- **Timing and thresholding.** Guidance is applied only during early timesteps $C$ — applied late, the mixture-of-unsafe-images signal acts as structural noise that wrecks detail refinement — and, in text-to-image mode, only when $\beta(x_t)$ exceeds a threshold $\beta_t$, i.e., only for trajectories that actually look unsafe. The $\beta_t$ ablation shows a clean U-shape: always-on guidance and never-on guidance are both worse than selective application.
+
+**Plug-in composition.** Because the theorem simply *replaces* $\mathbb{E}_\text{data}$ with $\mathbb{E}_\text{safe}$, the method stacks on top of SLD and SAFREE unchanged — their text-based steering plus this image-based repulsion. The 2×2 ablation on MMA-Diffusion says composition is the whole game: raw SD-v1.4 is 96.2% unsafe, SAFREE alone 60.1%, Safe Denoiser alone 63.3%, both together **46.9%**.
+
+## Experiments
+
+**Adversarial nudity prompts (Ring-A-Bell, [UnlearnDiff](https://arxiv.org/abs/2310.11868), MMA-Diffusion; NudeNet as judge).** On SD-v1.4, SAFREE + Safe Denoiser reaches ASR 12.7 / 20.7 / 46.9% versus 27.8 / 35.3 / 60.1% for SAFREE alone — and beats the fine-tuned unlearning baselines ESD and RECE on the safety–quality Pareto front, with COCO-30K FID actually improving (25.29 → 22.55). The MMA-Diffusion column is the telling one: text-based SLD barely helps there (88.1% unsafe) because the adversarial prompts contain no nudity words to negate, while image-based guidance halves it (→ 48.1%) — the clearest demonstration that example-based negation covers a failure mode text-based methods structurally cannot.
+
+**Multi-concept safety (CoPro, seven I2P categories, Q16 judge).** With a 3,000-image negation set spanning all categories, average inappropriate probability drops for every baseline it's added to (SD 0.223 → 0.187, SLD 0.170 → 0.151, SAFREE 0.153 → 0.144), with CLIP alignment essentially intact — one mechanism handling seven concepts simultaneously.
+
+**Standalone negation (no text guidance possible).** Class removal on class-conditional ImageNet: conditioning on "Chihuahua" after negating that class yields **0.00** Top-1 accuracy on the negated class (from 0.68), with better precision/recall than the Sparse Repellency baseline. On unconditional FFHQ, negating female faces shifts the split 64/36 → 55.6/44.4 — and here the comparison is instructive: Sparse Repellency pushes the classifier score slightly further (53.1%) but at FID 130.5 versus the baseline's 109.1, i.e., by generating degraded out-of-distribution images, while Safe Denoiser *improves* FID to 96.6.
+
+![Figure 6 of the paper: style-level intellectual property control. **Top:** the negation set — four originals of Munch's *The Scream* (1893–1910). **Bottom:** for the prompt *"If Barbie were the face of the world's most famous paintings"* — which never mentions Munch — SD-v1.4 reproduces the painting's composition and style almost exactly (left two); with the safe denoiser, alone and combined with SAFREE, the Barbie concept survives but Munch's style is gone (right two). (Kim et al., 2025)](fig-scream.png){#fig-scream fig-alt="Two rows of images: the top row shows four original versions of Munch's The Scream used as negative datapoints; the bottom row shows generated images where the baseline reproduces The Scream's style with a Barbie face while the safe denoiser produces Barbie images without Munch's style"}
+
+**Style-level IP control — the flagship qualitative result.** The paper identifies three IP-leak scenarios: the prompt names the work, describes it, or — hardest — does neither, yet the model reproduces the style anyway. Text-only defenses have *nothing to negate* in case three. With just **four images** of *The Scream* as the negation set, the safe denoiser strips Munch's style while preserving the prompt's actual concept (Figure 6 above). This is, to me, the single best argument for defining unsafety extensionally.
+
+![Figure 1(b) of the paper: memorization mitigation. Left to right: the real photograph of an individual, then generations moving from near-verbatim reproduction (baseline) to novel images that retain generic attributes (hair color, outfit) but no longer replicate the person's actual photo once the real image is used as the negation set. (Kim et al., 2025)](fig-memorization.png){#fig-memorization fig-alt="A row of five portrait images showing a real photograph of a woman followed by generated images that progressively diverge from the original while keeping similar hair color and outfit"}
+
+**Frontier-model compatibility (SD-v3).** Plugged into SD-v3, ASR on Ring-A-Bell drops 0.304 → 0.203 (a 33% relative reduction, versus SAFREE's 9%) with FID again slightly *improving*. The paper's explanation for the recurring FID gains is worth remembering: high CFG scales trade diversity for prompt alignment, and the safe denoiser's image-space repulsion injects text-independent stochasticity that partially restores that lost diversity.
+
+**Cost.** On an RTX 4090, the overhead is nearly invisible: 4.22 → 4.24 s/image on SAFREE with N=515 negatives, 4.29s with N=3,000 — sub-linear in N because the kernel evaluations are batched matrix multiplies. SAFREE itself costs over 1s per image; the safety add-on costs two hundredths.
+
+## Strengths
+
+1. **An exact identity where the field had heuristics.** Theorem 3.2 is Bayes' rule, not an approximation — the *decomposition* is exact, and every prior trajectory-modification method suddenly has a reference point. Sparse Repellency's ReLU-thresholded push is recognizably a crude $\beta^*$; SLD's adaptive $\mu$ is a text-space shadow of it. The paper explicitly frames SR as a special case lacking the distributional guarantee, and [SGF](../safety-guided-flow/) later made that unification rigorous.
+2. **Extensional unsafety is the right abstraction for the hard cases.** MMA-Diffusion prompts (no unsafe words), Munch's style (no textual handle), a specific person's photos (no concept name) — the three strongest results in the paper are all cases where "define unsafe by examples" works and "define unsafe by words" cannot.
+3. **Safety that doesn't tax quality.** FID improves alongside safety in the SAFREE, FFHQ, and SD-v3 experiments. The diversity-restoration explanation is plausible and, in hindsight, foreshadows SGF's memorization finding (pushing away from memorized modes frees the model).
+4. **Genuinely deployable.** Training-free, ~0.02s overhead, sub-linear in negation-set size, composable with whatever text-based guard you already run. The practitioner recipe is one sentence: *collect examples of what you don't want, add one term to the sampler.*
+
+## Weaknesses / open questions
+
+1. **The $\beta^*$ theory–practice gap.** What's exact is the decomposition; what runs is $\eta \cdot \frac{1}{N}\sum_n q_t(x_t \mid x^{(n)})$ with a hand-tuned $\eta$, a hand-tuned threshold $\beta_t$, and a hand-tuned time window $C$. The toy experiment itself shows the method is sensitive to weight miscalibration (half → leaks, double → over-avoids), which makes the constant-$\eta$ substitution the weakest link. This exact critique carries over to [SAD](../safety-aware-denoiser/), which inherits the approximation wholesale.
+2. **"Apply it early" is an observation here, not a result.** The critical-window trick is justified by one sentence of intuition (late guidance acts as structural noise). It took the follow-up SGF paper to turn this into a theorem — reading this paper now, the window is the most obviously under-theorized moving part.
+3. **The blind spot of every reference-based method.** Repulsion strength is kernel proximity to finitely many examples; semantically unsafe content that is far from every reference in pixel/latent space feels nothing. The residual 46.9% ASR on MMA-Diffusion — after combining *two* defenses — is the honest measure of the remaining gap.
+4. **Standalone negation is only partial.** The FFHQ result moves the female fraction from 64% to 55.6% — clearly better-behaved than Sparse Repellency, but far from *negation*. For coarse, high-mass regions of an unconditional model, a 515-image-scale repulsive mixture evidently can't carve out the whole region.
+5. **Evaluation rests on classifiers (NudeNet, Q16, a ResNet sex classifier)**, whose artifacts the FFHQ experiment itself demonstrates: SR "wins" the classifier metric by generating garbage. The paper is honest about this, but a human evaluation would have strengthened the safety claims.
+
+## My take
+
+Reading this after its two descendants is like reading the first paper of a trilogy last: the ideas that SGF proves and SAD transplants are all here in embryonic form, and it's striking how much of the line's DNA was set in this one move — *replace "unsafe" as a word with "unsafe" as a dataset, and let Bayes' rule tell you the force*. The theorem is simple (the proof is essentially conditional probability), and that's a feature: it explains why the method composes so cleanly with CFG-family guidance and why later work could generalize it rather than replace it.
+
+What holds it back from being more than a strong poster is the distance between the theorem and the algorithm. Everything provable lives in Eq. (4); everything deployed lives in the approximations — constant $\eta$, thresholded $\beta$, empirical time window — and the paper doesn't quantify what those approximations cost. It's telling that the strongest follow-up (SGF) is precisely a paper about closing that gap. But judged as the opening move of a research line, it's an excellent one: a clean primitive, an honest evaluation, and two qualitative results (the Munch experiment, the memorization figure) that make the case better than any table.
+
+**Verdict:** the foundational "define it by examples, derive the force by Bayes" paper — read it first, then [SGF](../safety-guided-flow/) for why the timing works, then [SAD](../safety-aware-denoiser/) for the same idea in text diffusion.
+
+## Peer review at a glance
+
+Safe Denoiser was accepted as a **Poster** at NeurIPS 2025, reviewed by five reviewers. Scores are from [Paper Copilot's open dataset](https://github.com/papercopilot/paperlists); the review text lives on the [OpenReview forum](https://openreview.net/forum?id=QQS7TudonJ). On NeurIPS 2025's 6-point rating scale, the 4.2 average sits almost exactly at the median of accepted papers (~4.25) — a solidly ordinary accept:
+
+| | Rating | Confidence | Quality | Clarity | Significance | Originality |
+|---|---|---|---|---|---|---|
+| Reviewer K2qK | 4 | 3 | 2 | 3 | 3 | 2 |
+| Reviewer vAUD | 4 | 3 | 3 | 3 | 2 | 3 |
+| Reviewer ksP9 | 4 | 4 | 3 | 2 | 3 | 3 |
+| Reviewer u6A8 | 4 | 3 | 3 | 2 | 3 | 3 |
+| Reviewer Wpcs | 5 | 4 | 2 | 2 | 2 | 3 |
+| **Average** | **4.2** | 3.4 | 2.6 | 2.4 | 2.6 | 2.8 |
+
+The consistent 2s in clarity are the most interpretable signal in the grid — and, having read the paper closely, fair: the method section interleaves the exact theorem with its stack of approximations in a way that takes real effort to disentangle (see weaknesses #1). The uniform near-consensus (4,4,4,4,5) contrasts sharply with the 4-to-10 spread its successor SGF drew at ICLR — reviewers agreed on what this paper is: a sound, useful primitive rather than a surprising one.
+
+## Related papers
+
+- **The paper:** Kim, Kim, Yusuf, Ermon & Park. *Training-Free Safe Denoisers for Safe Use of Diffusion Models.* NeurIPS 2025 — [arXiv:2502.08011](https://arxiv.org/abs/2502.08011)
+- **The theory sequel (unifies this with SPELL, proves the early-window rule):** Kim, Kim & Park. *Safety-Guided Flow.* ICLR 2026 (Oral) — [my review](../safety-guided-flow/)
+- **The text-diffusion sequel (ports Theorem 3.2 to masked discrete diffusion):** Yusuf, Jiang & Park. *The Safety-Aware Denoiser for Text Diffusion Models.* ICML 2026 — [my review](../safety-aware-denoiser/)
+- **The closest prior method it generalizes:** Kirchhof et al. *Sparse Repellency / Shielded Diffusion (SPELL).* ICML 2025 — [PMLR](https://proceedings.mlr.press/v267/kirchhof25a.html)
