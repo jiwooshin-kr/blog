@@ -112,15 +112,15 @@ window.Quarto = {
 <link rel="stylesheet" href="../../styles.css">
 <meta property="og:title" content="[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation – Jiwoo Shin">
 <meta property="og:description" content="An energy-based framework (MMD potential + control barrier functions) that explains how and when to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig-candles.png">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig1-teaser.png">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta property="og:image:height" content="224">
-<meta property="og:image:width" content="1033">
+<meta property="og:image:height" content="806">
+<meta property="og:image:width" content="1375">
 <meta name="twitter:title" content="[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation – Jiwoo Shin">
 <meta name="twitter:description" content="An energy-based framework (MMD potential + control barrier functions) that explains how and when to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig-candles.png">
-<meta name="twitter:image-height" content="224">
-<meta name="twitter:image-width" content="1033">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig1-teaser.png">
+<meta name="twitter:image-height" content="806">
+<meta name="twitter:image-width" content="1375">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -399,6 +399,16 @@ window.Quarto = {
 <blockquote class="blockquote">
 <p><strong>Paper:</strong> Mingyu Kim, Young-Heon Kim, Mijung Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></p>
 </blockquote>
+<div id="fig-teaser" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Two-panel teaser: top shows generated images for nudity prompts across methods with unsafe regions censored; bottom shows memorization comparison of generated images and their nearest training images for baseline versus SGF">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-teaser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="fig1-teaser.png" class="img-fluid figure-img" alt="Two-panel teaser: top shows generated images for nudity prompts across methods with unsafe regions censored; bottom shows memorization comparison of generated images and their nearest training images for baseline versus SGF">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-teaser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 1 of the paper. <strong>(a)</strong> On adversarial nudity prompts, adding SGF to SLD or SAFREE (rightmost columns) yields safe generations where fine-tuned unlearning (ESD, RECE) and negative-prompt baselines still leak unsafe content — sensitive regions are author-censored with black boxes, shown for research. <strong>(b)</strong> On a deliberately memorized SD-v2.1, SGF pushes generations away from near-verbatim training images; early-stopped guidance mitigates memorization while preserving quality and diversity. (Kim et al., 2026)
+</figcaption>
+</figure>
+</div>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
 <p>How do you make a diffusion or flow model generate <strong>safe content</strong> without retraining it? Recent training-free answers — Shielded Diffusion (SPELL) and Safe Denoiser — both push samples away from a set of known-unsafe examples during denoising, but each with its own ad-hoc force and an empirically hand-tuned schedule.</p>
@@ -440,7 +450,7 @@ E(x_t) \equiv \widehat{\mathrm{MMD}}^2_{k_\sigma}\!\left(\{x_t\}, \mathcal{D}^-\
 <img src="fig2-toy.png" class="img-fluid figure-img" alt="Four-panel 2D toy example showing a pretrained flow with negative data points, the velocity field with negative-guidance direction, and samples generated with full versus early-stopped negative guidance">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-toy-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Figure 2 of the paper: the mechanism on a 2D toy flow. The learned velocity field (arrows) is combined with the MMD-gradient repulsion away from the negative data (orange). Full-time guidance (c) distorts modes near the unsafe set; early-stopped guidance (d) both avoids the unsafe region and matches the target distribution better (W² 0.937 vs 1.009). (Kim et al., 2026)
+Figure&nbsp;2: Figure 2 of the paper: the mechanism on a 2D toy flow. The learned velocity field (arrows) is combined with the MMD-gradient repulsion away from the negative data (orange). Full-time guidance (c) distorts modes near the unsafe set; early-stopped guidance (d) both avoids the unsafe region and matches the target distribution better (W² 0.937 vs 1.009). (Kim et al., 2026)
 </figcaption>
 </figure>
 </div>
@@ -464,7 +474,7 @@ Figure&nbsp;1: Figure 2 of the paper: the mechanism on a 2D toy flow. The learne
 <img src="fig-candles.png" class="img-fluid figure-img" alt="Five images generated by SAFREE plus SGF for the same suggestive prompt under different negative-guidance time windows, transitioning from a woman by candlelight to scenes containing only candles">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-candles-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a suggestive lingerie-and-candlelight prompt where previous methods fail. Each panel varies the negative-guidance time window: with a short early window ([1.0, 0.8]) a figure still appears, and as the window covers more of the critical early phase the model resolves the same prompt into pure candlelit still-life scenes — unsafe semantics steered away while the contextual meaning of the prompt (soft candlelight) is preserved. (Kim et al., 2026)
+Figure&nbsp;3: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a suggestive lingerie-and-candlelight prompt where previous methods fail. Each panel varies the negative-guidance time window: with a short early window ([1.0, 0.8]) a figure still appears, and as the window covers more of the critical early phase the model resolves the same prompt into pure candlelit still-life scenes — unsafe semantics steered away while the contextual meaning of the prompt (soft candlelight) is preserved. (Kim et al., 2026)
 </figcaption>
 </figure>
 </div>
