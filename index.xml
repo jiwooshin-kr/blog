@@ -15,7 +15,118 @@
 <link>https://jiwooshin-kr.github.io/blog/</link>
 </image>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Mon, 06 Jul 2026 15:00:00 GMT</lastBuildDate>
+<lastBuildDate>Tue, 07 Jul 2026 15:00:00 GMT</lastBuildDate>
+<item>
+  <title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Text diffusion models (TDMs) like LLaDA and MDLM generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as DIJA and PAD reach near-100% attack success rates on instruction-tuned TDMs.</p>
+<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the safe denoiser of Kim et al.&nbsp;(NeurIPS 2025), originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
+</section>
+<section id="why-this-problem-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
+<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
+<ul>
+<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
+<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
+<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
+</ul>
+<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
+</section>
+<section id="background-the-safe-denoiser" class="level2">
+<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
+<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%20%5Ccup%20%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D">. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20+%20%5Cbeta%5E*(x_t)%5Cleft(%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20-%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%5Cright)%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)%20%5Cge%200"> grows with the posterior likelihood that the current state <img src="https://latex.codecogs.com/png.latex?x_t"> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <img src="https://latex.codecogs.com/png.latex?%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D">; the two remaining quantities are approximated from a finite set of unsafe references.</p>
+<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from DiffuGuard.</p>
+</section>
+<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
+<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
+<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
+<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <img src="https://latex.codecogs.com/png.latex?N"> unsafe reference sequences <img src="https://latex.codecogs.com/png.latex?x%5E%7B(1)%7D,%20%5Cdots,%20x%5E%7B(N)%7D"> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Chat%7B%5Cmathbb%7BE%7D%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Csum_%7Bn=1%7D%5E%7BN%7D%20x%5E%7B(n)%7D%20%5Cfrac%7Bq_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)%7D%7B%5Csum_%7Bm%7D%20q_t(x_t%20%5Cmid%20x%5E%7B(m)%7D)%7D%0A"></p>
+<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Aq_t(x_t%20%5Cmid%20x_0)%20=%20%5Calpha_t%5E%7B%5C#%5C%7B%5Ctext%7Bmatching%20positions%7D%5C%7D%7D%20(1-%5Calpha_t)%5E%7B%5C#%5C%7B%5Ctext%7Bmasked%20positions%7D%5C%7D%7D%0A"></p>
+<p>This is computable in <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
+<p><strong>3. Approximating <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <img src="https://latex.codecogs.com/png.latex?%5Ceta%20%5Ccdot%20%5Cfrac%7B1%7D%7BN%7D%5Csum_n%20q_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)"> with a tunable strength <img src="https://latex.codecogs.com/png.latex?%5Ceta">, applied only during a <strong>time window</strong> <img src="https://latex.codecogs.com/png.latex?C"> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
+<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
+<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>Three safety dimensions, on MDLM and the LLaDA/Dream family:</p>
+<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
+<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
+<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Btrain%7D"> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <img src="https://latex.codecogs.com/png.latex?%5Ceta"> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <img src="https://latex.codecogs.com/png.latex?(n,p)">-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
+<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches FK Steering (<img src="https://latex.codecogs.com/png.latex?k%7B=%7D8">) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
+<p><strong>Ablations worth remembering:</strong></p>
+<ul>
+<li><img src="https://latex.codecogs.com/png.latex?%5Ceta"> is a clean monotonic safety knob once the schedule is fixed.</li>
+<li>The time window <img src="https://latex.codecogs.com/png.latex?C"> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
+<li>Safety gains saturate at <img src="https://latex.codecogs.com/png.latex?N%20%5Capprox%20500%5Ctext%7B%E2%80%93%7D1000"> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
+</ul>
+</section>
+<section id="strengths" class="level2">
+<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<ol type="1">
+<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
+<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
+<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
+<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
+</ol>
+</section>
+<section id="weaknesses-open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
+<ol type="1">
+<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
+<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
+<li><strong>The theory–practice gap around <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The provable guarantee holds for the exact <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)">; in practice it’s replaced by a constant <img src="https://latex.codecogs.com/png.latex?%5Ceta"> inside a hand-tuned time window, with <img src="https://latex.codecogs.com/png.latex?%5Ceta"> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
+<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
+<li><strong>Scale.</strong> Experiments top out at 8B models and <img src="https://latex.codecogs.com/png.latex?N%7B=%7D5000"> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
+</ol>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
+<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la ILRR) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
+<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Yusuf, Jiang, Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026. <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a></li>
+<li>Kim et al.&nbsp;<em>Training-free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025.</li>
+<li>Nie et al.&nbsp;<em>Large Language Diffusion Models (LLaDA).</em> NeurIPS 2025.</li>
+<li>Sahoo et al.&nbsp;<em>Simple and Effective Masked Diffusion Language Models (MDLM).</em> NeurIPS 2024.</li>
+<li>Wen et al.&nbsp;<em>DIJA: a diffusion-specific jailbreak attack.</em> 2026.</li>
+<li>Zhang et al.&nbsp;<em>PAD: Parallel Decoding jailbreak.</em> 2025.</li>
+<li>Li et al.&nbsp;<em>DiffuGuard.</em> ICLR 2026.</li>
+<li>Singhal et al.&nbsp;<em>Feynman-Kac Steering.</em> 2025.</li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>paper-review</category>
+  <category>diffusion</category>
+  <category>safety</category>
+  <category>LLM</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</guid>
+  <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
+</item>
 <item>
   <title>Post With Code</title>
   <dc:creator>Harlow Malloc</dc:creator>

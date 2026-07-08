@@ -6,8 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-07-08">
+<meta name="description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
 
-<title>Blog | Jiwoo Shin – Jiwoo Shin</title>
+<title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -26,30 +29,28 @@ ul.task-list li input[type="checkbox"] {
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<link href="./favicon.png" rel="icon" type="image/png">
-<script src="site_libs/quarto-listing/list.min.js"></script>
-<script src="site_libs/quarto-listing/quarto-listing.js"></script>
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -77,35 +78,6 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
-<script>
-
-  window.document.addEventListener("DOMContentLoaded", function (_event) {
-    const listingTargetEl = window.document.querySelector('#listing-listing .list');
-    if (!listingTargetEl) {
-      // No listing discovered, do not attach.
-      return; 
-    }
-
-    const options = {
-      valueNames: ['listing-date','listing-author','listing-reading-time','listing-title','listing-description','listing-categories','listing-image',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-file-modified-sort'] }],
-      
-      searchColumns: ["listing-date","listing-title","listing-author","listing-image","listing-description","listing-categories"],
-    };
-
-    window['quarto-listings'] = window['quarto-listings'] || {};
-    window['quarto-listings']['listing-listing'] = new List('listing-listing', options);
-
-    if (window['quarto-listing-loaded']) {
-      window['quarto-listing-loaded']();
-    }
-  });
-
-  window.addEventListener('hashchange',() => {
-    if (window['quarto-listing-loaded']) {
-      window['quarto-listing-loaded']();
-    }
-  })
-  </script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -137,12 +109,14 @@ window.Quarto = {
 };
 </script>
 
-<link rel="stylesheet" href="styles.css">
-<link rel="alternate" type="application/rss+xml" title="Jiwoo Shin" href="index.xml" data-external="1"><meta property="og:title" content="Blog | Jiwoo Shin">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/welcome/thumbnail.jpg">
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin">
+<meta property="og:description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/profile.jpg">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta name="twitter:title" content="Blog | Jiwoo Shin">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/welcome/thumbnail.jpg">
+<meta name="twitter:title" content="[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin">
+<meta name="twitter:description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/profile.jpg">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -320,11 +294,11 @@ window.Quarto = {
   </script>
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">Notes to Self</span>
     </a>
   </div>
@@ -335,7 +309,7 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="../../index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
@@ -351,195 +325,172 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</h1>
+                  <div>
+        <div class="description">
+          A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">paper-review</div>
+                <div class="quarto-category">diffusion</div>
+                <div class="quarto-category">safety</div>
+                <div class="quarto-category">LLM</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Jiwoo Shin </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 8, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-    <h5 class="quarto-listing-category-title">Categories</h5><div class="quarto-listing-category category-default"><div class="category" data-category="">All <span class="quarto-category-count">(3)</span></div><div class="category" data-category="YW5hbHlzaXM=">analysis <span class="quarto-category-count">(2)</span></div><div class="category" data-category="Y29kZQ==">code <span class="quarto-category-count">(2)</span></div><div class="category" data-category="ZGlmZnVzaW9u">diffusion <span class="quarto-category-count">(1)</span></div><div class="category" data-category="TExN">LLM <span class="quarto-category-count">(1)</span></div><div class="category" data-category="bmV3cw==">news <span class="quarto-category-count">(2)</span></div><div class="category" data-category="cGFwZXItcmV2aWV3">paper-review <span class="quarto-category-count">(1)</span></div><div class="category" data-category="c2FmZXR5">safety <span class="quarto-category-count">(1)</span></div><div class="category" data-category="c3R1ZHk=">study <span class="quarto-category-count">(1)</span></div></div></div>
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#why-this-problem-matters" id="toc-why-this-problem-matters" class="nav-link" data-scroll-target="#why-this-problem-matters">Why this problem matters</a></li>
+  <li><a href="#background-the-safe-denoiser" id="toc-background-the-safe-denoiser" class="nav-link" data-scroll-target="#background-the-safe-denoiser">Background: the safe denoiser</a></li>
+  <li><a href="#method-adapting-the-safe-denoiser-to-masked-text-diffusion" id="toc-method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="nav-link" data-scroll-target="#method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</a></li>
+  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a></li>
+  <li><a href="#strengths" id="toc-strengths" class="nav-link" data-scroll-target="#strengths">Strengths</a></li>
+  <li><a href="#weaknesses-open-questions" id="toc-weaknesses-open-questions" class="nav-link" data-scroll-target="#weaknesses-open-questions">Weaknesses / open questions</a></li>
+  <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  </ul>
+</nav>
+    </div>
 <!-- main -->
-<main class="content column-page-left" id="quarto-document-content">
-
-
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">Notes to Self</h1>
-</div>
-
-
-
-<div class="quarto-title-meta column-page-left">
-
-    
-  
-    
-  </div>
-  
-
-
-</header>
-
-
-<script>
-(() => {
-  const setTitle = () => {
-    document.title = "Blog | Jiwoo Shin";
-  };
-  const setPostCount = () => {
-    const listing = window["quarto-listings"] && window["quarto-listings"]["listing-listing"];
-    const count = listing && listing.items
-      ? listing.items.length
-      : document.querySelectorAll(".quarto-listing-default .quarto-post").length;
-    const countEl = document.querySelector("#post-count-number");
-    if (countEl) {
-      countEl.textContent = String(count);
-    }
-  };
-  const moveAbout = () => {
-    const about = document.getElementById("sidebar-about");
-    const sidebar = document.getElementById("quarto-margin-sidebar");
-    if (about && sidebar) {
-      sidebar.insertBefore(about, sidebar.firstChild);
-    }
-  };
-  setTitle();
-  document.addEventListener("DOMContentLoaded", () => {
-    setPostCount();
-    moveAbout();
-  });
-  window.addEventListener("load", () => {
-    setTitle();
-    setPostCount();
-  });
-})();
-</script>
-<div class="post-count">
-<p>Total posts <span id="post-count-number"></span></p>
-</div>
-<div id="sidebar-about" class="sidebar-about">
-<p><img src="profile.jpg" class="sidebar-about-photo img-fluid"></p>
-<p><strong>Jiwoo Shin</strong></p>
-<p>Incoming M.S. student at KAIST Graduate School of AI.</p>
-<p>Notes on AI research, papers, and everyday things I want to remember.</p>
-<p><a href="https://jiwooshin-kr.github.io/">More about me →</a></p>
-</div>
+<main class="content quarto-banner-title-block" id="quarto-document-content">
 
 
 
 
-<div class="quarto-listing quarto-listing-container-default" id="listing-listing">
-<div class="list quarto-listing-default">
-<div class="quarto-post image-right" data-index="0" data-categories="cGFwZXItcmV2aWV3JTJDZGlmZnVzaW9uJTJDc2FmZXR5JTJDTExN" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783506257893" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="9" data-listing-word-count-sort="1681">
-<div class="thumbnail"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
 
-<div class="listing-item-img-placeholder card-img-top" >&nbsp;</div>
 
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</a>
-</h3>
-<div class="listing-categories">
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Text diffusion models (TDMs) like LLaDA and MDLM generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as DIJA and PAD reach near-100% attack success rates on instruction-tuned TDMs.</p>
+<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the safe denoiser of Kim et al.&nbsp;(NeurIPS 2025), originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
+</section>
+<section id="why-this-problem-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
+<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
+<ul>
+<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
+<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
+<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
+</ul>
+<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
+</section>
+<section id="background-the-safe-denoiser" class="level2">
+<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
+<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <span class="math inline">\(\mathcal{D} = \mathcal{D}_\text{safe} \cup \mathcal{D}_\text{unsafe}\)</span>. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
+<p><span class="math display">\[
+\mathbb{E}_{\mathcal{D}_\text{safe}}[x_0 \mid x_t] = \mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] + \beta^*(x_t)\left(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] - \mathbb{E}_{\mathcal{D}_\text{unsafe}}[x_0 \mid x_t]\right)
+\]</span></p>
+<p>where <span class="math inline">\(\beta^*(x_t) \ge 0\)</span> grows with the posterior likelihood that the current state <span class="math inline">\(x_t\)</span> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <span class="math inline">\(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t]\)</span>; the two remaining quantities are approximated from a finite set of unsafe references.</p>
+<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from DiffuGuard.</p>
+</section>
+<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
+<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
+<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
+<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <span class="math inline">\(N\)</span> unsafe reference sequences <span class="math inline">\(x^{(1)}, \dots, x^{(N)}\)</span> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
+<p><span class="math display">\[
+\hat{\mathbb{E}}_{\mathcal{D}_\text{unsafe}}[x_0 \mid x_t] = \sum_{n=1}^{N} x^{(n)} \frac{q_t(x_t \mid x^{(n)})}{\sum_{m} q_t(x_t \mid x^{(m)})}
+\]</span></p>
+<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
+<p><span class="math display">\[
+q_t(x_t \mid x_0) = \alpha_t^{\#\{\text{matching positions}\}} (1-\alpha_t)^{\#\{\text{masked positions}\}}
+\]</span></p>
+<p>This is computable in <span class="math inline">\(O(L)\)</span> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
+<p><strong>3. Approximating <span class="math inline">\(\beta^*\)</span>.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <span class="math inline">\(\eta \cdot \frac{1}{N}\sum_n q_t(x_t \mid x^{(n)})\)</span> with a tunable strength <span class="math inline">\(\eta\)</span>, applied only during a <strong>time window</strong> <span class="math inline">\(C\)</span> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
+<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
+<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>Three safety dimensions, on MDLM and the LLaDA/Dream family:</p>
+<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
+<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
+<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <span class="math inline">\(\mathcal{D}_\text{unsafe} = \mathcal{D}_\text{train}\)</span> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <span class="math inline">\(\eta\)</span> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <span class="math inline">\((n,p)\)</span>-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
+<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches FK Steering (<span class="math inline">\(k{=}8\)</span>) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
+<p><strong>Ablations worth remembering:</strong></p>
+<ul>
+<li><span class="math inline">\(\eta\)</span> is a clean monotonic safety knob once the schedule is fixed.</li>
+<li>The time window <span class="math inline">\(C\)</span> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
+<li>Safety gains saturate at <span class="math inline">\(N \approx 500\text{–}1000\)</span> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
+</ul>
+</section>
+<section id="strengths" class="level2">
+<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<ol type="1">
+<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
+<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <span class="math inline">\(O(L)\)</span> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
+<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
+<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
+</ol>
+</section>
+<section id="weaknesses-open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
+<ol type="1">
+<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
+<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
+<li><strong>The theory–practice gap around <span class="math inline">\(\beta^*\)</span>.</strong> The provable guarantee holds for the exact <span class="math inline">\(\beta^*(x_t)\)</span>; in practice it’s replaced by a constant <span class="math inline">\(\eta\)</span> inside a hand-tuned time window, with <span class="math inline">\(\eta\)</span> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
+<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
+<li><strong>Scale.</strong> Experiments top out at 8B models and <span class="math inline">\(N{=}5000\)</span> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
+</ol>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
+<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la ILRR) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
+<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Yusuf, Jiang, Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026. <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a></li>
+<li>Kim et al.&nbsp;<em>Training-free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025.</li>
+<li>Nie et al.&nbsp;<em>Large Language Diffusion Models (LLaDA).</em> NeurIPS 2025.</li>
+<li>Sahoo et al.&nbsp;<em>Simple and Effective Masked Diffusion Language Models (MDLM).</em> NeurIPS 2024.</li>
+<li>Wen et al.&nbsp;<em>DIJA: a diffusion-specific jailbreak attack.</em> 2026.</li>
+<li>Zhang et al.&nbsp;<em>PAD: Parallel Decoding jailbreak.</em> 2025.</li>
+<li>Li et al.&nbsp;<em>DiffuGuard.</em> ICLR 2026.</li>
+<li>Singhal et al.&nbsp;<em>Feynman-Kac Steering.</em> 2025.</li>
+</ul>
 
-<div class="listing-category" onclick="window.quartoListingCategory('cGFwZXItcmV2aWV3'); return false;">paper-review</div>
 
-<div class="listing-category" onclick="window.quartoListingCategory('ZGlmZnVzaW9u'); return false;">diffusion</div>
+</section>
 
-<div class="listing-category" onclick="window.quartoListingCategory('c2FmZXR5'); return false;">safety</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<p>A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<div class="listing-date">
-Jul 8, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">9 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="1" data-categories="bmV3cyUyQ2NvZGUlMkNhbmFseXNpcw==" data-listing-date-sort="1783350000000" data-listing-file-modified-sort="1783411203417" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="1" data-listing-word-count-sort="7">
-<div class="thumbnail"><a href="./posts/post-with-code/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/post-with-code/image.jpg" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/post-with-code/index.html" class="no-external">Post With Code</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('bmV3cw=='); return false;">news</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('Y29kZQ=='); return false;">code</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('YW5hbHlzaXM='); return false;">analysis</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/post-with-code/index.html" class="no-external">
-<p>A short summary of the post shows up here — write it as <code>description</code> in the front matter.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/post-with-code/index.html" class="no-external">
-<div class="listing-date">
-Jul 7, 2026
-</div>
-<div class="listing-author">
-Harlow Malloc
-</div>
-<div class="listing-reading-time">1 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="2" data-categories="bmV3cyUyQ2NvZGUlMkNhbmFseXNpcyUyQ3N0dWR5" data-listing-date-sort="1783350000000" data-listing-file-modified-sort="1783391089222" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="1" data-listing-word-count-sort="52">
-<div class="thumbnail"><a href="./posts/welcome/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/welcome/thumbnail.jpg" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/welcome/index.html" class="no-external">Quarto Basics</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('bmV3cw=='); return false;">news</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('Y29kZQ=='); return false;">code</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('YW5hbHlzaXM='); return false;">analysis</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('c3R1ZHk='); return false;">study</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/welcome/index.html" class="no-external">
-For a demonstration of a line plot on a polar axis, see Figure&nbsp;1.
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/welcome/index.html" class="no-external">
-<div class="listing-date">
-Jul 7, 2026
-</div>
-<div class="listing-author">
-Harlow Malloc
-</div>
-<div class="listing-reading-time">1 min</div>
-</a>
-</div>
-</div>
-</div>
-<div class="listing-no-matching d-none">No matching items</div>
-</div></main> <!-- /main -->
+</main> <!-- /main -->
 <script>
 /* GoatCounter: visitor tracking + footer counter (Total / Today / Yesterday).
    Setup: sign up at goatcounter.com, then put your site code below.
@@ -613,6 +564,106 @@ Harlow Malloc
   } else {
     run();
   }
+})();
+</script>
+<script>
+/* Prev/next + related posts, built from the home listing.
+   Runs on every post page; new posts are picked up automatically. */
+(async () => {
+  const offsetMeta = document.querySelector('meta[name="quarto:offset"]');
+  if (!offsetMeta) return;
+  const indexUrl = new URL(offsetMeta.content + "index.html", window.location.href);
+
+  let doc;
+  try {
+    const res = await fetch(indexUrl.href);
+    if (!res.ok) return;
+    doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  } catch (e) {
+    return;
+  }
+
+  const norm = (p) => p.replace(/index\.html$/, "");
+  const here = norm(window.location.pathname);
+
+  // listing is already sorted date-desc
+  const items = [...doc.querySelectorAll(".quarto-listing-default .quarto-post")]
+    .map((el) => {
+      const a = el.querySelector(".listing-title a");
+      if (!a) return null;
+      const url = new URL(a.getAttribute("href"), indexUrl);
+      let cats = [];
+      try {
+        cats = decodeURIComponent(atob(el.dataset.categories || "")).split(",").filter(Boolean);
+      } catch (e) {}
+      const img = el.querySelector(".thumbnail-image");
+      const dateEl = el.querySelector(".listing-date");
+      return {
+        href: url.href,
+        path: norm(url.pathname),
+        title: a.textContent.trim(),
+        date: dateEl ? dateEl.textContent.trim() : "",
+        image: img ? new URL(img.getAttribute("src"), indexUrl).href : null,
+        cats: cats,
+      };
+    })
+    .filter(Boolean);
+
+  const idx = items.findIndex((it) => it.path === here);
+  if (idx === -1 || items.length < 2) return;
+  const current = items[idx];
+  const newer = idx > 0 ? items[idx - 1] : null;
+  const older = idx < items.length - 1 ? items[idx + 1] : null;
+
+  // related: most shared categories first; ties keep date order
+  const related = items
+    .filter((_, i) => i !== idx)
+    .map((it) => ({ it, s: it.cats.filter((c) => current.cats.includes(c)).length }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 3)
+    .map((x) => x.it);
+
+  const esc = (s) =>
+    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const navItem = (post, cls, label) =>
+    post
+      ? `<a class="post-nav-item ${cls}" href="${post.href}">
+           <span class="post-nav-label">${label}</span>
+           <span class="post-nav-title">${esc(post.title)}</span>
+         </a>`
+      : `<span></span>`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "post-footer-nav";
+  wrap.innerHTML = `
+    <nav class="post-nav">
+      ${navItem(older, "post-nav-prev", "&larr; Older")}
+      ${navItem(newer, "post-nav-next", "Newer &rarr;")}
+    </nav>
+    ${
+      related.length
+        ? `<section class="related-posts">
+             <div class="related-posts-title">Related posts</div>
+             <div class="related-posts-grid">
+               ${related
+                 .map(
+                   (r) => `
+                 <a class="related-card" href="${r.href}">
+                   ${r.image ? `<img class="related-card-image" src="${r.image}" alt="">` : ""}
+                   <span class="related-card-title">${esc(r.title)}</span>
+                   <span class="related-card-date">${esc(r.date)}</span>
+                 </a>`
+                 )
+                 .join("")}
+             </div>
+           </section>`
+        : ""
+    }
+  `;
+
+  const main = document.getElementById("quarto-document-content");
+  if (main) main.appendChild(wrap);
 })();
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
@@ -1028,6 +1079,38 @@ Harlow Malloc
     }
   });
   </script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      if (authorPrefersDark) {
+          [baseTheme, altTheme] = [altTheme, baseTheme];
+      }
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "jiwooshin-kr/blog";
+    script.dataset.repoId = "R_kgDOTPVNpg";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDOTPVNps4DAq0B";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
