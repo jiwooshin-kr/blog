@@ -7,7 +7,7 @@ categories: [Paper-Review, Diffusion, Safety, Flow-Matching]
 image: "fig1-teaser.png"
 ---
 
-> **Paper:** Mingyu Kim, Young-Heon Kim, Mijung Park. *Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.* ICLR 2026. [arXiv:2603.13300](https://arxiv.org/abs/2603.13300)
+> **Paper:** Mingyu Kim, Young-Heon Kim, Mijung Park. *Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.* ICLR 2026 **(Oral)**. [arXiv:2603.13300](https://arxiv.org/abs/2603.13300) · [OpenReview](https://openreview.net/forum?id=EA80Zib9UI) · [Code](https://github.com/MingyuKim87/SGF)
 
 ![Figure 1 of the paper. **(a)** On adversarial nudity prompts, adding SGF to SLD or SAFREE (rightmost columns) yields safe generations where fine-tuned unlearning (ESD, RECE) and negative-prompt baselines still leak unsafe content — sensitive regions are author-censored with black boxes, shown for research. **(b)** On a deliberately memorized SD-v2.1, SGF pushes generations away from near-verbatim training images; early-stopped guidance mitigates memorization while preserving quality and diversity. (Kim et al., 2026)](fig1-teaser.png){#fig-teaser fig-alt="Two-panel teaser: top shows generated images for nudity prompts across methods with unsafe regions censored; bottom shows memorization comparison of generated images and their nearest training images for baseline versus SGF"}
 
@@ -108,6 +108,20 @@ If SAD (my previous review) was the "apply it" paper, this is the "understand it
 The unification also quietly raises the standard for future work: a new negative-guidance method now needs to either be a new potential (not just a new force heuristic) or improve the schedule beyond "early and decaying." And the open problems are well-defined — semantic kernels for the blind-spot issue, and relaxing the boundary-alignment assumption, which is exactly the gap between "provably safe under assumptions" and "provably safe."
 
 **Verdict:** the theoretical backbone of training-free safe generation — read it to understand *why* early negative guidance works, then read SAD to see it deployed on text diffusion.
+
+## Peer review at a glance
+
+SGF was accepted as an **Oral** at ICLR 2026 — the tier reserved for a small fraction of accepted papers. The scores (via [Paper Copilot's open dataset](https://github.com/papercopilot/paperlists); full review text on [OpenReview](https://openreview.net/forum?id=EA80Zib9UI) requires sign-in since OpenReview added a verification wall):
+
+| | Rating | Confidence | Soundness | Contribution | Presentation |
+|---|---|---|---|---|---|
+| Reviewer UsAs | 4 | 4 | 2 | 2 | 2 |
+| Reviewer ATH6 | 6 | 3 | 3 | 2 | 3 |
+| Reviewer TunD | 6 | 3 | 3 | 3 | 3 |
+| Reviewer h63Q | 10 | 5 | 3 | 4 | 3 |
+| **Average** | **6.5** | 3.75 | 2.75 | 2.75 | 2.75 |
+
+My reading of the numbers (the text itself isn't public, so this is interpretation): this was a *divisive* paper — a 4-to-10 spread is unusually wide. The dissenting reviewer wrote by far the longest weaknesses section (~580 words, versus 64–120 for the others) and scored soundness/contribution/presentation at 2s, while the champion gave a rare 10 at maximum confidence. The final Oral decision means the area chairs sided decisively with the champion. That pattern — one detailed skeptic versus one enthusiastic expert — fits the paper's profile: the CBF analysis rests on strong assumptions a careful reviewer would push on (see my weaknesses #1), while the unification result is exactly the kind of conceptual contribution that wins champions.
 
 ## Related papers
 

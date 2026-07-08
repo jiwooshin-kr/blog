@@ -7,7 +7,7 @@ categories: [Paper-Review, Diffusion, Safety, LLM]
 image: "fig1-tradeoff.png"
 ---
 
-> **Paper:** Amman Yusuf, Zhejun Jiang, Mijung Park. *The Safety-Aware Denoiser for Text Diffusion Models.* ICML 2026 (PMLR 306). [arXiv:2605.08116](https://arxiv.org/abs/2605.08116) · [Code](https://github.com/ParkLabML/SAD)
+> **Paper:** Amman Yusuf, Zhejun Jiang, Mijung Park. *The Safety-Aware Denoiser for Text Diffusion Models.* ICML 2026 (PMLR 306, Poster). [arXiv:2605.08116](https://arxiv.org/abs/2605.08116) · [OpenReview](https://openreview.net/forum?id=dw5BM3OQfZ) · [Code](https://github.com/ParkLabML/SAD)
 
 ## TL;DR
 
@@ -103,6 +103,20 @@ This is a solid "right tool, right paradigm" paper. The core idea is a transplan
 The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model's own hidden states à la [ILRR](https://arxiv.org/abs/2601.21647)) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the *entire generation trajectory* rather than on tokens after the fact.
 
 **Verdict:** a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.
+
+## Peer review at a glance
+
+SAD was accepted as a **Poster** at ICML 2026. The scores (via [Paper Copilot's open dataset](https://github.com/papercopilot/paperlists); ICML review text is not publicly posted, and [OpenReview](https://openreview.net/forum?id=dw5BM3OQfZ) now requires sign-in):
+
+| | Recommendation | Confidence | Soundness | Significance | Originality | Presentation |
+|---|---|---|---|---|---|---|
+| Reviewer 9T1S | 4 | 3 | 3 | 3 | 2 | 3 |
+| Reviewer YM1a | 4 | 3 | 3 | 4 | 3 | 3 |
+| Reviewer pAtC | 4 | 2 | 2 | 3 | 2 | 2 |
+| Reviewer ddgR | 4 | 3 | 3 | 3 | 3 | 3 |
+| **Average** | **4.0** | 2.75 | 2.75 | 3.25 | 2.5 | 2.75 |
+
+My reading of the numbers (the text itself isn't public, so this is interpretation): the mirror image of its sibling paper [SGF's divisive 4-to-10 spread](../safety-guided-flow/#peer-review-at-a-glance) — a perfectly uniform consensus accept, with no champion and no detractor. Reviewers rated **significance** (3.25) clearly above **originality** (2.5), which matches my own read: the safety problem in text diffusion is real and timely, but the method is a careful transplant of an existing theorem to a new domain rather than a new idea. Consensus-without-a-champion is the classic profile of a solid poster.
 
 ## Related papers
 
