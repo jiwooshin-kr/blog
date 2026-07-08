@@ -384,7 +384,7 @@ window.Quarto = {
   <li><a href="#strengths" id="toc-strengths" class="nav-link" data-scroll-target="#strengths">Strengths</a></li>
   <li><a href="#weaknesses-open-questions" id="toc-weaknesses-open-questions" class="nav-link" data-scroll-target="#weaknesses-open-questions">Weaknesses / open questions</a></li>
   <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#related-papers" id="toc-related-papers" class="nav-link" data-scroll-target="#related-papers">Related papers</a></li>
   </ul>
 </nav>
     </div>
@@ -401,8 +401,8 @@ window.Quarto = {
 </blockquote>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
-<p>Text diffusion models (TDMs) like LLaDA and MDLM generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as DIJA and PAD reach near-100% attack success rates on instruction-tuned TDMs.</p>
-<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the safe denoiser of Kim et al.&nbsp;(NeurIPS 2025), originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
+<p>Text diffusion models (TDMs) like <a href="https://openreview.net/forum?id=KnqiC0znVF">LLaDA</a> and <a href="https://openreview.net/forum?id=L4uaAR4ArM">MDLM</a> generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as <a href="https://openreview.net/forum?id=rIPeatvPy3">DIJA</a> and <a href="https://openreview.net/forum?id=NWvL280s2l">PAD</a> reach near-100% attack success rates on instruction-tuned TDMs.</p>
+<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the <a href="https://openreview.net/forum?id=QQS7TudonJ">safe denoiser of Kim et al.&nbsp;(NeurIPS 2025)</a>, originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
 </section>
 <section id="why-this-problem-matters" class="level2">
 <h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
@@ -421,7 +421,7 @@ window.Quarto = {
 \mathbb{E}_{\mathcal{D}_\text{safe}}[x_0 \mid x_t] = \mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] + \beta^*(x_t)\left(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] - \mathbb{E}_{\mathcal{D}_\text{unsafe}}[x_0 \mid x_t]\right)
 \]</span></p>
 <p>where <span class="math inline">\(\beta^*(x_t) \ge 0\)</span> grows with the posterior likelihood that the current state <span class="math inline">\(x_t\)</span> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <span class="math inline">\(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t]\)</span>; the two remaining quantities are approximated from a finite set of unsafe references.</p>
-<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from DiffuGuard.</p>
+<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from <a href="https://openreview.net/forum?id=zBPzxhso8M">DiffuGuard</a>.</p>
 </section>
 <section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
 <h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
@@ -441,7 +441,7 @@ q_t(x_t \mid x_0) = \alpha_t^{\#\{\text{matching positions}\}} (1-\alpha_t)^{\#\
 </section>
 <section id="experiments" class="level2">
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
-<p>Three safety dimensions, on MDLM and the LLaDA/Dream family:</p>
+<p>Three safety dimensions, on MDLM and the LLaDA/<a href="https://arxiv.org/abs/2508.15487">Dream</a> family:</p>
 <p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
 <div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
 <figure class="quarto-float quarto-float-fig figure">
@@ -455,7 +455,7 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 </div>
 <p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
 <p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <span class="math inline">\(\mathcal{D}_\text{unsafe} = \mathcal{D}_\text{train}\)</span> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <span class="math inline">\(\eta\)</span> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <span class="math inline">\((n,p)\)</span>-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
-<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches FK Steering (<span class="math inline">\(k{=}8\)</span>) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
+<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches <a href="https://proceedings.mlr.press/v267/singhal25b.html">FK Steering</a> (<span class="math inline">\(k{=}8\)</span>) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
 <p><strong>Ablations worth remembering:</strong></p>
 <ul>
 <li><span class="math inline">\(\eta\)</span> is a clean monotonic safety knob once the schedule is fixed.</li>
@@ -485,20 +485,15 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 <section id="my-take" class="level2">
 <h2 class="anchored" data-anchor-id="my-take">My take</h2>
 <p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
-<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la ILRR) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
+<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
 <p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
 </section>
-<section id="references" class="level2">
-<h2 class="anchored" data-anchor-id="references">References</h2>
+<section id="related-papers" class="level2">
+<h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
 <ul>
-<li>Yusuf, Jiang, Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026. <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a></li>
-<li>Kim et al.&nbsp;<em>Training-free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025.</li>
-<li>Nie et al.&nbsp;<em>Large Language Diffusion Models (LLaDA).</em> NeurIPS 2025.</li>
-<li>Sahoo et al.&nbsp;<em>Simple and Effective Masked Diffusion Language Models (MDLM).</em> NeurIPS 2024.</li>
-<li>Wen et al.&nbsp;<em>DIJA: a diffusion-specific jailbreak attack.</em> 2026.</li>
-<li>Zhang et al.&nbsp;<em>PAD: Parallel Decoding jailbreak.</em> 2025.</li>
-<li>Li et al.&nbsp;<em>DiffuGuard.</em> ICLR 2026.</li>
-<li>Singhal et al.&nbsp;<em>Feynman-Kac Steering.</em> 2025.</li>
+<li><strong>The paper:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">code</a></li>
+<li><strong>The theorem it adapts:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="https://openreview.net/forum?id=QQS7TudonJ">OpenReview</a></li>
+<li><strong>The theory behind the time window:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="../safety-guided-flow/">my review</a></li>
 </ul>
 
 
