@@ -28,7 +28,7 @@
 
 
 <blockquote class="blockquote">
-<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
 </blockquote>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
@@ -113,6 +113,80 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 <p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
 <p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
 </section>
+<section id="peer-review-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
+<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026. The scores (via <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; ICML review text is not publicly posted, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> now requires sign-in):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Recommendation</th>
+<th>Confidence</th>
+<th>Soundness</th>
+<th>Significance</th>
+<th>Originality</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Reviewer 9T1S</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>Reviewer YM1a</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Reviewer pAtC</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>3</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Reviewer ddgR</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td><strong>Average</strong></td>
+<td><strong>4.0</strong></td>
+<td>2.75</td>
+<td>2.75</td>
+<td>3.25</td>
+<td>2.5</td>
+<td>2.75</td>
+</tr>
+</tbody>
+</table>
+<p>My reading of the numbers (the text itself isn’t public, so this is interpretation): the mirror image of its sibling paper <a href="../safety-guided-flow/#peer-review-at-a-glance">SGF’s divisive 4-to-10 spread</a> — a perfectly uniform consensus accept, with no champion and no detractor. Reviewers rated <strong>significance</strong> (3.25) clearly above <strong>originality</strong> (2.5), which matches my own read: the safety problem in text diffusion is real and timely, but the method is a careful transplant of an existing theorem to a new domain rather than a new idea. Consensus-without-a-champion is the classic profile of a solid poster.</p>
+</section>
 <section id="related-papers" class="level2">
 <h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
 <ul>
@@ -145,7 +219,7 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 
 
 <blockquote class="blockquote">
-<p><strong>Paper:</strong> Mingyu Kim, Young-Heon Kim, Mijung Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></p>
+<p><strong>Paper:</strong> Mingyu Kim, Young-Heon Kim, Mijung Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 <strong>(Oral)</strong>. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a> · <a href="https://openreview.net/forum?id=EA80Zib9UI">OpenReview</a> · <a href="https://github.com/MingyuKim87/SGF">Code</a></p>
 </blockquote>
 <div id="fig-teaser" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Two-panel teaser: top shows generated images for nudity prompts across methods with unsafe regions censored; bottom shows memorization comparison of generated images and their nearest training images for baseline versus SGF">
 <figure class="quarto-float quarto-float-fig figure">
@@ -248,6 +322,65 @@ Figure&nbsp;3: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a
 <p>If SAD (my previous review) was the “apply it” paper, this is the “understand it” paper — and reading them together is more valuable than either alone. What I like most is that SGF converts the single most mysterious knob in this whole line of work — the guidance time window — from folklore into a theorem, and then shows in a controlled-budget ablation that the theorem’s prediction holds. That’s the right shape for a safety paper: the mechanism for generating safe content is not “we filter bad outputs” but <em>the sampling dynamics themselves are bent away from unsafe regions, at the moment when the sample’s coarse semantics are being decided, and left alone afterwards</em>. Safety becomes a property of the trajectory, not a patch on the output.</p>
 <p>The unification also quietly raises the standard for future work: a new negative-guidance method now needs to either be a new potential (not just a new force heuristic) or improve the schedule beyond “early and decaying.” And the open problems are well-defined — semantic kernels for the blind-spot issue, and relaxing the boundary-alignment assumption, which is exactly the gap between “provably safe under assumptions” and “provably safe.”</p>
 <p><strong>Verdict:</strong> the theoretical backbone of training-free safe generation — read it to understand <em>why</em> early negative guidance works, then read SAD to see it deployed on text diffusion.</p>
+</section>
+<section id="peer-review-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
+<p>SGF was accepted as an <strong>Oral</strong> at ICLR 2026 — the tier reserved for a small fraction of accepted papers. The scores (via <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; full review text on <a href="https://openreview.net/forum?id=EA80Zib9UI">OpenReview</a> requires sign-in since OpenReview added a verification wall):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th></th>
+<th>Rating</th>
+<th>Confidence</th>
+<th>Soundness</th>
+<th>Contribution</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Reviewer UsAs</td>
+<td>4</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Reviewer ATH6</td>
+<td>6</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Reviewer TunD</td>
+<td>6</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>Reviewer h63Q</td>
+<td>10</td>
+<td>5</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td><strong>Average</strong></td>
+<td><strong>6.5</strong></td>
+<td>3.75</td>
+<td>2.75</td>
+<td>2.75</td>
+<td>2.75</td>
+</tr>
+</tbody>
+</table>
+<p>My reading of the numbers (the text itself isn’t public, so this is interpretation): this was a <em>divisive</em> paper — a 4-to-10 spread is unusually wide. The dissenting reviewer wrote by far the longest weaknesses section (~580 words, versus 64–120 for the others) and scored soundness/contribution/presentation at 2s, while the champion gave a rare 10 at maximum confidence. The final Oral decision means the area chairs sided decisively with the champion. That pattern — one detailed skeptic versus one enthusiastic expert — fits the paper’s profile: the CBF analysis rests on strong assumptions a careful reviewer would push on (see my weaknesses #1), while the unification result is exactly the kind of conceptual contribution that wins champions.</p>
 </section>
 <section id="related-papers" class="level2">
 <h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>

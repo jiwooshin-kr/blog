@@ -4,7 +4,7 @@
     "href": "posts/safety-guided-flow/index.html",
     "title": "[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation",
     "section": "",
-    "text": "Paper: Mingyu Kim, Young-Heon Kim, Mijung Park. Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation. ICLR 2026. arXiv:2603.13300"
+    "text": "Paper: Mingyu Kim, Young-Heon Kim, Mijung Park. Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation. ICLR 2026 (Oral). arXiv:2603.13300 · OpenReview · Code"
   },
   {
     "objectID": "posts/safety-guided-flow/index.html#tldr",
@@ -63,6 +63,13 @@
     "text": "My take\nIf SAD (my previous review) was the “apply it” paper, this is the “understand it” paper — and reading them together is more valuable than either alone. What I like most is that SGF converts the single most mysterious knob in this whole line of work — the guidance time window — from folklore into a theorem, and then shows in a controlled-budget ablation that the theorem’s prediction holds. That’s the right shape for a safety paper: the mechanism for generating safe content is not “we filter bad outputs” but the sampling dynamics themselves are bent away from unsafe regions, at the moment when the sample’s coarse semantics are being decided, and left alone afterwards. Safety becomes a property of the trajectory, not a patch on the output.\nThe unification also quietly raises the standard for future work: a new negative-guidance method now needs to either be a new potential (not just a new force heuristic) or improve the schedule beyond “early and decaying.” And the open problems are well-defined — semantic kernels for the blind-spot issue, and relaxing the boundary-alignment assumption, which is exactly the gap between “provably safe under assumptions” and “provably safe.”\nVerdict: the theoretical backbone of training-free safe generation — read it to understand why early negative guidance works, then read SAD to see it deployed on text diffusion."
   },
   {
+    "objectID": "posts/safety-guided-flow/index.html#peer-review-at-a-glance",
+    "href": "posts/safety-guided-flow/index.html#peer-review-at-a-glance",
+    "title": "[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation",
+    "section": "Peer review at a glance",
+    "text": "Peer review at a glance\nSGF was accepted as an Oral at ICLR 2026 — the tier reserved for a small fraction of accepted papers. The scores (via Paper Copilot’s open dataset; full review text on OpenReview requires sign-in since OpenReview added a verification wall):\n\n\n\n\nRating\nConfidence\nSoundness\nContribution\nPresentation\n\n\n\n\nReviewer UsAs\n4\n4\n2\n2\n2\n\n\nReviewer ATH6\n6\n3\n3\n2\n3\n\n\nReviewer TunD\n6\n3\n3\n3\n3\n\n\nReviewer h63Q\n10\n5\n3\n4\n3\n\n\nAverage\n6.5\n3.75\n2.75\n2.75\n2.75\n\n\n\nMy reading of the numbers (the text itself isn’t public, so this is interpretation): this was a divisive paper — a 4-to-10 spread is unusually wide. The dissenting reviewer wrote by far the longest weaknesses section (~580 words, versus 64–120 for the others) and scored soundness/contribution/presentation at 2s, while the champion gave a rare 10 at maximum confidence. The final Oral decision means the area chairs sided decisively with the champion. That pattern — one detailed skeptic versus one enthusiastic expert — fits the paper’s profile: the CBF analysis rests on strong assumptions a careful reviewer would push on (see my weaknesses #1), while the unification result is exactly the kind of conceptual contribution that wins champions."
+  },
+  {
     "objectID": "posts/safety-guided-flow/index.html#related-papers",
     "href": "posts/safety-guided-flow/index.html#related-papers",
     "title": "[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation",
@@ -74,7 +81,7 @@
     "href": "index.html",
     "title": "Notes to Self",
     "section": "",
-    "text": "Total posts \n\n\n\nJiwoo Shin\nIncoming M.S. student at KAIST Graduate School of AI.\nNotes on AI research, papers, and everyday things I want to remember.\nMore about me →\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models\n\n\n\nPaper-Review\n\nDiffusion\n\nSafety\n\nLLM\n\n\n\nA training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.\n\n\n\n\n\nJul 8, 2026\n\n\nJiwoo Shin\n\n9 min\n\n\n\n\n\n\n\n\n\n\n\n[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation\n\n\n\nPaper-Review\n\nDiffusion\n\nSafety\n\nFlow-Matching\n\n\n\nAn energy-based framework (MMD potential + control barrier functions) that explains how and when to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.\n\n\n\n\n\nJul 8, 2026\n\n\nJiwoo Shin\n\n12 min\n\n\n\n\nNo matching items"
+    "text": "Total posts \n\n\n\nJiwoo Shin\nIncoming M.S. student at KAIST Graduate School of AI.\nNotes on AI research, papers, and everyday things I want to remember.\nMore about me →\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models\n\n\n\nPaper-Review\n\nDiffusion\n\nSafety\n\nLLM\n\n\n\nA training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.\n\n\n\n\n\nJul 8, 2026\n\n\nJiwoo Shin\n\n10 min\n\n\n\n\n\n\n\n\n\n\n\n[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation\n\n\n\nPaper-Review\n\nDiffusion\n\nSafety\n\nFlow-Matching\n\n\n\nAn energy-based framework (MMD potential + control barrier functions) that explains how and when to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.\n\n\n\n\n\nJul 8, 2026\n\n\nJiwoo Shin\n\n13 min\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "about.html",
@@ -88,7 +95,7 @@
     "href": "posts/safety-aware-denoiser/index.html",
     "title": "[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models",
     "section": "",
-    "text": "Paper: Amman Yusuf, Zhejun Jiang, Mijung Park. The Safety-Aware Denoiser for Text Diffusion Models. ICML 2026 (PMLR 306). arXiv:2605.08116 · Code"
+    "text": "Paper: Amman Yusuf, Zhejun Jiang, Mijung Park. The Safety-Aware Denoiser for Text Diffusion Models. ICML 2026 (PMLR 306, Poster). arXiv:2605.08116 · OpenReview · Code"
   },
   {
     "objectID": "posts/safety-aware-denoiser/index.html#tldr",
@@ -145,6 +152,13 @@
     "title": "[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models",
     "section": "My take",
     "text": "My take\nThis is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is cheap in the masked-diffusion setting because the forward kernel is just match-counting.\nThe bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la ILRR) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the entire generation trajectory rather than on tokens after the fact.\nVerdict: a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on."
+  },
+  {
+    "objectID": "posts/safety-aware-denoiser/index.html#peer-review-at-a-glance",
+    "href": "posts/safety-aware-denoiser/index.html#peer-review-at-a-glance",
+    "title": "[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models",
+    "section": "Peer review at a glance",
+    "text": "Peer review at a glance\nSAD was accepted as a Poster at ICML 2026. The scores (via Paper Copilot’s open dataset; ICML review text is not publicly posted, and OpenReview now requires sign-in):\n\n\n\n\n\n\n\n\n\n\n\n\n\nRecommendation\nConfidence\nSoundness\nSignificance\nOriginality\nPresentation\n\n\n\n\nReviewer 9T1S\n4\n3\n3\n3\n2\n3\n\n\nReviewer YM1a\n4\n3\n3\n4\n3\n3\n\n\nReviewer pAtC\n4\n2\n2\n3\n2\n2\n\n\nReviewer ddgR\n4\n3\n3\n3\n3\n3\n\n\nAverage\n4.0\n2.75\n2.75\n3.25\n2.5\n2.75\n\n\n\nMy reading of the numbers (the text itself isn’t public, so this is interpretation): the mirror image of its sibling paper SGF’s divisive 4-to-10 spread — a perfectly uniform consensus accept, with no champion and no detractor. Reviewers rated significance (3.25) clearly above originality (2.5), which matches my own read: the safety problem in text diffusion is real and timely, but the method is a careful transplant of an existing theorem to a new domain rather than a new idea. Consensus-without-a-champion is the classic profile of a solid poster."
   },
   {
     "objectID": "posts/safety-aware-denoiser/index.html#related-papers",

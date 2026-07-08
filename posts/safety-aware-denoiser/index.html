@@ -384,6 +384,7 @@ window.Quarto = {
   <li><a href="#strengths" id="toc-strengths" class="nav-link" data-scroll-target="#strengths">Strengths</a></li>
   <li><a href="#weaknesses-open-questions" id="toc-weaknesses-open-questions" class="nav-link" data-scroll-target="#weaknesses-open-questions">Weaknesses / open questions</a></li>
   <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
+  <li><a href="#peer-review-at-a-glance" id="toc-peer-review-at-a-glance" class="nav-link" data-scroll-target="#peer-review-at-a-glance">Peer review at a glance</a></li>
   <li><a href="#related-papers" id="toc-related-papers" class="nav-link" data-scroll-target="#related-papers">Related papers</a></li>
   </ul>
 </nav>
@@ -397,7 +398,7 @@ window.Quarto = {
 
 
 <blockquote class="blockquote">
-<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
 </blockquote>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
@@ -487,6 +488,80 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 <p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
 <p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
 <p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
+</section>
+<section id="peer-review-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
+<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026. The scores (via <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; ICML review text is not publicly posted, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> now requires sign-in):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Recommendation</th>
+<th>Confidence</th>
+<th>Soundness</th>
+<th>Significance</th>
+<th>Originality</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Reviewer 9T1S</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>Reviewer YM1a</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Reviewer pAtC</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>3</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Reviewer ddgR</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td><strong>Average</strong></td>
+<td><strong>4.0</strong></td>
+<td>2.75</td>
+<td>2.75</td>
+<td>3.25</td>
+<td>2.5</td>
+<td>2.75</td>
+</tr>
+</tbody>
+</table>
+<p>My reading of the numbers (the text itself isn’t public, so this is interpretation): the mirror image of its sibling paper <a href="../safety-guided-flow/#peer-review-at-a-glance">SGF’s divisive 4-to-10 spread</a> — a perfectly uniform consensus accept, with no champion and no detractor. Reviewers rated <strong>significance</strong> (3.25) clearly above <strong>originality</strong> (2.5), which matches my own read: the safety problem in text diffusion is real and timely, but the method is a careful transplant of an existing theorem to a new domain rather than a new idea. Consensus-without-a-champion is the classic profile of a solid poster.</p>
 </section>
 <section id="related-papers" class="level2">
 <h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>

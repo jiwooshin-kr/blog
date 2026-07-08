@@ -384,6 +384,7 @@ window.Quarto = {
   <li><a href="#strengths" id="toc-strengths" class="nav-link" data-scroll-target="#strengths">Strengths</a></li>
   <li><a href="#weaknesses-open-questions" id="toc-weaknesses-open-questions" class="nav-link" data-scroll-target="#weaknesses-open-questions">Weaknesses / open questions</a></li>
   <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
+  <li><a href="#peer-review-at-a-glance" id="toc-peer-review-at-a-glance" class="nav-link" data-scroll-target="#peer-review-at-a-glance">Peer review at a glance</a></li>
   <li><a href="#related-papers" id="toc-related-papers" class="nav-link" data-scroll-target="#related-papers">Related papers</a></li>
   </ul>
 </nav>
@@ -397,7 +398,7 @@ window.Quarto = {
 
 
 <blockquote class="blockquote">
-<p><strong>Paper:</strong> Mingyu Kim, Young-Heon Kim, Mijung Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></p>
+<p><strong>Paper:</strong> Mingyu Kim, Young-Heon Kim, Mijung Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 <strong>(Oral)</strong>. <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a> · <a href="https://openreview.net/forum?id=EA80Zib9UI">OpenReview</a> · <a href="https://github.com/MingyuKim87/SGF">Code</a></p>
 </blockquote>
 <div id="fig-teaser" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Two-panel teaser: top shows generated images for nudity prompts across methods with unsafe regions censored; bottom shows memorization comparison of generated images and their nearest training images for baseline versus SGF">
 <figure class="quarto-float quarto-float-fig figure">
@@ -506,6 +507,65 @@ Figure&nbsp;3: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a
 <p>If SAD (my previous review) was the “apply it” paper, this is the “understand it” paper — and reading them together is more valuable than either alone. What I like most is that SGF converts the single most mysterious knob in this whole line of work — the guidance time window — from folklore into a theorem, and then shows in a controlled-budget ablation that the theorem’s prediction holds. That’s the right shape for a safety paper: the mechanism for generating safe content is not “we filter bad outputs” but <em>the sampling dynamics themselves are bent away from unsafe regions, at the moment when the sample’s coarse semantics are being decided, and left alone afterwards</em>. Safety becomes a property of the trajectory, not a patch on the output.</p>
 <p>The unification also quietly raises the standard for future work: a new negative-guidance method now needs to either be a new potential (not just a new force heuristic) or improve the schedule beyond “early and decaying.” And the open problems are well-defined — semantic kernels for the blind-spot issue, and relaxing the boundary-alignment assumption, which is exactly the gap between “provably safe under assumptions” and “provably safe.”</p>
 <p><strong>Verdict:</strong> the theoretical backbone of training-free safe generation — read it to understand <em>why</em> early negative guidance works, then read SAD to see it deployed on text diffusion.</p>
+</section>
+<section id="peer-review-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
+<p>SGF was accepted as an <strong>Oral</strong> at ICLR 2026 — the tier reserved for a small fraction of accepted papers. The scores (via <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; full review text on <a href="https://openreview.net/forum?id=EA80Zib9UI">OpenReview</a> requires sign-in since OpenReview added a verification wall):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th></th>
+<th>Rating</th>
+<th>Confidence</th>
+<th>Soundness</th>
+<th>Contribution</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Reviewer UsAs</td>
+<td>4</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Reviewer ATH6</td>
+<td>6</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Reviewer TunD</td>
+<td>6</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>Reviewer h63Q</td>
+<td>10</td>
+<td>5</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td><strong>Average</strong></td>
+<td><strong>6.5</strong></td>
+<td>3.75</td>
+<td>2.75</td>
+<td>2.75</td>
+<td>2.75</td>
+</tr>
+</tbody>
+</table>
+<p>My reading of the numbers (the text itself isn’t public, so this is interpretation): this was a <em>divisive</em> paper — a 4-to-10 spread is unusually wide. The dissenting reviewer wrote by far the longest weaknesses section (~580 words, versus 64–120 for the others) and scored soundness/contribution/presentation at 2s, while the champion gave a rare 10 at maximum confidence. The final Oral decision means the area chairs sided decisively with the champion. That pattern — one detailed skeptic versus one enthusiastic expert — fits the paper’s profile: the CBF analysis rests on strong assumptions a careful reviewer would push on (see my weaknesses #1), while the unification result is exactly the kind of conceptual contribution that wins champions.</p>
 </section>
 <section id="related-papers" class="level2">
 <h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
