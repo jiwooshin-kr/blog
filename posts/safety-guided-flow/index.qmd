@@ -113,4 +113,4 @@ The unification also quietly raises the standard for future work: a new negative
 
 - **The paper:** Kim, Kim & Park. *Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.* ICLR 2026 — [arXiv:2603.13300](https://arxiv.org/abs/2603.13300)
 - **The two methods it unifies:** Kim et al. *Training-Free Safe Denoisers.* NeurIPS 2025 — [OpenReview](https://openreview.net/forum?id=QQS7TudonJ) · Kirchhof et al. *Shielded Diffusion (SPELL).* ICML 2025 — [PMLR](https://proceedings.mlr.press/v267/kirchhof25a.html)
-- **The mechanism deployed on text diffusion:** Yusuf, Jiang & Park. *The Safety-Aware Denoiser for Text Diffusion Models.* ICML 2026 — [my review](../safety-aware-denoiser/)
+- **Follow-up work (published two months later, cites this paper):** Yusuf, Jiang & Park. *The Safety-Aware Denoiser for Text Diffusion Models.* ICML 2026 — deploys this line of negative guidance on text diffusion — [my review](../safety-aware-denoiser/)
