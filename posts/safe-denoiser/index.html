@@ -8,9 +8,9 @@
 
 <meta name="author" content="Jiwoo Shin">
 <meta name="dcterms.date" content="2026-07-08">
-<meta name="description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
+<meta name="description" content="The origin paper of the safe-denoiser research line: an exact Bayes decomposition showing the safe denoiser equals the pretrained denoiser plus a posterior-odds-weighted push away from an unsafe one — with a close look at the three approximations (kernel regression, odds→likelihood weight, tuned kernel and schedule) that turn the identity into a training-free algorithm.">
 
-<title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin</title>
+<title>[Paper Review] Training-Free Safe Denoisers for Safe Use of Diffusion Models – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -110,17 +110,17 @@ window.Quarto = {
 </script>
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin">
-<meta property="og:description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png">
+<meta property="og:title" content="[Paper Review] Training-Free Safe Denoisers for Safe Use of Diffusion Models – Jiwoo Shin">
+<meta property="og:description" content="The origin paper of the safe-denoiser research line: an exact Bayes decomposition showing the safe denoiser equals the pretrained denoiser plus a posterior-odds-weighted push away from an unsafe one — with a close look at the three approximations (kernel regression, odds→likelihood weight, tuned kernel and schedule) that turn the identity into a training-free algorithm.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/safe-denoiser/fig-scream.png">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta property="og:image:height" content="440">
-<meta property="og:image:width" content="795">
-<meta name="twitter:title" content="[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin">
-<meta name="twitter:description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png">
-<meta name="twitter:image-height" content="440">
-<meta name="twitter:image-width" content="795">
+<meta property="og:image:height" content="860">
+<meta property="og:image:width" content="1300">
+<meta name="twitter:title" content="[Paper Review] Training-Free Safe Denoisers for Safe Use of Diffusion Models – Jiwoo Shin">
+<meta name="twitter:description" content="The origin paper of the safe-denoiser research line: an exact Bayes decomposition showing the safe denoiser equals the pretrained denoiser plus a posterior-odds-weighted push away from an unsafe one — with a close look at the three approximations (kernel regression, odds→likelihood weight, tuned kernel and schedule) that turn the identity into a training-free algorithm.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/safe-denoiser/fig-scream.png">
+<meta name="twitter:image-height" content="860">
+<meta name="twitter:image-width" content="1300">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -332,17 +332,17 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</h1>
+      <h1 class="title">[Paper Review] Training-Free Safe Denoisers for Safe Use of Diffusion Models</h1>
                   <div>
         <div class="description">
-          A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.
+          The origin paper of the safe-denoiser research line: an exact Bayes decomposition showing the <em>safe</em> denoiser equals the pretrained denoiser plus a posterior-odds-weighted push away from an unsafe one — with a close look at the three approximations (kernel regression, odds→likelihood weight, tuned kernel and schedule) that turn the identity into a training-free algorithm.
         </div>
       </div>
                           <div class="quarto-categories">
                 <div class="quarto-category">Paper-Review</div>
                 <div class="quarto-category">Diffusion</div>
                 <div class="quarto-category">Safety</div>
-                <div class="quarto-category">LLM</div>
+                <div class="quarto-category">Text-to-Image</div>
               </div>
                   </div>
   </div>
@@ -378,8 +378,13 @@ window.Quarto = {
   <ul>
   <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
   <li><a href="#why-this-problem-matters" id="toc-why-this-problem-matters" class="nav-link" data-scroll-target="#why-this-problem-matters">Why this problem matters</a></li>
-  <li><a href="#background-the-safe-denoiser" id="toc-background-the-safe-denoiser" class="nav-link" data-scroll-target="#background-the-safe-denoiser">Background: the safe denoiser</a></li>
-  <li><a href="#method-adapting-the-safe-denoiser-to-masked-text-diffusion" id="toc-method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="nav-link" data-scroll-target="#method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</a></li>
+  <li><a href="#the-core-identity-safety-is-bayes-rule-not-a-heuristic" id="toc-the-core-identity-safety-is-bayes-rule-not-a-heuristic" class="nav-link" data-scroll-target="#the-core-identity-safety-is-bayes-rule-not-a-heuristic">The core identity: safety is Bayes’ rule, not a heuristic</a></li>
+  <li><a href="#from-identity-to-algorithm-the-three-approximations" id="toc-from-identity-to-algorithm-the-three-approximations" class="nav-link" data-scroll-target="#from-identity-to-algorithm-the-three-approximations">From identity to algorithm: the three approximations</a>
+  <ul class="collapse">
+  <li><a href="#approximation-1-the-unsafe-denoiser-kernel-regression-on-the-negation-set" id="toc-approximation-1-the-unsafe-denoiser-kernel-regression-on-the-negation-set" class="nav-link" data-scroll-target="#approximation-1-the-unsafe-denoiser-kernel-regression-on-the-negation-set">Approximation 1 — the unsafe denoiser: kernel regression on the negation set</a></li>
+  <li><a href="#approximation-2-the-weight-from-posterior-odds-to-a-thresholded-likelihood" id="toc-approximation-2-the-weight-from-posterior-odds-to-a-thresholded-likelihood" class="nav-link" data-scroll-target="#approximation-2-the-weight-from-posterior-odds-to-a-thresholded-likelihood">Approximation 2 — the weight: from posterior odds to a thresholded likelihood</a></li>
+  <li><a href="#approximation-3-the-kernel-and-the-schedule-where-theory-hands-over-to-tuning" id="toc-approximation-3-the-kernel-and-the-schedule-where-theory-hands-over-to-tuning" class="nav-link" data-scroll-target="#approximation-3-the-kernel-and-the-schedule-where-theory-hands-over-to-tuning">Approximation 3 — the kernel and the schedule: where theory hands over to tuning</a></li>
+  </ul></li>
   <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a></li>
   <li><a href="#strengths" id="toc-strengths" class="nav-link" data-scroll-target="#strengths">Strengths</a></li>
   <li><a href="#weaknesses-open-questions" id="toc-weaknesses-open-questions" class="nav-link" data-scroll-target="#weaknesses-open-questions">Weaknesses / open questions</a></li>
@@ -398,100 +403,148 @@ window.Quarto = {
 
 
 <blockquote class="blockquote">
-<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+<p><strong>Paper:</strong> Mingyu Kim<em>, Dongjun Kim</em>, Amman Yusuf, Stefano Ermon, Mijung Park. <em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 (Poster). <a href="https://arxiv.org/abs/2502.08011">arXiv:2502.08011</a> · <a href="https://openreview.net/forum?id=QQS7TudonJ">OpenReview</a></p>
 </blockquote>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
-<p>Text diffusion models (TDMs) like <a href="https://openreview.net/forum?id=KnqiC0znVF">LLaDA</a> and <a href="https://openreview.net/forum?id=L4uaAR4ArM">MDLM</a> generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as <a href="https://openreview.net/forum?id=rIPeatvPy3">DIJA</a> and <a href="https://openreview.net/forum?id=NWvL280s2l">PAD</a> reach near-100% attack success rates on instruction-tuned TDMs.</p>
-<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the <a href="https://openreview.net/forum?id=QQS7TudonJ">safe denoiser of Kim et al.&nbsp;(NeurIPS 2025)</a>, originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
+<p>This is the paper that started the research line I’ve been reviewing — the <a href="../safety-guided-flow/">Safety-Guided Flow</a> theory paper generalizes it, and the <a href="../safety-aware-denoiser/">Safety-Aware Denoiser</a> ports it to text diffusion. The question it asks: can you make a <em>frozen</em> diffusion model avoid generating specific content — NSFW imagery, a copyrighted painting, a person who asked to be forgotten — given nothing but a folder of examples of that content?</p>
+<p>The answer is a single exact identity (<strong>Theorem 3.2</strong>). Split the data distribution into safe and unsafe parts; then the denoiser of the safe part can be written <em>exactly</em> as the pretrained model’s denoiser plus a correction term that points away from the <em>unsafe</em> denoiser, weighted by how likely the current noisy sample is to have come from the unsafe region. The unsafe denoiser is the only unknown, and it is cheaply approximated as a kernel-weighted average of the unsafe examples — no retraining, no fine-tuning, no classifier, no text prompts. Plugged into <a href="https://arxiv.org/abs/2410.12761">SAFREE</a> on Stable Diffusion v1.4, it cuts the nudity attack success rate on <a href="https://arxiv.org/abs/2310.10012">Ring-A-Bell</a> from 27.8% to <strong>12.7%</strong> — while FID on COCO <em>improves</em> (25.29 → 22.55) — and the same mechanism erases a class from ImageNet, suppresses Munch’s style without ever being told the word “Munch,” and mitigates memorization of individuals’ photos.</p>
 </section>
 <section id="why-this-problem-matters" class="level2">
 <h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
-<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
+<p>The mainstream tools for keeping diffusion models safe all have structural problems:</p>
 <ul>
-<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
-<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
-<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
+<li><strong>Text-based negative guidance</strong> (<a href="https://arxiv.org/abs/2211.05105">SLD</a>, negative prompts, SAFREE) can only negate what can be <em>named</em>. Adversarial prompts like <a href="https://arxiv.org/abs/2311.17516">MMA-Diffusion</a>’s are white-box-optimized to contain no explicit unsafe words — and there, SLD leaves 88.1% of generations unsafe. Worse, some content has no textual handle at all: a model can reproduce <em>The Scream</em>’s style from the prompt “If Barbie were the face of the world’s most famous paintings,” which mentions neither Munch nor the painting.</li>
+<li><strong>Unlearning by fine-tuning</strong> (<a href="https://arxiv.org/abs/2303.07345">ESD</a>, <a href="https://arxiv.org/abs/2407.12383">RECE</a>) is expensive, risks catastrophic forgetting, and must be redone for every new concept and every model checkpoint.</li>
+<li><strong>Post-hoc filters</strong> act after an unsafe image already exists, and adversarial prompt engineering is precisely the art of getting past them.</li>
 </ul>
-<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
+<p>The gap is a mechanism that (a) defines “unsafe” by <em>examples</em> rather than words, (b) acts <em>inside</em> the sampling loop, and (c) touches no weights. That’s what this paper builds.</p>
 </section>
-<section id="background-the-safe-denoiser" class="level2">
-<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
-<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <span class="math inline">\(\mathcal{D} = \mathcal{D}_\text{safe} \cup \mathcal{D}_\text{unsafe}\)</span>. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
+<section id="the-core-identity-safety-is-bayes-rule-not-a-heuristic" class="level2">
+<h2 class="anchored" data-anchor-id="the-core-identity-safety-is-bayes-rule-not-a-heuristic">The core identity: safety is Bayes’ rule, not a heuristic</h2>
+<p>Define indicator functions that partition the data: every <span class="math inline">\(x\)</span> in the support of <span class="math inline">\(p_\text{data}\)</span> is either safe or unsafe, so <span class="math inline">\(\mathbb{1}_\text{safe}(x) + \mathbb{1}_\text{unsafe}(x) = 1\)</span> and the safe distribution is the restriction <span class="math inline">\(p_\text{safe}(x) = \frac{1}{Z_\text{safe}}\mathbb{1}_\text{safe}(x)\,p_\text{data}(x)\)</span> with <span class="math inline">\(Z_\text{safe} = \int \mathbb{1}_\text{safe}(x)\,p_\text{data}(x)\,dx\)</span> (and analogously for unsafe). Each distribution has its own denoiser — the posterior mean of clean data given the noisy sample, <span class="math inline">\(\mathbb{E}_\bullet[x \mid x_t] = \frac{\int x\, p_\bullet(x)\, q_t(x_t \mid x)\, dx}{p_{\bullet,t}(x_t)}\)</span>, where <span class="math inline">\(q_t(x_t \mid x) = \mathcal{N}(x_t;\, \alpha_t x,\, \sigma_t^2 I)\)</span> is the forward kernel and <span class="math inline">\(p_{\bullet,t}\)</span> the noisy marginal. The paper’s central result (<strong>Theorem 3.2</strong>):</p>
 <p><span class="math display">\[
-\mathbb{E}_{\mathcal{D}_\text{safe}}[x_0 \mid x_t] = \mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] + \beta^*(x_t)\left(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] - \mathbb{E}_{\mathcal{D}_\text{unsafe}}[x_0 \mid x_t]\right)
+\mathbb{E}_\text{safe}[x \mid x_t] \;=\; \mathbb{E}_\text{data}[x \mid x_t] \;+\; \beta^*(x_t)\Big(\mathbb{E}_\text{data}[x \mid x_t] - \mathbb{E}_\text{unsafe}[x \mid x_t]\Big),
+\qquad
+\beta^*(x_t) \;=\; \frac{Z_\text{unsafe}\, p_{\text{unsafe},t}(x_t)}{Z_\text{safe}\, p_{\text{safe},t}(x_t)}.
 \]</span></p>
-<p>where <span class="math inline">\(\beta^*(x_t) \ge 0\)</span> grows with the posterior likelihood that the current state <span class="math inline">\(x_t\)</span> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <span class="math inline">\(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t]\)</span>; the two remaining quantities are approximated from a finite set of unsafe references.</p>
-<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from <a href="https://openreview.net/forum?id=zBPzxhso8M">DiffuGuard</a>.</p>
+<p><strong>The proof is three observations, and the structure is worth seeing.</strong> The appendix derives it by splitting <span class="math inline">\(\mathbb{1} = \mathbb{1}_\text{safe} + \mathbb{1}_\text{unsafe}\)</span> inside the integrals, but it’s cleanest read backwards, as an <em>inverted mixture decomposition</em>:</p>
+<ol type="1">
+<li><strong>Noisy marginals mix linearly.</strong> Diffusing a mixture is the mixture of diffusions, so <span class="math inline">\(p_{\text{data},t}(x_t) = Z_\text{safe}\, p_{\text{safe},t}(x_t) + Z_\text{unsafe}\, p_{\text{unsafe},t}(x_t)\)</span> at every <span class="math inline">\(t\)</span>.</li>
+<li><strong>Denoisers therefore mix with posterior weights.</strong> Conditional expectations under a two-component mixture decompose as <span class="math display">\[
+\mathbb{E}_\text{data}[x \mid x_t] = P(\text{safe} \mid x_t)\, \mathbb{E}_\text{safe}[x \mid x_t] + P(\text{unsafe} \mid x_t)\, \mathbb{E}_\text{unsafe}[x \mid x_t],
+\]</span> where <span class="math inline">\(P(\text{unsafe} \mid x_t) = \frac{Z_\text{unsafe}\, p_{\text{unsafe},t}(x_t)}{p_{\text{data},t}(x_t)}\)</span> is the posterior probability that <span class="math inline">\(x_t\)</span> was produced by noising an <em>unsafe</em> datum. The pretrained denoiser is, exactly, a posterior-weighted blend of the safe and unsafe denoisers.</li>
+<li><strong>Solve for the safe denoiser.</strong> Rearranging with <span class="math inline">\(\beta^* = \frac{P(\text{unsafe} \mid x_t)}{P(\text{safe} \mid x_t)}\)</span> gives <span class="math inline">\(\mathbb{E}_\text{safe} = (1+\beta^*)\,\mathbb{E}_\text{data} - \beta^*\,\mathbb{E}_\text{unsafe}\)</span>, which is the theorem.</li>
+</ol>
+<p>So <span class="math inline">\(\beta^*(x_t)\)</span> is not a designed weight — it is the <strong>posterior odds that the current trajectory originated from the unsafe set</strong>. That single fact explains all its qualitative behavior: it grows when <span class="math inline">\(x_t\)</span> drifts toward unsafe territory, vanishes when the trajectory is safely far away, and its precise value is a <em>calibration</em>, not a knob. The 2D toy ablation (Figure 3 of the paper) confirms the calibration reading: at <em>half</em> the theoretical weight, samples leak into the unsafe region; at the theoretical weight they avoid it while still covering the entire safe support; at <em>double</em> the weight they over-avoid, vacating the unsafe set’s neighborhood and losing coverage of legitimate nearby modes.</p>
+<p><strong>The score-space view.</strong> By Tweedie’s formula, <span class="math inline">\(\mathbb{E}_\bullet[x \mid x_t] = \frac{1}{\alpha_t}\big(x_t + \sigma_t^2\, \nabla_{x_t} \log p_{\bullet,t}(x_t)\big)\)</span>, so the guidance direction is a log-likelihood-<em>ratio</em> gradient:</p>
+<p><span class="math display">\[
+\mathbb{E}_\text{data}[x \mid x_t] - \mathbb{E}_\text{unsafe}[x \mid x_t] \;=\; \frac{\sigma_t^2}{\alpha_t}\, \nabla_{x_t} \log \frac{p_{\text{data},t}(x_t)}{p_{\text{unsafe},t}(x_t)}.
+\]</span></p>
+<p>That is classifier guidance with an <em>implicit</em> safe-vs-unsafe classifier — no classifier ever trained — and it clarifies why the identity has exactly the shape of CFG (denoiser plus a scaled difference of denoisers) and drops into any sampler as one extra term. SLD’s adaptive weight <span class="math inline">\(\mu\)</span> was a heuristic gesture at this quantity; <span class="math inline">\(\beta^*\)</span> is what Bayes’ rule says it must be. Note also what the theorem quietly avoids: the safe <em>score</em> itself, <span class="math inline">\(\nabla \log p_{\text{safe},t}\)</span>, is the score of a <strong>difference</strong> of densities (<span class="math inline">\(Z_\text{safe}\,p_{\text{safe},t} = p_{\text{data},t} - Z_\text{unsafe}\,p_{\text{unsafe},t}\)</span>), which has no simple expression in terms of the component scores — the posterior-mean formulation is what linearizes the problem.</p>
 </section>
-<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
-<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
-<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
-<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <span class="math inline">\(N\)</span> unsafe reference sequences <span class="math inline">\(x^{(1)}, \dots, x^{(N)}\)</span> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
+<section id="from-identity-to-algorithm-the-three-approximations" class="level2">
+<h2 class="anchored" data-anchor-id="from-identity-to-algorithm-the-three-approximations">From identity to algorithm: the three approximations</h2>
+<p>Everything above is exact. The pretrained model supplies <span class="math inline">\(\mathbb{E}_\text{data}[x \mid x_t] \approx \frac{1}{\alpha_t}(x_t - \sigma_t \epsilon_\theta(x_t, t))\)</span>; the other two quantities must come from a negation set <span class="math inline">\(\{x^{(n)}\}_{n=1}^N\)</span> of unsafe examples (515 nudity images from I2P, four photographs of <em>The Scream</em>, ten photos of one person…). This is where the paper’s real design decisions live — and, since the paper interleaves them with the theorem in a way that takes effort to disentangle (the reviewers’ uniform clarity-2 scores have a point), it’s worth laying out each approximation, what it preserves, and what it silently changes.</p>
+<section id="approximation-1-the-unsafe-denoiser-kernel-regression-on-the-negation-set" class="level3">
+<h3 class="anchored" data-anchor-id="approximation-1-the-unsafe-denoiser-kernel-regression-on-the-negation-set">Approximation 1 — the unsafe denoiser: kernel regression on the negation set</h3>
+<p>Both the numerator and denominator of <span class="math inline">\(\mathbb{E}_\text{unsafe}[x \mid x_t] = \frac{\int x\, p_\text{unsafe}(x)\, q_t(x_t \mid x)\, dx}{\int p_\text{unsafe}(x)\, q_t(x_t \mid x)\, dx}\)</span> are expectations under <span class="math inline">\(p_\text{unsafe}\)</span>, so replace <span class="math inline">\(p_\text{unsafe}\)</span> with the empirical measure <span class="math inline">\(\frac{1}{N}\sum_n \delta_{x^{(n)}}\)</span>:</p>
 <p><span class="math display">\[
-\hat{\mathbb{E}}_{\mathcal{D}_\text{unsafe}}[x_0 \mid x_t] = \sum_{n=1}^{N} x^{(n)} \frac{q_t(x_t \mid x^{(n)})}{\sum_{m} q_t(x_t \mid x^{(m)})}
+\hat{\mathbb{E}}_\text{unsafe}[x \mid x_t] \;=\; \sum_{n=1}^N w_n(x_t)\, x^{(n)},
+\qquad
+w_n(x_t) \;=\; \frac{q_t(x_t \mid x^{(n)})}{\sum_{m} q_t(x_t \mid x^{(m)})}
+\;=\; \operatorname{softmax}_n\!\left(-\frac{\|x_t - \alpha_t x^{(n)}\|^2}{2\sigma_t^2}\right).
 \]</span></p>
-<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
+<p>This is a Nadaraya–Watson kernel regression estimate of the posterior mean — equivalently, self-normalized importance sampling. Numerator and denominator are each unbiased Monte Carlo estimates of their integrals; the <em>ratio</em> is biased at finite <span class="math inline">\(N\)</span> but consistent as <span class="math inline">\(N \to \infty\)</span> (and the <span class="math inline">\(N\)</span>-ablation, where safety keeps improving from 200 to 500 references, is the empirical face of that consistency).</p>
+<p>The two limits of the softmax explain the method’s dynamics better than any prose in the paper:</p>
+<ul>
+<li><strong>High noise (<span class="math inline">\(t \to T\)</span>, <span class="math inline">\(\sigma_t\)</span> large):</strong> the exponents flatten, <span class="math inline">\(w_n \to 1/N\)</span>, and the estimate tends toward the <strong>barycenter of the negation set</strong> — a broad, semantic “average unsafe direction.” Repulsion here steers coarse composition, which is exactly what safety needs.</li>
+<li><strong>Low noise (<span class="math inline">\(t \to 0\)</span>, <span class="math inline">\(\sigma_t \to 0\)</span>):</strong> the softmax collapses to an argmax and the estimate snaps to the <strong>single nearest unsafe reference</strong>. The correction term then subtracts one specific clean image from the prediction — an image-shaped, high-frequency perturbation injected during detail refinement. This is precisely the paper’s observed failure mode for late guidance (“acts as structural noise”), derived rather than observed.</li>
+</ul>
+<p>One caveat the paper doesn’t quantify: the estimator is only trustworthy where the negation set has mass near the trajectory. The softmax’s effective sample size <span class="math inline">\(1/\sum_n w_n^2\)</span> can collapse to <span class="math inline">\(\approx 1\)</span> in sparse regions, at which point “the unsafe denoiser” means “whichever reference happens to be least far away.”</p>
+</section>
+<section id="approximation-2-the-weight-from-posterior-odds-to-a-thresholded-likelihood" class="level3">
+<h3 class="anchored" data-anchor-id="approximation-2-the-weight-from-posterior-odds-to-a-thresholded-likelihood">Approximation 2 — the weight: from posterior odds to a thresholded likelihood</h3>
+<p>The exact weight is a ratio, and its two halves are wildly unequal in difficulty:</p>
 <p><span class="math display">\[
-q_t(x_t \mid x_0) = \alpha_t^{\#\{\text{matching positions}\}} (1-\alpha_t)^{\#\{\text{masked positions}\}}
+\beta^*(x_t) = \frac{\overbrace{Z_\text{unsafe}\, p_{\text{unsafe},t}(x_t)}^{\text{estimable from } N \text{ references}}}{\underbrace{Z_\text{safe}\, p_{\text{safe},t}(x_t)}_{\text{KDE over the entire safe corpus}}}.
 \]</span></p>
-<p>This is computable in <span class="math inline">\(O(L)\)</span> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
-<p><strong>3. Approximating <span class="math inline">\(\beta^*\)</span>.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <span class="math inline">\(\eta \cdot \frac{1}{N}\sum_n q_t(x_t \mid x^{(n)})\)</span> with a tunable strength <span class="math inline">\(\eta\)</span>, applied only during a <strong>time window</strong> <span class="math inline">\(C\)</span> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
-<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
-<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
+<p>The numerator is <span class="math inline">\(\int \mathbb{1}_\text{unsafe}(x)\, p_\text{data}(x)\, q_t(x_t \mid x)\, dx\)</span> — the same kernel evaluations as Approximation 1, so <span class="math inline">\(\frac{1}{N}\sum_n q_t(x_t \mid x^{(n)})\)</span> estimates it (up to <span class="math inline">\(Z_\text{unsafe}\)</span>) for free. The denominator, however, is a kernel density estimate over <em>everything safe the model was trained on</em> — for Stable Diffusion, LAION-scale — evaluated at every one of 50 sampling steps. Infeasible. The paper’s move is blunt: keep the numerator, replace the denominator with a constant,</p>
+<p><span class="math display">\[
+\beta^*(x_t) \;\approx\; \eta \cdot \beta(x_t), \qquad \beta(x_t) = \frac{1}{N}\sum_{n=1}^N q_t(x_t \mid x^{(n)}).
+\]</span></p>
+<p>What survives: monotonicity — <span class="math inline">\(\beta(x_t)\)</span> rises exactly when the unsafe-origin likelihood rises, so trajectories that look more unsafe are pushed harder, preserving the <em>ordering</em> the theorem prescribes. What’s lost is everything the denominator was doing:</p>
+<ul>
+<li><strong>Scale.</strong> <span class="math inline">\(\beta\)</span> is now an unnormalized Gaussian density value in very high dimension — a number whose magnitude swings by orders of magnitude across timesteps, datasets, and bandwidths. The constant <span class="math inline">\(\eta\)</span> has to absorb all of it, which is why it lands at 0.02 (ImageNet), 0.03 (SLD), 0.33 (SAFREE), 0.69 (memorization) across this paper’s experiments — and up to 128 in <a href="../safety-aware-denoiser/">SAD</a> downstream. <span class="math inline">\(\eta\)</span> isn’t a preference dial; it’s compensating for a discarded normalizer.</li>
+<li><strong>Gating direction.</strong> The true <span class="math inline">\(\beta^*\)</span> is an <em>odds</em> ratio: it can be large even where the unsafe density is tiny, provided the safe density is tinier still. The likelihood proxy can’t see that — where both densities are small (early, far-from-data regions) it silently under-guides relative to the exact weight, and near dense safe modes it can fire when the true odds say don’t bother.</li>
+</ul>
+<p>The threshold <span class="math inline">\(\beta_t\)</span> (text-to-image mode: zero out the correction whenever <span class="math inline">\(\beta(x_t) &lt; \beta_t\)</span>) restores a piece of the lost gating — intervene only when unsafe origin is <em>plausible</em> — and its ablation traces a clean U-shape in attack success rate: <span class="math inline">\(\beta_t = 0\)</span> (always-on guidance) and <span class="math inline">\(\beta_t = \infty\)</span> (never-on) are both worse than selective triggering. The exact <span class="math inline">\(\beta^*\)</span> would have done this gating automatically.</p>
+</section>
+<section id="approximation-3-the-kernel-and-the-schedule-where-theory-hands-over-to-tuning" class="level3">
+<h3 class="anchored" data-anchor-id="approximation-3-the-kernel-and-the-schedule-where-theory-hands-over-to-tuning">Approximation 3 — the kernel and the schedule: where theory hands over to tuning</h3>
+<p>The theorem fixes the kernel: it must be the forward kernel <span class="math inline">\(q_t\)</span>, whose bandwidth <span class="math inline">\(\sigma_t/\alpha_t\)</span> is dictated by the noise schedule — there are no free parameters. The implementation (Appendix C) quietly replaces it with an RBF kernel <span class="math inline">\(K(x, x') = \exp\!\big(-\|x - x'\|^2 / 2\sigma^2\big)\)</span> whose bandwidth is hand-tuned per task: <span class="math inline">\(\sigma = 1.0\)</span> for SLD, <span class="math inline">\(3.15\)</span> for SAFREE, <span class="math inline">\(13.15\)</span> for the memorization experiment. The bandwidth thereby becomes a <em>reach</em> knob — how far into image space each reference’s repulsion extends — decoupled from the diffusion schedule that the theory says should determine it. (This freed bandwidth is exactly the object <a href="../safety-guided-flow/">SGF</a> later promotes to a first-class citizen via the MMD potential’s kernel.)</p>
+<p>The guidance window <span class="math inline">\(C\)</span> is likewise per-task: timesteps <span class="math inline">\([780, 1000]\)</span> of 1000 for text-to-image — only the high-noise first ~22% of reverse sampling — but <span class="math inline">\([200, 800]\)</span> for the ImageNet class-negation experiment and <em>all</em> timesteps for FFHQ. The early-only choice for text-to-image follows directly from the softmax limit analysis above (late-time repulsion subtracts a specific clean image during detail refinement), but as deployed it’s an empirical setting justified by one sentence of intuition, and the fact that three experiments needed three different windows shows how much slack the theory leaves here. Turning “early is provably better” into a theorem is, again, precisely what SGF did next.</p>
+<p><strong>Cost of all three, for the record:</strong> each step needs <span class="math inline">\(N\)</span> squared distances <span class="math inline">\(\|x_t - \alpha_t x^{(n)}\|^2\)</span> — one batched matrix operation, <span class="math inline">\(O(Nd)\)</span>, with the softmax computed via log-sum-exp. That’s the entire overhead, and it’s why N=3,000 references cost 0.07 s/image.</p>
+<p><strong>Plug-in composition.</strong> Because the theorem simply <em>replaces</em> <span class="math inline">\(\mathbb{E}_\text{data}\)</span> with <span class="math inline">\(\mathbb{E}_\text{safe}\)</span>, the method stacks on top of SLD and SAFREE unchanged: their text-space guidance terms are added to <span class="math inline">\(\hat{\mathbb{E}}_\text{safe}\)</span> instead of <span class="math inline">\(\mathbb{E}_\text{data}\)</span> (Eqs. 8–9 of the paper), giving text-based steering plus image-based repulsion. The 2×2 ablation on MMA-Diffusion says composition is the whole game: raw SD-v1.4 is 96.2% unsafe, SAFREE alone 60.1%, Safe Denoiser alone 63.3%, both together <strong>46.9%</strong>.</p>
+</section>
 </section>
 <section id="experiments" class="level2">
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
-<p>Three safety dimensions, on MDLM and the LLaDA/<a href="https://arxiv.org/abs/2508.15487">Dream</a> family:</p>
-<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
-<div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+<p><strong>Adversarial nudity prompts (Ring-A-Bell, <a href="https://arxiv.org/abs/2310.11868">UnlearnDiff</a>, MMA-Diffusion; NudeNet as judge).</strong> On SD-v1.4, SAFREE + Safe Denoiser reaches ASR 12.7 / 20.7 / 46.9% versus 27.8 / 35.3 / 60.1% for SAFREE alone — and beats the fine-tuned unlearning baselines ESD and RECE on the safety–quality Pareto front, with COCO-30K FID actually improving (25.29 → 22.55). The MMA-Diffusion column is the telling one: text-based SLD barely helps there (88.1% unsafe) because the adversarial prompts contain no nudity words to negate, while image-based guidance halves it (→ 48.1%) — the clearest demonstration that example-based negation covers a failure mode text-based methods structurally cannot.</p>
+<p><strong>Multi-concept safety (CoPro, seven I2P categories, Q16 judge).</strong> With a 3,000-image negation set spanning all categories, average inappropriate probability drops for every baseline it’s added to (SD 0.223 → 0.187, SLD 0.170 → 0.151, SAFREE 0.153 → 0.144), with CLIP alignment essentially intact — one mechanism handling seven concepts simultaneously.</p>
+<p><strong>Standalone negation (no text guidance possible).</strong> Class removal on class-conditional ImageNet: conditioning on “Chihuahua” after negating that class yields <strong>0.00</strong> Top-1 accuracy on the negated class (from 0.68), with better precision/recall than the Sparse Repellency baseline. On unconditional FFHQ, negating female faces shifts the split 64/36 → 55.6/44.4 — and here the comparison is instructive: Sparse Repellency pushes the classifier score slightly further (53.1%) but at FID 130.5 versus the baseline’s 109.1, i.e., by generating degraded out-of-distribution images, while Safe Denoiser <em>improves</em> FID to 96.6.</p>
+<div id="fig-scream" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Two rows of images: the top row shows four original versions of Munch's The Scream used as negative datapoints; the bottom row shows generated images where the baseline reproduces The Scream's style with a Barbie face while the safe denoiser produces Barbie images without Munch's style">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="fig1-tradeoff.png" class="img-fluid figure-img" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+<div aria-describedby="fig-scream-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="fig-scream.png" class="img-fluid figure-img" alt="Two rows of images: the top row shows four original versions of Munch's The Scream used as negative datapoints; the bottom row shows generated images where the baseline reproduces The Scream's style with a Barbie face while the safe denoiser produces Barbie images without Munch's style">
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Each point is a SAD configuration; going down (fewer unsafe generations) usually costs some perplexity, and the guidance time window (colours) controls where you land on the curve. (Yusuf et al., 2026)
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-scream-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 6 of the paper: style-level intellectual property control. <strong>Top:</strong> the negation set — four originals of Munch’s <em>The Scream</em> (1893–1910). <strong>Bottom:</strong> for the prompt <em>“If Barbie were the face of the world’s most famous paintings”</em> — which never mentions Munch — SD-v1.4 reproduces the painting’s composition and style almost exactly (left two); with the safe denoiser, alone and combined with SAFREE, the Barbie concept survives but Munch’s style is gone (right two). (Kim et al., 2025)
 </figcaption>
 </figure>
 </div>
-<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
-<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <span class="math inline">\(\mathcal{D}_\text{unsafe} = \mathcal{D}_\text{train}\)</span> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <span class="math inline">\(\eta\)</span> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <span class="math inline">\((n,p)\)</span>-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
-<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches <a href="https://proceedings.mlr.press/v267/singhal25b.html">FK Steering</a> (<span class="math inline">\(k{=}8\)</span>) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
-<p><strong>Ablations worth remembering:</strong></p>
-<ul>
-<li><span class="math inline">\(\eta\)</span> is a clean monotonic safety knob once the schedule is fixed.</li>
-<li>The time window <span class="math inline">\(C\)</span> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
-<li>Safety gains saturate at <span class="math inline">\(N \approx 500\text{–}1000\)</span> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
-</ul>
+<p><strong>Style-level IP control — the flagship qualitative result.</strong> The paper identifies three IP-leak scenarios: the prompt names the work, describes it, or — hardest — does neither, yet the model reproduces the style anyway. Text-only defenses have <em>nothing to negate</em> in case three. With just <strong>four images</strong> of <em>The Scream</em> as the negation set, the safe denoiser strips Munch’s style while preserving the prompt’s actual concept (Figure 6 above). This is, to me, the single best argument for defining unsafety extensionally.</p>
+<div id="fig-memorization" class="quarto-float quarto-figure quarto-figure-center anchored" alt="A row of five portrait images showing a real photograph of a woman followed by generated images that progressively diverge from the original while keeping similar hair color and outfit">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-memorization-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="fig-memorization.png" class="img-fluid figure-img" alt="A row of five portrait images showing a real photograph of a woman followed by generated images that progressively diverge from the original while keeping similar hair color and outfit">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-memorization-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Figure 1(b) of the paper: memorization mitigation. Left to right: the real photograph of an individual, then generations moving from near-verbatim reproduction (baseline) to novel images that retain generic attributes (hair color, outfit) but no longer replicate the person’s actual photo once the real image is used as the negation set. (Kim et al., 2025)
+</figcaption>
+</figure>
+</div>
+<p><strong>Frontier-model compatibility (SD-v3).</strong> Plugged into SD-v3, ASR on Ring-A-Bell drops 0.304 → 0.203 (a 33% relative reduction, versus SAFREE’s 9%) with FID again slightly <em>improving</em>. The paper’s explanation for the recurring FID gains is worth remembering: high CFG scales trade diversity for prompt alignment, and the safe denoiser’s image-space repulsion injects text-independent stochasticity that partially restores that lost diversity.</p>
+<p><strong>Cost.</strong> On an RTX 4090, the overhead is nearly invisible: 4.22 → 4.24 s/image on SAFREE with N=515 negatives, 4.29s with N=3,000 — sub-linear in N because the kernel evaluations are batched matrix multiplies. SAFREE itself costs over 1s per image; the safety add-on costs two hundredths.</p>
 </section>
 <section id="strengths" class="level2">
 <h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
 <ol type="1">
-<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
-<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <span class="math inline">\(O(L)\)</span> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
-<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
-<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
+<li><strong>An exact identity where the field had heuristics.</strong> Theorem 3.2 is Bayes’ rule, not an approximation — the <em>decomposition</em> is exact, and every prior trajectory-modification method suddenly has a reference point. Sparse Repellency’s ReLU-thresholded push is recognizably a crude <span class="math inline">\(\beta^*\)</span>; SLD’s adaptive <span class="math inline">\(\mu\)</span> is a text-space shadow of it. The paper explicitly frames SR as a special case lacking the distributional guarantee, and <a href="../safety-guided-flow/">SGF</a> later made that unification rigorous.</li>
+<li><strong>Extensional unsafety is the right abstraction for the hard cases.</strong> MMA-Diffusion prompts (no unsafe words), Munch’s style (no textual handle), a specific person’s photos (no concept name) — the three strongest results in the paper are all cases where “define unsafe by examples” works and “define unsafe by words” cannot.</li>
+<li><strong>Safety that doesn’t tax quality.</strong> FID improves alongside safety in the SAFREE, FFHQ, and SD-v3 experiments. The diversity-restoration explanation is plausible and, in hindsight, foreshadows SGF’s memorization finding (pushing away from memorized modes frees the model).</li>
+<li><strong>Genuinely deployable.</strong> Training-free, ~0.02s overhead, sub-linear in negation-set size, composable with whatever text-based guard you already run. The practitioner recipe is one sentence: <em>collect examples of what you don’t want, add one term to the sampler.</em></li>
 </ol>
 </section>
 <section id="weaknesses-open-questions" class="level2">
 <h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
 <ol type="1">
-<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
-<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
-<li><strong>The theory–practice gap around <span class="math inline">\(\beta^*\)</span>.</strong> The provable guarantee holds for the exact <span class="math inline">\(\beta^*(x_t)\)</span>; in practice it’s replaced by a constant <span class="math inline">\(\eta\)</span> inside a hand-tuned time window, with <span class="math inline">\(\eta\)</span> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
-<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
-<li><strong>Scale.</strong> Experiments top out at 8B models and <span class="math inline">\(N{=}5000\)</span> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
+<li><strong>The <span class="math inline">\(\beta^*\)</span> theory–practice gap.</strong> What’s exact is the decomposition; what runs replaces the posterior <em>odds</em> with a thresholded, <span class="math inline">\(\eta\)</span>-rescaled <em>likelihood</em> (Approximation 2 above), plus a hand-tuned bandwidth and time window. The toy experiment itself shows the method is sensitive to weight miscalibration — half the theoretical weight leaks, double over-avoids — yet the deployed weight discards precisely the normalizer that made <span class="math inline">\(\beta^*\)</span> calibrated, and no bound on the resulting error is offered. This exact critique carries over to <a href="../safety-aware-denoiser/">SAD</a>, which inherits the approximation wholesale.</li>
+<li><strong>“Apply it early” is an observation here, not a result.</strong> The critical-window choice follows naturally from the softmax limit analysis (the estimator degenerates to nearest-reference subtraction at low noise), but the paper never makes that argument formally — the window is set empirically, and differently for each of the three experimental settings. It took the follow-up SGF paper to turn this into a theorem; reading this paper now, the window is the most obviously under-theorized moving part.</li>
+<li><strong>The blind spot of every reference-based method.</strong> Repulsion strength is kernel proximity to finitely many examples; semantically unsafe content that is far from every reference in pixel/latent space feels nothing. The residual 46.9% ASR on MMA-Diffusion — after combining <em>two</em> defenses — is the honest measure of the remaining gap.</li>
+<li><strong>Standalone negation is only partial.</strong> The FFHQ result moves the female fraction from 64% to 55.6% — clearly better-behaved than Sparse Repellency, but far from <em>negation</em>. For coarse, high-mass regions of an unconditional model, a 515-image-scale repulsive mixture evidently can’t carve out the whole region.</li>
+<li><strong>Evaluation rests on classifiers (NudeNet, Q16, a ResNet sex classifier)</strong>, whose artifacts the FFHQ experiment itself demonstrates: SR “wins” the classifier metric by generating garbage. The paper is honest about this, but a human evaluation would have strengthened the safety claims.</li>
 </ol>
 </section>
 <section id="my-take" class="level2">
 <h2 class="anchored" data-anchor-id="my-take">My take</h2>
-<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
-<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
-<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
+<p>Reading this after its two descendants is like reading the first paper of a trilogy last: the ideas that SGF proves and SAD transplants are all here in embryonic form, and it’s striking how much of the line’s DNA was set in this one move — <em>replace “unsafe” as a word with “unsafe” as a dataset, and let Bayes’ rule tell you the force</em>. The theorem is simple (the proof is essentially conditional probability), and that’s a feature: it explains why the method composes so cleanly with CFG-family guidance and why later work could generalize it rather than replace it.</p>
+<p>What holds it back from being more than a strong poster is the distance between the theorem and the algorithm. Everything provable lives in Eq. (4); everything deployed lives in the approximations — constant <span class="math inline">\(\eta\)</span>, thresholded <span class="math inline">\(\beta\)</span>, empirical time window — and the paper doesn’t quantify what those approximations cost. It’s telling that the strongest follow-up (SGF) is precisely a paper about closing that gap. But judged as the opening move of a research line, it’s an excellent one: a clean primitive, an honest evaluation, and two qualitative results (the Munch experiment, the memorization figure) that make the case better than any table.</p>
+<p><strong>Verdict:</strong> the foundational “define it by examples, derive the force by Bayes” paper — read it first, then <a href="../safety-guided-flow/">SGF</a> for why the timing works, then <a href="../safety-aware-denoiser/">SAD</a> for the same idea in text diffusion.</p>
 </section>
 <section id="peer-review-at-a-glance" class="level2">
 <h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
-<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026, reviewed by four reviewers. The scores below are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text is not publicly available (ICML does not post reviews, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> requires sign-in), so they are reproduced here without interpretation.</p>
+<p>Safe Denoiser was accepted as a <strong>Poster</strong> at NeurIPS 2025, reviewed by five reviewers. Scores are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text lives on the <a href="https://openreview.net/forum?id=QQS7TudonJ">OpenReview forum</a>. On NeurIPS 2025’s 6-point rating scale, the 4.2 average sits almost exactly at the median of accepted papers (~4.25) — a solidly ordinary accept:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 14%">
@@ -505,17 +558,26 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 <thead>
 <tr class="header">
 <th></th>
-<th>Recommendation</th>
+<th>Rating</th>
 <th>Confidence</th>
-<th>Soundness</th>
+<th>Quality</th>
+<th>Clarity</th>
 <th>Significance</th>
 <th>Originality</th>
-<th>Presentation</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Reviewer 9T1S</td>
+<td>Reviewer K2qK</td>
+<td>4</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Reviewer vAUD</td>
 <td>4</td>
 <td>3</td>
 <td>3</td>
@@ -523,51 +585,53 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 <td>2</td>
 <td>3</td>
 </tr>
+<tr class="odd">
+<td>Reviewer ksP9</td>
+<td>4</td>
+<td>4</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+<td>3</td>
+</tr>
 <tr class="even">
-<td>Reviewer YM1a</td>
+<td>Reviewer u6A8</td>
 <td>4</td>
 <td>3</td>
 <td>3</td>
-<td>4</td>
+<td>2</td>
 <td>3</td>
 <td>3</td>
 </tr>
 <tr class="odd">
-<td>Reviewer pAtC</td>
+<td>Reviewer Wpcs</td>
+<td>5</td>
 <td>4</td>
 <td>2</td>
 <td>2</td>
+<td>2</td>
 <td>3</td>
-<td>2</td>
-<td>2</td>
 </tr>
 <tr class="even">
-<td>Reviewer ddgR</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-</tr>
-<tr class="odd">
 <td><strong>Average</strong></td>
-<td><strong>4.0</strong></td>
-<td>2.75</td>
-<td>2.75</td>
-<td>3.25</td>
-<td>2.5</td>
-<td>2.75</td>
+<td><strong>4.2</strong></td>
+<td>3.4</td>
+<td>2.6</td>
+<td>2.4</td>
+<td>2.6</td>
+<td>2.8</td>
 </tr>
 </tbody>
 </table>
+<p>The consistent 2s in clarity are the most interpretable signal in the grid — and, having read the paper closely, fair: the method section interleaves the exact theorem with its stack of approximations in a way that takes real effort to disentangle (see weaknesses #1). The uniform near-consensus (4,4,4,4,5) contrasts sharply with the 4-to-10 spread its successor SGF drew at ICLR — reviewers agreed on what this paper is: a sound, useful primitive rather than a surprising one.</p>
 </section>
 <section id="related-papers" class="level2">
 <h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
 <ul>
-<li><strong>The paper:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">code</a></li>
-<li><strong>The theorem it adapts:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="../safe-denoiser/">my review</a></li>
-<li><strong>The theory behind the time window:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="../safety-guided-flow/">my review</a></li>
+<li><strong>The paper:</strong> Kim, Kim, Yusuf, Ermon &amp; Park. <em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="https://arxiv.org/abs/2502.08011">arXiv:2502.08011</a></li>
+<li><strong>The theory sequel (unifies this with SPELL, proves the early-window rule):</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow.</em> ICLR 2026 (Oral) — <a href="../safety-guided-flow/">my review</a></li>
+<li><strong>The text-diffusion sequel (ports Theorem 3.2 to masked discrete diffusion):</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="../safety-aware-denoiser/">my review</a></li>
+<li><strong>The closest prior method it generalizes:</strong> Kirchhof et al.&nbsp;<em>Sparse Repellency / Shielded Diffusion (SPELL).</em> ICML 2025 — <a href="https://proceedings.mlr.press/v267/kirchhof25a.html">PMLR</a></li>
 </ul>
 
 
