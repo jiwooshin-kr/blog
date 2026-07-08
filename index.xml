@@ -115,7 +115,7 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 </section>
 <section id="peer-review-at-a-glance" class="level2">
 <h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
-<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026. The scores (via <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; ICML review text is not publicly posted, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> now requires sign-in):</p>
+<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026, reviewed by four reviewers. The scores below are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text is not publicly available (ICML does not post reviews, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> requires sign-in), so they are reproduced here without interpretation.</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 14%">
@@ -185,7 +185,6 @@ Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Eac
 </tr>
 </tbody>
 </table>
-<p>My reading of the numbers (the text itself isn’t public, so this is interpretation): the mirror image of its sibling paper <a href="../safety-guided-flow/#peer-review-at-a-glance">SGF’s divisive 4-to-10 spread</a> — a perfectly uniform consensus accept, with no champion and no detractor. Reviewers rated <strong>significance</strong> (3.25) clearly above <strong>originality</strong> (2.5), which matches my own read: the safety problem in text diffusion is real and timely, but the method is a careful transplant of an existing theorem to a new domain rather than a new idea. Consensus-without-a-champion is the classic profile of a solid poster.</p>
 </section>
 <section id="related-papers" class="level2">
 <h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
