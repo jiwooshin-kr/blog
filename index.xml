@@ -68,6 +68,16 @@
 <h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
 <p>Three safety dimensions, on MDLM and the LLaDA/Dream family:</p>
 <p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
+<div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" class="img-fluid figure-img" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Each point is a SAD configuration; going down (fewer unsafe generations) usually costs some perplexity, and the guidance time window (colours) controls where you land on the curve. (Yusuf et al., 2026)
+</figcaption>
+</figure>
+</div>
 <p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
 <p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Btrain%7D"> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <img src="https://latex.codecogs.com/png.latex?%5Ceta"> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <img src="https://latex.codecogs.com/png.latex?(n,p)">-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
 <p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches FK Steering (<img src="https://latex.codecogs.com/png.latex?k%7B=%7D8">) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
@@ -120,35 +130,13 @@
 </section>
 
  ]]></description>
-  <category>paper-review</category>
-  <category>diffusion</category>
-  <category>safety</category>
+  <category>Paper-Review</category>
+  <category>Diffusion</category>
+  <category>Safety</category>
   <category>LLM</category>
   <guid>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</guid>
   <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Post With Code</title>
-  <dc:creator>Harlow Malloc</dc:creator>
-  <link>https://jiwooshin-kr.github.io/blog/posts/post-with-code/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-
-<p>This is a post with executable code.</p>
-
-
-
- ]]></description>
-  <category>news</category>
-  <category>code</category>
-  <category>analysis</category>
-  <guid>https://jiwooshin-kr.github.io/blog/posts/post-with-code/</guid>
-  <pubDate>Mon, 06 Jul 2026 15:00:00 GMT</pubDate>
-  <media:content url="https://jiwooshin-kr.github.io/blog/posts/post-with-code/image.jpg" medium="image" type="image/jpeg"/>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" medium="image" type="image/png" height="80" width="144"/>
 </item>
 <item>
   <title>Quarto Basics</title>
