@@ -2,9 +2,10 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/diffuser-planning/index.html",
       "/posts/safe-denoiser/index.html",
-      "/posts/safety-guided-flow/index.html",
-      "/posts/safety-aware-denoiser/index.html"
+      "/posts/safety-aware-denoiser/index.html",
+      "/posts/safety-guided-flow/index.html"
     ]
   }
 ]

@@ -15,7 +15,146 @@
 <link>https://jiwooshin-kr.github.io/blog/</link>
 </image>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Tue, 07 Jul 2026 15:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 09 Jul 2026 15:00:00 GMT</lastBuildDate>
+<item>
+  <title>[Paper Review] Planning with Diffusion for Flexible Behavior Synthesis (Diffuser)</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/diffuser-planning/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Michael Janner*, Yilun Du*, Joshua B. Tenenbaum, Sergey Levine. <em>Planning with Diffusion for Flexible Behavior Synthesis.</em> ICML 2022. <a href="https://arxiv.org/abs/2205.09991">arXiv:2205.09991</a> · <a href="https://proceedings.mlr.press/v162/janner22a.html">PMLR</a> · <a href="https://diffusion-planning.github.io/">Project page</a> · <a href="https://github.com/jannerm/diffuser">Code</a></p>
+</blockquote>
+<div id="fig-teaser" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Diagram of Diffuser denoising a two-dimensional array of states and actions across the planning horizon, with a local receptive field highlighted and a guide function J injected into the denoising process">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-teaser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://jiwooshin-kr.github.io/blog/posts/diffuser-planning/fig2-teaser.png" class="img-fluid figure-img" alt="Diagram of Diffuser denoising a two-dimensional array of states and actions across the planning horizon, with a local receptive field highlighted and a guide function J injected into the denoising process">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-teaser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 2 of the paper. Diffuser denoises a two-dimensional array of state-action pairs — one column per planning timestep — all at once. Each denoising step has only a local receptive field over time, so a single step enforces local consistency; stacking many steps produces globally coherent plans. An optional guide <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BJ%7D"> biases samples toward high return. (Janner et al., 2022)
+</figcaption>
+</figure>
+</div>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Model-based RL usually means: learn a one-step dynamics model, then hand it to a classical trajectory optimizer. In practice the optimizer exploits the model’s errors, producing adversarial plans rather than optimal ones. <strong>Diffuser</strong> dissolves the model/planner boundary: train a <a href="https://arxiv.org/abs/2006.11239">denoising diffusion model</a> directly over <em>entire trajectories</em> — a 2D array of states and actions — so that <strong>planning becomes almost identical to sampling</strong>. A plan is not rolled out step by step; it emerges whole, refined from noise over the denoising iterations.</p>
+<p>Two conditioning mechanisms make the samples useful for control, both borrowed from image diffusion: rewards enter as <a href="https://arxiv.org/abs/2105.05233">classifier-guided sampling</a> (gradients of a learned return model nudge the denoising mean), and constraints — most importantly <strong>the initial and final states of the trajectory</strong> — enter as <strong>inpainting</strong>: the constrained entries of the array are simply overwritten with their fixed values after every denoising step, exactly like known pixels in image inpainting. That second mechanism is the answer to a question I had when reading: <em>can you fix where a generated trajectory starts and ends?</em> Here it is not a trick bolted on afterwards — it is how every plan is conditioned on the current state, and how goal-reaching is solved with zero reward signal. On the sparse-reward Maze2D benchmark, this start/goal inpainting alone scores <strong>119.5</strong> average (vs 47.0 for the best model-free baseline), and the same trained model transfers to randomized goals <em>without any retraining</em> — you just clamp a different terminal state.</p>
+</section>
+<section id="why-this-problem-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
+<p>Trajectory optimization is the cleanest story in control: write down the objective, let the optimizer find the actions. But it needs ground-truth dynamics <img src="https://latex.codecogs.com/png.latex?s_%7Bt+1%7D%20=%20f(s_t,%20a_t)">. The learning-based workaround — approximate <img src="https://latex.codecogs.com/png.latex?f"> with a neural network, plug it into the optimizer — fails in a characteristic way: powerful optimizers treat model error as opportunity, steering into regions where the learned model hallucinates high reward. So practical model-based RL retreated to weak gradient-free planners, or abandoned planning for value functions.</p>
+<p>Diffuser’s proposal: if the planner is going to be tightly coupled to the model anyway, design the <em>model</em> around the planning problem. Predict full trajectories non-autoregressively (no compounding one-step error), model actions jointly with states (a plan needs both), stay reward-agnostic (one model, many tasks), and make the sampling procedure itself the planner.</p>
+</section>
+<section id="the-diffusion-model-planning-as-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="the-diffusion-model-planning-as-sampling">The diffusion model: planning as sampling</h2>
+<p><strong>Trajectories as arrays.</strong> Diffuser represents a plan as a two-dimensional array — one column per planning timestep, states stacked on actions:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Ctau%20%5C;=%5C;%0A%5Cbegin%7Bbmatrix%7D%0As_0%20&amp;%20s_1%20&amp;%20%5Ccdots%20&amp;%20s_T%20%5C%5C%0Aa_0%20&amp;%20a_1%20&amp;%20%5Ccdots%20&amp;%20a_T%0A%5Cend%7Bbmatrix%7D%0A"></p>
+<p>The model learns <img src="https://latex.codecogs.com/png.latex?p_%5Ctheta(%5Ctau)"> with a standard diffusion setup (<a href="https://arxiv.org/abs/1503.03585">Sohl-Dickstein et al., 2015</a>; <a href="https://arxiv.org/abs/2006.11239">Ho et al., 2020</a>): a forward process corrupts trajectories with Gaussian noise over diffusion steps <img src="https://latex.codecogs.com/png.latex?i%20=%201,%5Cdots,N">, and a learned reverse process <img src="https://latex.codecogs.com/png.latex?p_%5Ctheta(%5Ctau%5E%7Bi-1%7D%20%5Cmid%20%5Ctau%5Ei)"> denoises them back. Training is the usual simplified <img src="https://latex.codecogs.com/png.latex?%5Cepsilon">-prediction objective <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BL%7D(%5Ctheta)%20=%20%5Cmathbb%7BE%7D_%7Bi,%5Cepsilon,%5Ctau%5E0%7D%5Cbig%5B%5ClVert%20%5Cepsilon%20-%20%5Cepsilon_%5Ctheta(%5Ctau%5Ei,%20i)%5CrVert%5E2%5Cbig%5D"> with a <a href="https://arxiv.org/abs/2102.09672">cosine noise schedule</a>. Notation to keep straight: superscripts are <em>diffusion</em> time (noise level), subscripts are <em>planning</em> time.</p>
+<p><strong>Why generation must be non-autoregressive.</strong> This is my favorite conceptual point in the paper. Dynamics prediction is causal — the present follows from the past — but <em>decision-making is anti-causal</em>: what I should do now depends on where I want to end up. Formally, goal-conditioned inference <img src="https://latex.codecogs.com/png.latex?p(s_1%20%5Cmid%20s_0,%20s_T)"> conditions on the future. A left-to-right autoregressive model structurally cannot do this; a diffusion model that generates all timesteps concurrently can. This is precisely the property that makes terminal-state conditioning possible at all — information from the clamped end of the trajectory propagates backwards through planning time during denoising.</p>
+<p><strong>Architecture: local steps, global coherence.</strong> The denoiser is a U-Net of 1D <em>temporal</em> convolutions — the image-diffusion U-Net with spatial convolutions swapped for convolutions along the horizon axis. Each denoising step sees only a local temporal receptive field, so a single step can only enforce <em>local</em> consistency (do adjacent transitions look dynamically plausible?). Global coherence — a path that actually connects start to goal — emerges from composing many local refinements. Two nice consequences: the model is fully convolutional in time, so the <strong>planning horizon is set by the width of the input noise</strong>, not the architecture (variable-length plans for free); and the local-consistency bias lets Diffuser <strong>stitch</strong> in-distribution trajectory snippets into novel composite plans (trained only on straight-line trajectories, it generalizes to v-shaped ones — Figure 3b).</p>
+<div id="fig-properties" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Four-panel figure showing denoising toward a goal in a maze, stitching of straight trajectories into v-shapes, variable-length plans from different noise sizes, and planning under a new reward heatmap">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-properties-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://jiwooshin-kr.github.io/blog/posts/diffuser-planning/fig3-properties.png" class="img-fluid figure-img" alt="Four-panel figure showing denoising toward a goal in a maze, stitching of straight trajectories into v-shapes, variable-length plans from different noise sizes, and planning under a new reward heatmap">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-properties-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Figure 3 of the paper: properties of diffusion planners. <strong>(a)</strong> Long-horizon sparse-reward planning where shooting methods fail. <strong>(b)</strong> Temporal compositionality: trained only on straight-line trajectories, Diffuser stitches them into novel v-shaped plans. <strong>(c)</strong> Variable-length plans via the input-noise dimensionality. <strong>(d)</strong> Task compositionality: a new reward unseen in training, applied as guidance at sampling time. ⦿ is the start state, ★ the goal. (Janner et al., 2022)
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="conditioning-i-generating-the-initial-and-terminal-states-by-inpainting" class="level2">
+<h2 class="anchored" data-anchor-id="conditioning-i-generating-the-initial-and-terminal-states-by-inpainting">Conditioning I: generating the initial and terminal states by inpainting</h2>
+<p>Sampling from <img src="https://latex.codecogs.com/png.latex?p_%5Ctheta(%5Ctau)"> gives <em>plausible</em> trajectories from anywhere to anywhere. Planning needs trajectories that satisfy conditions. Diffuser frames all conditioning as sampling from a perturbed distribution</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Ctilde%7Bp%7D_%5Ctheta(%5Ctau)%20%5C;%5Cpropto%5C;%20p_%5Ctheta(%5Ctau)%5C,%20h(%5Ctau),%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?h(%5Ctau)"> carries everything task-specific — and because the dynamics knowledge lives entirely in <img src="https://latex.codecogs.com/png.latex?p_%5Ctheta">, one trained model serves every task in the environment.</p>
+<p>The case I want to dwell on — and the reason I picked up this paper — is <strong>hard state constraints: fixing where the trajectory begins and ends.</strong> Section 3.3 observes that with the 2D-array trajectory representation, this is <em>literally</em> the inpainting problem from image diffusion: constrained states play the role of observed pixels, and the model must fill in everything else consistently. The perturbation function is a Dirac delta on the constrained entries — for a constraint <img src="https://latex.codecogs.com/png.latex?c_t"> at planning time <img src="https://latex.codecogs.com/png.latex?t">:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Ah(%5Ctau)%20%5C;=%5C;%20%5Cdelta_%7Bc_t%7D(s_0,%20a_0,%20%5Cdots,%20s_T,%20a_T)%20%5C;=%5C;%0A%5Cbegin%7Bcases%7D%0A+%5Cinfty%20&amp;%20%5Ctext%7Bif%20%7D%20c_t%20=%20s_t%20%5C%5C%0A0%20&amp;%20%5Ctext%7Botherwise%7D%0A%5Cend%7Bcases%7D%0A"></p>
+<p>The implementation is disarmingly simple. At every denoising step <img src="https://latex.codecogs.com/png.latex?i%20%5Cin%20%5C%7BN,%20%5Cdots,%201%5C%7D">:</p>
+<ol type="1">
+<li>sample <img src="https://latex.codecogs.com/png.latex?%5Ctau%5E%7Bi-1%7D%20%5Csim%20p_%5Ctheta(%5Ctau%5E%7Bi-1%7D%20%5Cmid%20%5Ctau%5Ei)"> as usual;</li>
+<li><strong>overwrite the constrained entries with their fixed values</strong> — for start/goal conditioning, <img src="https://latex.codecogs.com/png.latex?%5Ctau_%7Bs_0%7D%20%5Cleftarrow%20s_%7B%5Ctext%7Bcurrent%7D%7D"> and <img src="https://latex.codecogs.com/png.latex?%5Ctau_%7Bs_T%7D%20%5Cleftarrow%20s_%7B%5Ctext%7Bgoal%7D%7D">.</li>
+</ol>
+<p>Because the clamp is re-imposed after <em>every</em> step, the denoiser is repeatedly forced to reconcile the free middle of the trajectory with both fixed endpoints. The anti-causal, bidirectional receptive field is what lets the goal at <img src="https://latex.codecogs.com/png.latex?t%7B=%7DT"> shape the actions at <img src="https://latex.codecogs.com/png.latex?t%7B=%7D0"> — over the denoising iterations, boundary information diffuses inward through planning time until the inpainted middle is a dynamically consistent path connecting the two. Figure 4 makes this visual and is, for me, the most striking figure of the paper: red point-clouds of noise crystallize into a single path pinned at ⦿ and ★.</p>
+<div id="fig-inpainting" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Grid of maze images across three maze sizes showing scattered red noise points progressively denoising into a single coherent trajectory connecting a fixed start and goal marker">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-inpainting-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://jiwooshin-kr.github.io/blog/posts/diffuser-planning/fig4-inpainting.png" class="img-fluid figure-img" alt="Grid of maze images across three maze sizes showing scattered red noise points progressively denoising into a single coherent trajectory connecting a fixed start and goal marker">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-inpainting-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Figure 4 of the paper: planning as inpainting in Maze2D. The start ⦿ and goal ★ states are clamped; denoising “inpaints” the intermediate states into a feasible path. (Janner et al., 2022)
+</figcaption>
+</figure>
+</div>
+<p>Three things worth underlining about this mechanism:</p>
+<ul>
+<li><strong>It is universal, not optional.</strong> Even pure reward-maximization runs use it — every plan must begin at the <em>current</em> state, so <img src="https://latex.codecogs.com/png.latex?%5Ctau_%7Bs_0%7D%20%5Cleftarrow%20s"> is line 10 of the planning algorithm, executed unconditionally. Terminal-state clamping is the same line applied at the other end. Initial and termination conditions are first-class citizens of the sampler.</li>
+<li><strong>It generalizes beyond endpoints.</strong> Nothing is special about <img src="https://latex.codecogs.com/png.latex?t=0"> and <img src="https://latex.codecogs.com/png.latex?t=T">: any subset of the array can be clamped — intermediate waypoints, even action dimensions (the paper’s definition for action constraints is identical). You could pin a mid-trajectory checkpoint just as easily.</li>
+<li><strong>It is a <em>hard</em> constraint, training-free, and retarget-able.</strong> No goal-conditioned training, no reward shaping. The Multi2D experiment is the payoff: the single-task Maze2D model is reused with randomized goals by changing only the clamped value of <img src="https://latex.codecogs.com/png.latex?%5Ctau_%7Bs_T%7D">, and performance doesn’t move (129.4 vs 119.5). The caveat is the flip side of the same coin: clamping guarantees the endpoints <em>appear</em>, but the inpainted middle is only as feasible as the training distribution — clamp an endpoint pair the data never connects, and the model must extrapolate.</li>
+</ul>
+</section>
+<section id="conditioning-ii-reward-as-classifier-guidance" class="level2">
+<h2 class="anchored" data-anchor-id="conditioning-ii-reward-as-classifier-guidance">Conditioning II: reward as classifier guidance</h2>
+<p>For reward maximization, Diffuser ports <a href="https://arxiv.org/abs/2105.05233">classifier-guided sampling</a> through the <a href="https://arxiv.org/abs/1805.00909">control-as-inference</a> lens. Let <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BO%7D_t"> be the optimality variable with <img src="https://latex.codecogs.com/png.latex?p(%5Cmathcal%7BO%7D_t%20=%201)%20=%20%5Cexp(r(s_t,%20a_t))">; setting <img src="https://latex.codecogs.com/png.latex?h(%5Ctau)%20=%20p(%5Cmathcal%7BO%7D_%7B1:T%7D%20%5Cmid%20%5Ctau)"> turns RL into conditional sampling. When the guidance term is smooth, the guided reverse step is Gaussian with a shifted mean:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Ap_%5Ctheta(%5Ctau%5E%7Bi-1%7D%20%5Cmid%20%5Ctau%5Ei,%20%5Cmathcal%7BO%7D_%7B1:T%7D)%20%5C;%5Capprox%5C;%20%5Cmathcal%7BN%7D%5C!%5Cbig(%5Ctau%5E%7Bi-1%7D;%5C;%20%5Cmu%20+%20%5Calpha%5CSigma%5C,%5Cnabla%5Cmathcal%7BJ%7D(%5Cmu),%5C;%20%5CSigma%5Ei%5Cbig)%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BJ%7D_%5Cphi"> is a separately trained return predictor on noisy trajectories, standing in for the image-domain classifier. Guidance and inpainting compose in the same loop — shift the mean by <img src="https://latex.codecogs.com/png.latex?%5Calpha%5CSigma%5Cnabla%5Cmathcal%7BJ%7D">, sample, clamp <img src="https://latex.codecogs.com/png.latex?%5Ctau_%7Bs_0%7D">, repeat — and multiple guides can be <em>added</em> (task compositionality, Figure 3d: a reward function never seen during training steers the same model at test time). Execution is receding-horizon: plan, execute the first action, observe, replan.</p>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p><strong>Long-horizon sparse reward (Maze2D / Multi2D).</strong> Reward is 1 only at the goal, hundreds of steps away — a credit-assignment nightmare for model-free RL. Diffuser plans by pure start/goal inpainting (no reward guidance at all) and scores 113.9–123.0 across maze sizes (&gt;100 = better than the reference expert), vs 47.0 average for <a href="https://arxiv.org/abs/2110.06169">IQL</a> and worse for <a href="https://arxiv.org/abs/2006.04779">CQL</a> and <a href="https://arxiv.org/abs/1509.01149">MPPI</a> — the latter <em>with ground-truth dynamics</em>, which neatly isolates planning difficulty from model error. In the multi-goal variant, IQL (with hindsight relabeling) drops to 16.9 while Diffuser holds at 129.4, unchanged, because retargeting is just a different clamp.</p>
+<p><strong>Test-time flexibility (block stacking).</strong> One model trained on <a href="https://arxiv.org/abs/1802.08705">PDDLStream</a> demonstrations handles three tasks by swapping <img src="https://latex.codecogs.com/png.latex?h(%5Ctau)">: unconditional stacking (no perturbation), conditional stacking and rearrangement (a final-state-matching guide composed with an end-effector contact constraint). Diffuser averages 54.4 where goal-conditioned <a href="https://arxiv.org/abs/1812.02900">BCQ</a> and CQL score 0.0 — the conditional settings simply break the model-free baselines.</p>
+<p><strong>Offline locomotion (D4RL).</strong> On the <a href="https://arxiv.org/abs/2004.07219">D4RL</a> MuJoCo suite with reward guidance, Diffuser averages 77.5 — on par with the best purpose-built single-task methods (CQL 77.6, IQL 77.0, <a href="https://arxiv.org/abs/2106.02039">Trajectory Transformer</a> 78.9, beating <a href="https://arxiv.org/abs/2106.01345">Decision Transformer</a> 74.7). A telling ablation: using Diffuser merely as a <em>dynamics model</em> inside MPPI performs no better than random — the value is in the coupled model-planner, not in prediction accuracy.</p>
+<p><strong>Speed, the honest caveat.</strong> Iterative denoising per plan is slow. Warm-starting helps a lot: re-noise the previous timestep’s plan a few steps and re-denoise, cutting the budget ~10× with only a modest score drop (Figure 7). Still, this is 2022-era diffusion sampling — slow relative to a policy forward pass.</p>
+</section>
+<section id="strengths" class="level2">
+<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<ol type="1">
+<li><strong>A genuinely new abstraction for planning.</strong> “Sampling = planning” is not a slogan here — the planner <em>is</em> the sampler plus a perturbation function. This eliminates the model-exploitation failure mode by construction: there is no outer-loop optimizer to adversarially probe the model.</li>
+<li><strong>Conditioning by inpainting is elegant and exactly right for goal-reaching.</strong> Hard endpoint constraints, zero retraining, task retargeting by changing one clamped value, and it <em>is</em> the Maze2D result — the paper’s biggest margin comes from its simplest mechanism.</li>
+<li><strong>The anti-causality argument.</strong> The observation that control is anti-causal while autoregressive models are causal is a crisp, transferable insight that justifies the whole non-autoregressive design — and predicts exactly which problems (goal-conditioned, sparse-reward, long-horizon) diffusion planners should win.</li>
+<li><strong>Compositionality demonstrated, not just claimed.</strong> Trajectory stitching (3b), variable horizons (3c), unseen rewards (3d), and constraint composition in block stacking are each backed by an experiment.</li>
+</ol>
+</section>
+<section id="weaknesses-open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
+<ol type="1">
+<li><strong>Feasibility of inpainted plans is distributional, not guaranteed.</strong> Clamping makes the endpoints appear; nothing certifies the middle respects dynamics or obstacles when conditions leave the data manifold. Plans are also executed open-loop in Maze2D — fine there, fragile in general.</li>
+<li><strong>Reward guidance is the weaker of the two mechanisms.</strong> On D4RL, Diffuser only matches model-free baselines, and <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BJ%7D_%5Cphi"> must be trained per reward on <em>noisy</em> trajectories — a somewhat awkward object. Later work (classifier-free variants like <a href="https://arxiv.org/abs/2211.15657">Decision Diffuser</a>) largely replaced it.</li>
+<li><strong>Sampling cost.</strong> Even warm-started, denoising-per-decision is orders of magnitude more expensive than a policy. The paper is upfront about this; it remains the main deployment barrier for this family.</li>
+<li><strong>Low-dimensional states only.</strong> Everything here is proprioceptive/planar state; image-based control is untouched (and the temporal-U-Net-over-state-vectors design doesn’t obviously transfer).</li>
+</ol>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>Reading this in 2026, Diffuser is clearly a lineage-starting paper — diffusion policies, guided trajectory generation, and half of today’s robot-learning stacks trace back to the two conditioning mechanisms in Section 3. What struck me most on a close read is the asymmetry between them: the reward-guidance half (Section 3.2) is the part the title advertises, but the <em>inpainting</em> half (Section 3.3) is the part that wins the experiments and that survived best in follow-up work. Fixing the initial condition is what makes any of it a planner; fixing the terminal condition is what makes it a goal-reaching planner with free task transfer. And the mechanism is one line: sample, clamp, repeat. The deeper enabler — easy to miss — is the anti-causal generation order: only a model that generates all timesteps jointly can let a constraint at <img src="https://latex.codecogs.com/png.latex?t%7B=%7DT"> reshape the action at <img src="https://latex.codecogs.com/png.latex?t%7B=%7D0">.</p>
+<p>The through-line to my earlier reviews is inference-time steering of a frozen diffusion model: <a href="../safety-guided-flow/">SGF</a> steers <em>away</em> from unsafe regions with a soft guidance force and proves <em>when</em> to apply it; Diffuser steers <em>toward</em> conditions with both a soft force (reward gradients) and a hard clamp (inpainting). The hard-constraint end of that spectrum is exactly where the safety line and the planning line meet — <a href="https://arxiv.org/abs/2306.00148">SafeDiffuser</a> later put control barrier functions <em>inside</em> Diffuser’s denoising steps to certify constraint satisfaction, closing the loop between these two literatures.</p>
+<p><strong>Verdict:</strong> the founding paper of diffusion-based planning, and still the cleanest exposition of the two conditioning mechanisms everything since builds on. If you only read one section, read 3.3 — the inpainting trick is the highest insight-per-equation in the paper.</p>
+</section>
+<section id="related-papers" class="level2">
+<h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
+<ul>
+<li><strong>The paper:</strong> Janner*, Du*, Tenenbaum &amp; Levine. <em>Planning with Diffusion for Flexible Behavior Synthesis.</em> ICML 2022 — <a href="https://arxiv.org/abs/2205.09991">arXiv:2205.09991</a></li>
+<li><strong>The machinery it builds on:</strong> Ho, Jain &amp; Abbeel. <em>Denoising Diffusion Probabilistic Models.</em> NeurIPS 2020 — <a href="https://arxiv.org/abs/2006.11239">arXiv:2006.11239</a> · Dhariwal &amp; Nichol. <em>Diffusion Models Beat GANs on Image Synthesis</em> (classifier guidance). NeurIPS 2021 — <a href="https://arxiv.org/abs/2105.05233">arXiv:2105.05233</a></li>
+<li><strong>Steering frozen diffusion models at inference time, safety edition:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow.</em> ICLR 2026 — negative guidance with a CBF-based timing theory; the repulsive counterpart of Diffuser’s attractive conditioning — <a href="../safety-guided-flow/">my review</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Paper-Review</category>
+  <category>Diffusion</category>
+  <category>Reinforcement-Learning</category>
+  <category>Planning</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/diffuser-planning/</guid>
+  <pubDate>Thu, 09 Jul 2026 15:00:00 GMT</pubDate>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/diffuser-planning/fig2-teaser.png" medium="image" type="image/png" height="105" width="144"/>
+</item>
 <item>
   <title>[Paper Review] Training-Free Safe Denoisers for Safe Use of Diffusion Models</title>
   <dc:creator>Jiwoo Shin</dc:creator>
@@ -255,6 +394,196 @@ Figure&nbsp;2: Figure 1(b) of the paper: memorization mitigation. Left to right:
   <media:content url="https://jiwooshin-kr.github.io/blog/posts/safe-denoiser/fig-scream.png" medium="image" type="image/png" height="95" width="144"/>
 </item>
 <item>
+  <title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Text diffusion models (TDMs) like <a href="https://openreview.net/forum?id=KnqiC0znVF">LLaDA</a> and <a href="https://openreview.net/forum?id=L4uaAR4ArM">MDLM</a> generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as <a href="https://openreview.net/forum?id=rIPeatvPy3">DIJA</a> and <a href="https://openreview.net/forum?id=NWvL280s2l">PAD</a> reach near-100% attack success rates on instruction-tuned TDMs.</p>
+<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the <a href="https://openreview.net/forum?id=QQS7TudonJ">safe denoiser of Kim et al.&nbsp;(NeurIPS 2025)</a>, originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
+</section>
+<section id="why-this-problem-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
+<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
+<ul>
+<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
+<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
+<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
+</ul>
+<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
+</section>
+<section id="background-the-safe-denoiser" class="level2">
+<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
+<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%20%5Ccup%20%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D">. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20+%20%5Cbeta%5E*(x_t)%5Cleft(%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20-%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%5Cright)%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)%20%5Cge%200"> grows with the posterior likelihood that the current state <img src="https://latex.codecogs.com/png.latex?x_t"> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <img src="https://latex.codecogs.com/png.latex?%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D">; the two remaining quantities are approximated from a finite set of unsafe references.</p>
+<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from <a href="https://openreview.net/forum?id=zBPzxhso8M">DiffuGuard</a>.</p>
+</section>
+<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
+<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
+<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
+<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <img src="https://latex.codecogs.com/png.latex?N"> unsafe reference sequences <img src="https://latex.codecogs.com/png.latex?x%5E%7B(1)%7D,%20%5Cdots,%20x%5E%7B(N)%7D"> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Chat%7B%5Cmathbb%7BE%7D%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Csum_%7Bn=1%7D%5E%7BN%7D%20x%5E%7B(n)%7D%20%5Cfrac%7Bq_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)%7D%7B%5Csum_%7Bm%7D%20q_t(x_t%20%5Cmid%20x%5E%7B(m)%7D)%7D%0A"></p>
+<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Aq_t(x_t%20%5Cmid%20x_0)%20=%20%5Calpha_t%5E%7B%5C#%5C%7B%5Ctext%7Bmatching%20positions%7D%5C%7D%7D%20(1-%5Calpha_t)%5E%7B%5C#%5C%7B%5Ctext%7Bmasked%20positions%7D%5C%7D%7D%0A"></p>
+<p>This is computable in <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
+<p><strong>3. Approximating <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <img src="https://latex.codecogs.com/png.latex?%5Ceta%20%5Ccdot%20%5Cfrac%7B1%7D%7BN%7D%5Csum_n%20q_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)"> with a tunable strength <img src="https://latex.codecogs.com/png.latex?%5Ceta">, applied only during a <strong>time window</strong> <img src="https://latex.codecogs.com/png.latex?C"> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
+<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
+<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>Three safety dimensions, on MDLM and the LLaDA/<a href="https://arxiv.org/abs/2508.15487">Dream</a> family:</p>
+<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
+<div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" class="img-fluid figure-img" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Each point is a SAD configuration; going down (fewer unsafe generations) usually costs some perplexity, and the guidance time window (colours) controls where you land on the curve. (Yusuf et al., 2026)
+</figcaption>
+</figure>
+</div>
+<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
+<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Btrain%7D"> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <img src="https://latex.codecogs.com/png.latex?%5Ceta"> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <img src="https://latex.codecogs.com/png.latex?(n,p)">-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
+<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches <a href="https://proceedings.mlr.press/v267/singhal25b.html">FK Steering</a> (<img src="https://latex.codecogs.com/png.latex?k%7B=%7D8">) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
+<p><strong>Ablations worth remembering:</strong></p>
+<ul>
+<li><img src="https://latex.codecogs.com/png.latex?%5Ceta"> is a clean monotonic safety knob once the schedule is fixed.</li>
+<li>The time window <img src="https://latex.codecogs.com/png.latex?C"> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
+<li>Safety gains saturate at <img src="https://latex.codecogs.com/png.latex?N%20%5Capprox%20500%5Ctext%7B%E2%80%93%7D1000"> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
+</ul>
+</section>
+<section id="strengths" class="level2">
+<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<ol type="1">
+<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
+<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
+<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
+<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
+</ol>
+</section>
+<section id="weaknesses-open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
+<ol type="1">
+<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
+<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
+<li><strong>The theory–practice gap around <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The provable guarantee holds for the exact <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)">; in practice it’s replaced by a constant <img src="https://latex.codecogs.com/png.latex?%5Ceta"> inside a hand-tuned time window, with <img src="https://latex.codecogs.com/png.latex?%5Ceta"> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
+<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
+<li><strong>Scale.</strong> Experiments top out at 8B models and <img src="https://latex.codecogs.com/png.latex?N%7B=%7D5000"> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
+</ol>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
+<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
+<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
+</section>
+<section id="peer-review-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
+<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026, reviewed by four reviewers. The scores below are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text is not publicly available (ICML does not post reviews, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> requires sign-in), so they are reproduced here without interpretation.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Recommendation</th>
+<th>Confidence</th>
+<th>Soundness</th>
+<th>Significance</th>
+<th>Originality</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Reviewer 9T1S</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>Reviewer YM1a</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Reviewer pAtC</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>3</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Reviewer ddgR</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td><strong>Average</strong></td>
+<td><strong>4.0</strong></td>
+<td>2.75</td>
+<td>2.75</td>
+<td>3.25</td>
+<td>2.5</td>
+<td>2.75</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="related-papers" class="level2">
+<h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
+<ul>
+<li><strong>The paper:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">code</a></li>
+<li><strong>The theorem it adapts:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="../safe-denoiser/">my review</a></li>
+<li><strong>The theory behind the time window:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="../safety-guided-flow/">my review</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Paper-Review</category>
+  <category>Diffusion</category>
+  <category>Safety</category>
+  <category>LLM</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</guid>
+  <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" medium="image" type="image/png" height="80" width="144"/>
+</item>
+<item>
   <title>[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation</title>
   <dc:creator>Jiwoo Shin</dc:creator>
   <link>https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/</link>
@@ -445,6 +774,7 @@ Figure&nbsp;3: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a
 <li><strong>The paper:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="https://arxiv.org/abs/2603.13300">arXiv:2603.13300</a></li>
 <li><strong>The two methods it unifies:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers.</em> NeurIPS 2025 — <a href="../safe-denoiser/">my review</a> · Kirchhof et al.&nbsp;<em>Shielded Diffusion (SPELL).</em> ICML 2025 — <a href="https://proceedings.mlr.press/v267/kirchhof25a.html">PMLR</a></li>
 <li><strong>Follow-up work (published two months later, cites this paper):</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — deploys this line of negative guidance on text diffusion — <a href="../safety-aware-denoiser/">my review</a></li>
+<li><strong>Where inference-time steering of diffusion sampling began in decision-making:</strong> Janner et al.&nbsp;<em>Planning with Diffusion (Diffuser).</em> ICML 2022 — the attractive counterpart (guidance toward rewards, hard constraints by inpainting) to SGF’s repulsive guidance — <a href="../diffuser-planning/">my review</a></li>
 </ul>
 
 
@@ -458,196 +788,6 @@ Figure&nbsp;3: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a
   <guid>https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/</guid>
   <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
   <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig1-teaser.png" medium="image" type="image/png" height="84" width="144"/>
-</item>
-<item>
-  <title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</title>
-  <dc:creator>Jiwoo Shin</dc:creator>
-  <link>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-
-<blockquote class="blockquote">
-<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
-</blockquote>
-<section id="tldr" class="level2">
-<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
-<p>Text diffusion models (TDMs) like <a href="https://openreview.net/forum?id=KnqiC0znVF">LLaDA</a> and <a href="https://openreview.net/forum?id=L4uaAR4ArM">MDLM</a> generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as <a href="https://openreview.net/forum?id=rIPeatvPy3">DIJA</a> and <a href="https://openreview.net/forum?id=NWvL280s2l">PAD</a> reach near-100% attack success rates on instruction-tuned TDMs.</p>
-<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the <a href="https://openreview.net/forum?id=QQS7TudonJ">safe denoiser of Kim et al.&nbsp;(NeurIPS 2025)</a>, originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
-</section>
-<section id="why-this-problem-matters" class="level2">
-<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
-<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
-<ul>
-<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
-<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
-<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
-</ul>
-<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
-</section>
-<section id="background-the-safe-denoiser" class="level2">
-<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
-<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%20%5Ccup%20%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D">. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
-<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20+%20%5Cbeta%5E*(x_t)%5Cleft(%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20-%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%5Cright)%0A"></p>
-<p>where <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)%20%5Cge%200"> grows with the posterior likelihood that the current state <img src="https://latex.codecogs.com/png.latex?x_t"> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <img src="https://latex.codecogs.com/png.latex?%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D">; the two remaining quantities are approximated from a finite set of unsafe references.</p>
-<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from <a href="https://openreview.net/forum?id=zBPzxhso8M">DiffuGuard</a>.</p>
-</section>
-<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
-<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
-<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
-<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <img src="https://latex.codecogs.com/png.latex?N"> unsafe reference sequences <img src="https://latex.codecogs.com/png.latex?x%5E%7B(1)%7D,%20%5Cdots,%20x%5E%7B(N)%7D"> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
-<p><img src="https://latex.codecogs.com/png.latex?%0A%5Chat%7B%5Cmathbb%7BE%7D%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Csum_%7Bn=1%7D%5E%7BN%7D%20x%5E%7B(n)%7D%20%5Cfrac%7Bq_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)%7D%7B%5Csum_%7Bm%7D%20q_t(x_t%20%5Cmid%20x%5E%7B(m)%7D)%7D%0A"></p>
-<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
-<p><img src="https://latex.codecogs.com/png.latex?%0Aq_t(x_t%20%5Cmid%20x_0)%20=%20%5Calpha_t%5E%7B%5C#%5C%7B%5Ctext%7Bmatching%20positions%7D%5C%7D%7D%20(1-%5Calpha_t)%5E%7B%5C#%5C%7B%5Ctext%7Bmasked%20positions%7D%5C%7D%7D%0A"></p>
-<p>This is computable in <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
-<p><strong>3. Approximating <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <img src="https://latex.codecogs.com/png.latex?%5Ceta%20%5Ccdot%20%5Cfrac%7B1%7D%7BN%7D%5Csum_n%20q_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)"> with a tunable strength <img src="https://latex.codecogs.com/png.latex?%5Ceta">, applied only during a <strong>time window</strong> <img src="https://latex.codecogs.com/png.latex?C"> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
-<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
-<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
-</section>
-<section id="experiments" class="level2">
-<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
-<p>Three safety dimensions, on MDLM and the LLaDA/<a href="https://arxiv.org/abs/2508.15487">Dream</a> family:</p>
-<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
-<div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" class="img-fluid figure-img" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Each point is a SAD configuration; going down (fewer unsafe generations) usually costs some perplexity, and the guidance time window (colours) controls where you land on the curve. (Yusuf et al., 2026)
-</figcaption>
-</figure>
-</div>
-<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
-<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Btrain%7D"> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <img src="https://latex.codecogs.com/png.latex?%5Ceta"> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <img src="https://latex.codecogs.com/png.latex?(n,p)">-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
-<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches <a href="https://proceedings.mlr.press/v267/singhal25b.html">FK Steering</a> (<img src="https://latex.codecogs.com/png.latex?k%7B=%7D8">) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
-<p><strong>Ablations worth remembering:</strong></p>
-<ul>
-<li><img src="https://latex.codecogs.com/png.latex?%5Ceta"> is a clean monotonic safety knob once the schedule is fixed.</li>
-<li>The time window <img src="https://latex.codecogs.com/png.latex?C"> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
-<li>Safety gains saturate at <img src="https://latex.codecogs.com/png.latex?N%20%5Capprox%20500%5Ctext%7B%E2%80%93%7D1000"> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
-</ul>
-</section>
-<section id="strengths" class="level2">
-<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
-<ol type="1">
-<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
-<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
-<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
-<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
-</ol>
-</section>
-<section id="weaknesses-open-questions" class="level2">
-<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
-<ol type="1">
-<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
-<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
-<li><strong>The theory–practice gap around <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The provable guarantee holds for the exact <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)">; in practice it’s replaced by a constant <img src="https://latex.codecogs.com/png.latex?%5Ceta"> inside a hand-tuned time window, with <img src="https://latex.codecogs.com/png.latex?%5Ceta"> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
-<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
-<li><strong>Scale.</strong> Experiments top out at 8B models and <img src="https://latex.codecogs.com/png.latex?N%7B=%7D5000"> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
-</ol>
-</section>
-<section id="my-take" class="level2">
-<h2 class="anchored" data-anchor-id="my-take">My take</h2>
-<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
-<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
-<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
-</section>
-<section id="peer-review-at-a-glance" class="level2">
-<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
-<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026, reviewed by four reviewers. The scores below are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text is not publicly available (ICML does not post reviews, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> requires sign-in), so they are reproduced here without interpretation.</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-</colgroup>
-<thead>
-<tr class="header">
-<th></th>
-<th>Recommendation</th>
-<th>Confidence</th>
-<th>Soundness</th>
-<th>Significance</th>
-<th>Originality</th>
-<th>Presentation</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Reviewer 9T1S</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>2</td>
-<td>3</td>
-</tr>
-<tr class="even">
-<td>Reviewer YM1a</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-</tr>
-<tr class="odd">
-<td>Reviewer pAtC</td>
-<td>4</td>
-<td>2</td>
-<td>2</td>
-<td>3</td>
-<td>2</td>
-<td>2</td>
-</tr>
-<tr class="even">
-<td>Reviewer ddgR</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-</tr>
-<tr class="odd">
-<td><strong>Average</strong></td>
-<td><strong>4.0</strong></td>
-<td>2.75</td>
-<td>2.75</td>
-<td>3.25</td>
-<td>2.5</td>
-<td>2.75</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="related-papers" class="level2">
-<h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
-<ul>
-<li><strong>The paper:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">code</a></li>
-<li><strong>The theorem it adapts:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="../safe-denoiser/">my review</a></li>
-<li><strong>The theory behind the time window:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="../safety-guided-flow/">my review</a></li>
-</ul>
-
-
-</section>
-
- ]]></description>
-  <category>Paper-Review</category>
-  <category>Diffusion</category>
-  <category>Safety</category>
-  <category>LLM</category>
-  <guid>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</guid>
-  <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
-  <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" medium="image" type="image/png" height="80" width="144"/>
 </item>
 </channel>
 </rss>
