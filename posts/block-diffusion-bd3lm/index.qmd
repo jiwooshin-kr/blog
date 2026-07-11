@@ -1,0 +1,110 @@
+---
+title: "[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models"
+description: "The BD3-LM paper asks: what if we stop treating autoregression and diffusion as rivals and make the *block* the unit of autoregression and the *token* the unit of diffusion? A close read of the two parts that make it work — why diffusion models couldn't have a KV cache until now, and why the noise schedule turns out to be a variance knob, not a modeling choice."
+author: "Jiwoo Shin"
+date: "2026-07-11"
+categories: [Paper-Review, Diffusion, LLM]
+image: "cover.png"
+---
+
+> **Paper:** Marianne Arriola, Aaron Gokaslan, Justin T. Chiu, Zhihan Yang, Zhixuan Qi, Jiaqi Han, Subham Sekhar Sahoo, Volodymyr Kuleshov. *Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models.* ICLR 2025. [arXiv:2503.09573](https://arxiv.org/abs/2503.09573) · [project page](https://m-arriola.com/bd3lms) · [code](https://github.com/kuleshov-group/bd3lms)
+
+## TL;DR
+
+Diffusion language models circa 2024 had three chronic problems: they could only generate sequences of a fixed, training-time length; they couldn't use a KV cache, so they re-encoded the entire sequence at every denoising step; and their perplexity lagged autoregressive models. **BD3-LMs** (Block Discrete Denoising Diffusion Language Models) attack all three with one structural move: be **autoregressive over blocks, diffusion within blocks**. Generate a block of $L'$ tokens by parallel denoising, freeze it, cache its keys and values exactly like an AR model caches tokens, then move to the next block — which restores both the KV cache and arbitrary-length generation in one stroke.
+
+The subtler half of the paper is about the perplexity gap, and it contains the result I find most instructive: a BD3-LM with block size 1 is *mathematically equivalent* to an AR model in expectation, yet trains to a two-point-worse perplexity. The culprit is not the objective but the **variance of its Monte Carlo estimator** — and the noise schedule, which famously doesn't affect the diffusion ELBO's *value*, turns out to control that variance entirely. Their fix, **clipped schedules** that only sample masking rates inside a data-driven band $[\beta, \omega]$, cuts gradient variance dramatically and sets a then-state-of-the-art perplexity for discrete diffusion (within ~15% of AR on OpenWebText). If you read my [DiffusionGemma post](../diffusion-gemma-uniform-state/), this paper is the academic blueprint of that model's block-autoregressive skeleton — worth understanding on its own terms.
+
+## The setup: two paradigms, complementary failure modes
+
+An autoregressive model factorizes $\log p_\theta(x) = \sum_\ell \log p_\theta(x^\ell \mid x^{<\ell})$ and pays for its quality with strict seriality: $L$ tokens take $L$ forward passes. A discrete diffusion model (D3PM-style, and its masked-diffusion refinements like MDLM) denoises all $L$ positions in parallel — but it commits to a canvas of fixed width $L$ at training time, and because every position is still in flux at every step, *nothing can ever be cached*.
+
+BD3-LM's move is to put a dial between the two. Partition the sequence into $B$ blocks of length $L'$ and factorize
+
+$$
+\log p_\theta(x) \;=\; \sum_{b=1}^{B} \log p_\theta(x^b \mid x^{<b}),
+$$
+
+where each conditional $p_\theta(x^b \mid x^{<b})$ is itself a masked diffusion model over just the $L'$ tokens of block $b$, conditioned on all *clean, finished* previous blocks. Set $L' = 1$ and you recover an AR model; set $L' = L$ and you recover vanilla diffusion; everything in between is new territory. One transformer with a **block-causal attention mask** parameterizes all $B$ conditionals at once: tokens in block $b$ attend to blocks $1$ through $b$, bidirectionally within their own block, causally across blocks.
+
+Here is the metaphor I'll use for the rest of the post. An AR model is a **typewriter**: one keystroke at a time, ink permanent, and the growing manuscript sits in a binder next to you for reference. A vanilla diffusion model is a **whiteboard**: the whole essay is sketched at once in erasable marker and revised in sweeps — wonderfully parallel, but since *any* word might still change, you can never file anything away, and every revision pass means re-reading the entire board. BD3-LM writes on **whiteboard panels the size of a paragraph**: draft the current panel in erasable marker, and the moment it's done, laminate it, file it in the binder, and start a fresh panel. The binder is the KV cache.
+
+## Part I: why diffusion models couldn't have a KV cache — and how blocks restore it
+
+### Caching requires immutability
+
+The KV cache is such a fixture of AR inference that it's easy to forget what makes it *valid*: keys and values for position $\ell$ can be stored and reused only because token $\ell$ **never changes again**. The cache is a ledger of settled facts. Vanilla diffusion violates this at every step — position 3 at denoising step 7 may hold a different token than at step 6, and with bidirectional attention its key/value vectors also depend on every *other* position, which is also changing. Every entry in the would-be cache is stale the moment you write it. So diffusion models recompute attention over all $L$ positions at all $T$ steps: the whole whiteboard, re-read for every sweep of the marker.
+
+Block diffusion restores the ledger by restoring immutability — at block granularity. During generation (their Algorithm 2):
+
+1. Denoise block $b$'s canvas over some number of diffusion steps, with cross-attention into the cached keys/values $K^{1:b-1}, V^{1:b-1}$ of all finished blocks.
+2. When the block is done, run one clean forward pass over it to produce $K^b, V^b$, and append them to the cache — laminate the panel, file it.
+3. Open the next canvas.
+
+The finished prefix is now exactly as cheap as it is for an AR model, while the live canvas keeps diffusion's parallelism (all $L'$ tokens per denoising step). And since blocks are appended one after another with no fixed horizon, generation runs until an `[EOS]` appears — the fixed-length straitjacket is gone for free. In their OpenWebText experiments this is dramatic: SEDD, trained on 1024-token contexts, can emit at most 1024 tokens; BD3-LM sampled documents up to **~9,982 tokens** — roughly 10× its training context — because "context length" now only bounds the binder the model was *trained* to read, not the number of panels it can file.
+
+### The training-time twist: every block must be seen twice
+
+There's a wrinkle that makes *training* less obvious than sampling, and the paper's engineering contribution lives here. To compute the loss for block $b$ you need the model's denoising prediction on the **noisy** $x^b_t$ — but to condition blocks $b{+}1, \dots, B$ you need keys/values from the **clean** $x^b$. Same block, two roles, two different inputs. A single standard forward pass can't produce both, so naively you'd loop over blocks $B$ times.
+
+Their vectorized solution: concatenate the noisy and clean sequences into one input $x_{\text{noisy}} \oplus x$ of length $2L$ and run a *single* forward pass under a specialized attention mask stitched from three pieces:
+
+- $M_{BD}$ (block-diagonal): noisy tokens attend to noisy tokens **within their own block** — the live panel is coherent with itself;
+- $M_{OBC}$ (offset block-causal): noisy tokens attend to **clean tokens of strictly earlier blocks** — the panel may consult the binder, but only the laminated pages, never a clean copy of *itself* (that would be the answer key for the very exercise being graded);
+- $M_{BC}$ (block-causal): clean tokens attend to clean tokens of their own and earlier blocks — this builds the binder itself.
+
+The resulting $2L \times 2L$ mask is extremely sparse, and they exploit that with a fused FlexAttention kernel: up to ~5× faster than a naively masked `scaled_dot_product_attention` on the attention op, ~20–25% end-to-end training speedup over the two-pass alternative, and overall training that stays within 2× the cost of ordinary diffusion training. Each token still passes through the network twice in effect — that's the irreducible price of playing both student and answer key — but the two passes share one kernel launch and one attention computation.
+
+## Part II: the noise schedule is a variance knob
+
+This is the half of the paper I'd assign to students. It starts with an experiment that should be a null result and isn't.
+
+### The puzzle: an equivalence that fails in practice
+
+Set $L' = 1$. Every "block" is a single token, the within-block diffusion collapses, and the paper proves (their Suppl. B.4) that the block-diffusion NELBO is **equal in expectation to the AR negative log-likelihood**. Same model class, same objective in expectation — training should give the same perplexity. It doesn't: on LM1B, AR reaches 22.88 while the $L'=1$ BD3-LM stalls at ≤ 25.56.
+
+The diagnosis is beautiful in its mundanity. Under the standard linear masking schedule, the mask rate at a uniformly sampled time $t$ averages 50% — so on any given batch, the diffusion loss is computed **only on the ~half of tokens that happen to be masked**. The AR model gets a gradient signal from every token in the batch; the diffusion model gets a gradient estimated from a random half. Both estimators are unbiased. One is twice as noisy. The authors make the point with a killer control: train an AR model with a *randomized batch size* and its perplexity degrades to 24.37 — most of the way to the diffusion number. The "diffusion gap" at $L'=1$ was never about diffusion; it was about **gradient variance**.
+
+The metaphor: imagine two teachers estimating a student's ability. One grades the *entire* exam every week. The other rolls a die and grades a random subset of questions — sometimes three questions, sometimes forty. Their long-run averages agree exactly, but the second teacher's weekly reports swing wildly, and if you adjust your teaching (your gradient step) after every report, the noisy reports send you zigzagging. SGD is that teacher: what matters isn't only the expected loss but how much the estimate jitters batch to batch.
+
+And here's the twist that turns diagnosis into cure: for $L'=1$, if you change the forward process to **always mask the token** ($q(x_t = m \mid x) = 1$), the diffusion objective becomes *literally* next-token prediction — every "worksheet" is exactly the AR exercise — and the perplexity gap closes to zero: 22.88, matching AR to the second decimal. Measured NELBO variance drops from 1.52 to 0.11. The schedule didn't change what the model was learning in expectation; it changed how noisily the model was told about it.
+
+### Why extreme mask rates are wasted worksheets
+
+For $L' > 1$, always-mask-everything is no longer the answer (the model must learn to denoise *partial* corruption to sample well). But the variance logic generalizes into an intuition about which masking rates are worth training on. Think of each training example as a fill-in-the-blank worksheet, with the schedule deciding how many blanks:
+
+- **Almost no blanks:** the exercise is copy-the-context; reconstruction is trivial, loss ≈ 0, gradient ≈ nothing. A wasted worksheet.
+- **All blanks:** with no context at all inside the block, the best possible answer is the marginal statistics of the language — guess "the," guess "of." That's learnable in the first hour of training and never again informative. Also wasted.
+- **The middle band:** enough context to reason from, enough blanks to be forced to. All the learning signal lives here.
+
+A linear schedule samples mask rates uniformly on $[0,1]$, so it keeps printing worksheets from both wasted extremes — and those near-zero-signal batches are precisely what inflates the variance of the gradient estimator. The fix is almost embarrassingly simple: **clipped schedules**, which sample the mask rate $1 - \alpha_t \sim \mathcal{U}[\beta, \omega]$ and simply refuse to train outside the productive band.
+
+The subtle part — and the reason this is a *contribution* rather than a hack — is the theoretical status of the schedule. The masked-diffusion NELBO is provably **invariant to the noise schedule** in expectation (a known MDLM-era result), which had licensed everyone to treat the schedule as a don't-care. The paper's point is that this invariance holds for the *value* of the objective, not for the *variance of its Monte Carlo estimator*. The schedule is not a modeling choice at all; it is a **variance-reduction dial** hiding in plain sight. (Two teachers again: both unbiased, but you get to choose which one grades you.)
+
+### Data-driven clipping: the right band depends on the block size
+
+Where should $[\beta, \omega]$ sit? Not anywhere universal. Their Table 8 is worth staring at: for $L' = 4$, heavy masking $\mathcal{U}[0.45, 0.95]$ is best; for $L' = 16$, a moderate band $\mathcal{U}[0.3, 0.8]$ wins. The pattern makes sense through the worksheet lens: a small block sits inside lots of clean, laminated left-context, so even a nearly-blank worksheet is still solvable from the binder — you can crank the difficulty up. A big block is more self-referential, so all-blanks degenerates toward marginal-guessing faster — the productive band sits lower.
+
+Rather than hand-tune this, they make it adaptive: since gradient variance itself is expensive to estimate, they use the **variance of the NELBO estimator as a proxy**, and grid-search $\beta, \omega$ to minimize it at every validation epoch (~every 5K steps) during training. Variance of the loss turns out to correlate cleanly with final test perplexity across schedules — which is itself a nice empirical finding: you can *select* schedules by a statistic that never touches held-out data.
+
+## Does it work?
+
+On likelihoods, yes, and monotonically in the direction the theory predicts (smaller blocks → closer to AR): on LM1B (65B tokens), BD3-LM reaches PPL ≤ 30.60 / 29.83 / 28.23 for $L' = 16/8/4$, versus MDLM's 31.78 — up to a 13% improvement and a new discrete-diffusion state of the art at the time. On OpenWebText (524B tokens): ≤ 22.27 / 21.68 / 20.73 versus MDLM's 22.98, with AR at 17.54. The gap to AR is narrowed, not closed — the NELBO is provably looser as $L'$ grows, so some of the remaining gap is structural.
+
+On sample quality, the ordering is the same: generative perplexity 25.7 ($L'=4$) versus MDLM's 46.8 at matched compute (1K function evaluations), and an order of magnitude fewer network calls than SSD-LM, the earlier Gaussian-embedding block-diffusion approach, at far better quality. And the arbitrary-length capability is qualitative: ~10× longer samples than any fixed-canvas diffusion baseline.
+
+## My take
+
+The lasting contribution here isn't the architecture — "semi-autoregressive" generation existed — it's two conceptual clarifications that outlived the specific model. First, the observation that **caching and revision are fundamentally in tension**, and that the block is the natural truce line: revise freely inside the panel, laminate at the boundary. Every deployed diffusion LM I'm aware of has since adopted exactly this shape — [DiffusionGemma's](../diffusion-gemma-uniform-state/) 256-token canvases committed to a KV cache, with causal/bidirectional mode switching, is this paper's Figure-1 diagram productionized (with the within-block noise swapped from masking to uniform-state, trading the tight NELBO for self-correction — the two posts are really about the two halves of one design space). It's also no coincidence: BD3-LM comes from the Kuleshov group, whose *Diffusion Duality* line supplied the uniform-state half of that story too.
+
+Second, and more transferable: **"invariant in expectation" is not "irrelevant in practice."** The noise-schedule result is a small masterclass in a failure pattern that recurs all over ML — an objective is proven invariant to some choice, the community stops thinking about that choice, and the choice quietly dominates optimization through second-order statistics. The $L'=1$ experiment is the cleanest demonstration I've seen: two provably-equivalent objectives, a two-point perplexity gap, and a one-line schedule change that closes it exactly. If you keep one thing from this paper, keep the habit of asking not "does this choice change my loss?" but "does it change the *variance of my estimator* of my loss?"
+
+The honest limitations are the ones the authors state: training costs up to ~2× standard diffusion (every block plays both student and answer key), small blocks reinherit AR's seriality, and the optimal block size is task-dependent with no principle yet for choosing it. And the perplexity gap to AR, while narrowed, remains — closed only in the degenerate $L'=1$ limit where you've rebuilt an AR model. Interpolation, it turns out, means inheriting a weighted average of the weaknesses too. But as a piece of analysis that turned "diffusion LMs are worse and nobody quite knows why" into "here is the variance, here is the knob, here is the recipe," it's one of the most useful diffusion-LM papers of its year.
+
+## Related
+
+- **The paper:** Arriola et al. *Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models.* ICLR 2025 — [arXiv:2503.09573](https://arxiv.org/abs/2503.09573) · [project page & blog](https://m-arriola.com/bd3lms) · [code](https://github.com/kuleshov-group/bd3lms)
+- **The masked-diffusion foundation it builds on:** Sahoo et al. *Simple and Effective Masked Diffusion Language Models* (MDLM), NeurIPS 2024 — [OpenReview](https://openreview.net/forum?id=L4uaAR4ArM)
+- **Where the design shipped:** my review of [DiffusionGemma](../diffusion-gemma-uniform-state/), whose block-autoregressive canvas + KV-cache design is this paper's skeleton at 26B scale
+- **The same group's uniform-state line:** Sahoo et al. *The Diffusion Duality*, ICML 2025 — [arXiv:2506.10892](https://arxiv.org/abs/2506.10892)
+- **The Gaussian-embedding predecessor it improves on:** Han et al. *SSD-LM*, 2022 — [arXiv:2210.17432](https://arxiv.org/abs/2210.17432)

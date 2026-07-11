@@ -1,0 +1,66 @@
+---
+title: "[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space"
+description: "The paper that started the continuous-latent-reasoning line: instead of decoding a chain-of-thought into words, feed the LLM's last hidden state straight back as the next input embedding — turning a single reasoning trajectory into a superposition that can search breadth-first."
+author: "Jiwoo Shin"
+date: "2026-07-11"
+categories: [Paper-Review, LLM, Planning]
+image: "cover.png"
+---
+
+> **Paper:** Shibo Hao, Sainbayar Sukhbaatar, DiJia Su, Xian Li, Zhiting Hu, Jason Weston, Yuandong Tian. *Training Large Language Models to Reason in a Continuous Latent Space.* COLM 2025. [arXiv:2412.06769](https://arxiv.org/abs/2412.06769)
+
+## TL;DR
+
+Chain-of-thought forces a model to think in *words*, but most tokens in a reasoning trace are there for grammatical glue, not computation — and words force the model to commit to one path at each step. **Coconut (Chain of Continuous Thought)** removes the words: it takes the LLM's last hidden state and feeds it back in as the *next input embedding*, so the model reasons in its own continuous representation space instead of decoding to text and re-encoding. The payoff is that a continuous thought is not a single token but a distribution — it can hold several candidate next steps at once, letting the model do something like a breadth-first search over a reasoning graph rather than greedily picking one branch. On planning-heavy logical tasks Coconut matches or beats CoT while emitting far fewer tokens; the cost is a fiddly multi-stage training curriculum and reasoning traces no human can read.
+
+## Why this matters
+
+Chain-of-thought works, but it is a strange thing to demand of a model. To "reason," the model must serialize its internal state into a sequence of natural-language tokens, then re-read those tokens to continue. Two problems fall out of this. First, it is wasteful: in a sentence like "so the next number we need to check is 12, which means...", the tokens carrying reasoning content are a small fraction of the whole; the rest is textual coherence. Second, and more fundamentally, *language is committal*. Sampling a token is a hard decision — the moment the model writes "12," it has thrown away the alternative that it should have checked 15. For problems that require search or backtracking, this premature commitment is exactly the failure mode.
+
+Coconut's premise is that the reasoning state does not need to pass through the vocabulary bottleneck at all. The natural place for a transformer to keep its "state" is the hidden vector it already computes — a point in $\mathbb{R}^d$, not a one-hot over the vocabulary. Why round that vector to the nearest word and then re-embed it, when you can just hand it back to the model directly?
+
+## The core idea: feed the hidden state back, don't decode it
+
+In ordinary autoregressive decoding, the input embedding at each step comes from the previously generated *token*. Coconut adds a second mode. Special markers `<bot>` and `<eot>` (begin/end of thought) bracket a stretch of *latent* reasoning. Inside that stretch, the input embedding at step $t$ is not a token embedding — it is the last hidden state from the previous step:
+
+$$
+x_t \;=\;
+\begin{cases}
+\text{Embed}(w_t) & \text{(language mode)}\\[4pt]
+h_{t-1} & \text{(latent mode, between }\texttt{<bot>}\text{ and }\texttt{<eot>}\text{)}
+\end{cases}
+$$
+
+where $h_{t-1}$ is the final-layer hidden state produced at the previous position. No softmax, no token sampling, no re-embedding — the "continuous thought" is just $h_{t-1}$ passed forward. After a fixed number of such latent steps, the model emits `<eot>` and returns to normal language decoding to produce the answer.
+
+The conceptual consequence is the whole point. A decoded token is a single choice; a hidden state is a dense vector that can carry a *superposition* of possibilities. The authors show, on a graph-reachability planning task, that the continuous thought behaves like the frontier of a **breadth-first search**: early latent steps keep weight on several candidate next nodes simultaneously, and later steps prune the dead ends. CoT, by contrast, must gamble on one node and hope it can recover if wrong. Reasoning in latent space lets the model *defer commitment* — it explores in parallel and only collapses to a definite answer when it decodes back to language.
+
+## Training: a curriculum that dissolves the chain of thought
+
+You cannot supervise a continuous thought directly — there is no ground-truth hidden vector to regress toward. Coconut is trained instead by a **multi-stage curriculum** that gradually replaces language reasoning with latent reasoning, starting from ordinary CoT data.
+
+At stage $0$, the model trains on full written CoT (question, all reasoning steps, answer) as usual. At stage $k$, the first $k$ reasoning steps are removed from the text and replaced by $k \cdot c$ continuous thoughts, where $c$ is the number of latent thoughts substituted per step (a small constant). The loss is computed only on the *remaining* text — the later reasoning steps and the final answer. The continuous thoughts receive no direct loss; gradients reach them by backpropagating through the recurrence from the tokens that follow. Over stages, more and more of the written reasoning is swallowed into latent space, and the model learns to carry that computation in $h_t$ instead of in words.
+
+One consequence worth flagging for anyone tempted to reproduce it: because each continuous thought depends on the hidden state of the one before, the latent segment cannot be parallelized across positions the way teacher-forced token training can. Generating $n$ continuous thoughts requires $n$ sequential forward passes, which makes training meaningfully more expensive than standard CoT fine-tuning. This is the practical tax on the whole idea.
+
+## Results
+
+The evaluation is deliberately built around tasks where *search matters*: GSM8K for math word problems, and two synthetic logical-reasoning benchmarks, ProntoQA and the harder ProsQA (a graph-structured reachability task designed to demand real planning rather than pattern completion).
+
+The headline pattern is a favorable accuracy–efficiency trade-off. On the planning-heavy tasks, Coconut with enough continuous thoughts per step **matches or exceeds** written CoT while generating dramatically fewer tokens at inference — the reasoning happens in latent space, so the model does not pay to spell it out. On ProsQA in particular, where the branching structure rewards keeping options open, latent reasoning pulls clearly ahead of CoT; adding more continuous thoughts per step continues to help, consistent with the BFS interpretation. On GSM8K the story is more nuanced — CoT's explicit arithmetic is a strong baseline — but Coconut still beats a no-reasoning baseline and lands close to CoT at a fraction of the token count.
+
+The interpretability probe is, to me, the most convincing evidence. When the authors decode what the continuous thoughts *would* have said, they find the latent state maintaining a spread of plausible next nodes and narrowing it over successive steps — a mechanistic picture of the parallel-then-prune behavior, rather than a claim inferred only from accuracy numbers.
+
+## My take
+
+What I like about Coconut is that it isolates a single, clean idea and follows it honestly: the vocabulary is a bottleneck on reasoning, so route around it. The superposition-enabling-search framing is genuinely illuminating — it reframes CoT's weakness not as "too few tokens" but as "premature discretization," which is a more useful diagnosis. It also sits in an interesting relationship with the broader push toward inference-time compute: everyone is trying to buy more "thinking," and Coconut argues some of that thinking is cheaper and better done in latent space than in text.
+
+The honest caveats are real, though. The sequential training cost is the obvious one, and it partly explains why the paper stays at the scale it does. The curriculum is delicate — the method is a recipe as much as an architecture, and how gracefully it transfers to large pretrained reasoners without heavy per-task staging is still open. And the interpretability loss cuts against a major reason CoT became popular in the first place: a readable trace you can audit. A model that reasons in vectors is, by construction, harder to oversee.
+
+The reason I'm reviewing an early-2025 paper as a "hot" pick is that the line it opened is unmistakably where a chunk of 2026 reasoning research now lives. The continuous-latent-reasoning direction — looped and recurrent-depth transformers, "pondering" in embedding space, and theoretical work on *why* continuous chains of thought are more expressive than discrete ones (the superposition analyses) — all trace back to this move. Coconut isn't the last word on latent reasoning; it's the paper that made the question respectable. Read it for the idea, not the leaderboard.
+
+## Related
+
+- **The paper:** Hao, Sukhbaatar, Su, Li, Hu, Weston & Tian. *Training Large Language Models to Reason in a Continuous Latent Space.* COLM 2025 — [arXiv:2412.06769](https://arxiv.org/abs/2412.06769)
+- **The contrast it's arguing with:** Wei et al. *Chain-of-Thought Prompting Elicits Reasoning in Large Language Models.* NeurIPS 2022 — [arXiv:2201.11903](https://arxiv.org/abs/2201.11903)
+- **Where the line went next:** a growing 2025–2026 literature on latent/looped reasoning and the training dynamics of continuous chain-of-thought (e.g. the "emergence of superposition" analyses).

@@ -1,0 +1,117 @@
+---
+title: "[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale"
+description: "Google DeepMind's DiffusionGemma bets on uniform-state discrete diffusion — the formulation everyone 'knew' was worse than masked diffusion — because it is the only one that can self-correct. A look at the four engineering moves that make the bet pay off: adapting a strong autoregressive checkpoint, a dual-mode encoder–denoiser backbone, self-conditioning through distributions, and an entropy-bounded accept/re-noise sampler."
+author: "Jiwoo Shin"
+date: "2026-07-11"
+categories: [Model-Review, Diffusion, LLM]
+image: "cover.png"
+---
+
+> **Model:** Google DeepMind, *DiffusionGemma* (26B MoE, ~3.8B active), released June 2026. [Official page](https://deepmind.google/models/gemma/diffusiongemma/) · [Developer guide](https://developers.googleblog.com/en/diffusiongemma-the-developer-guide) · [Docs & explainer](https://ai.google.dev/gemma/docs/diffusiongemma/explained) · [Weights on Hugging Face](https://huggingface.co/google/diffusiongemma-26B-A4B-it)
+
+## TL;DR
+
+For the past two years the discrete-diffusion language-model literature has had a settled hierarchy: masked (absorbing-state) diffusion works, uniform-state diffusion doesn't. Masked diffusion gives the model an explicit signal about *which* tokens need fixing, and essentially every competitive diffusion LM — MDLM, LLaDA, and friends — has been built on it. So it was genuinely surprising that **DiffusionGemma**, DeepMind's first open diffusion language model, is built on **uniform-state diffusion**, where corruption replaces tokens with *random vocabulary tokens* rather than a `[MASK]` symbol.
+
+The reason for the bet is the one property masked diffusion structurally lacks: **self-correction**. In masked diffusion, once a mask is resolved into a word, it is locked in forever. In uniform-state diffusion, *any* position can be re-noised and revised when later context invalidates it. DiffusionGemma makes that property practical with four moves: (1) it doesn't train from scratch but **adapts a strong autoregressive checkpoint** (Gemma 4 26B A4B), sidestepping the hardest part of the uniform-state training problem; (2) a **single backbone that toggles between causal and bidirectional attention**, so prompts are prefetched into a KV cache autoregressively while 256-token "canvases" are denoised in parallel; (3) **self-conditioning**, feeding the previous step's full token *distribution* forward so aggressive re-noising doesn't cause oscillation; and (4) an **entropy-bounded sampler** that accepts only confident tokens each step, re-noises the rest, and stops adaptively — typically in 12–16 steps. The payoff is 1,000+ tokens/second on a single H100 (~4× autoregressive) with a visible ability to fix its own mistakes mid-generation; the cost is a 5–15 point drop on reasoning-heavy benchmarks versus its own autoregressive parent.
+
+## Background: why masked diffusion was supposed to win
+
+Discrete diffusion LMs replace left-to-right decoding with an iterative denoising loop: corrupt text with noise in a forward process, train a model to invert it, then generate by starting from pure noise and denoising a whole block of tokens in parallel. The design choice that defines everything downstream is *what the noise is*.
+
+**Masked (absorbing-state) diffusion** corrupts by replacing tokens with a special `[MASK]` token. The forward process for a token $x_0$ interpolates toward a point mass on the mask:
+
+$$
+q(x_t \mid x_0) = \alpha_t\,\delta_{x_0} + (1-\alpha_t)\,\delta_{[\text{MASK}]}
+$$
+
+**Uniform-state diffusion** corrupts by resampling tokens uniformly from the vocabulary:
+
+$$
+q(x_t \mid x_0) = \alpha_t\,\delta_{x_0} + (1-\alpha_t)\,\mathrm{Uniform}(V)
+$$
+
+The masked version has dominated for a mundane but decisive reason: the model always knows which tokens are noise, because they are literally labeled `[MASK]`. Denoising reduces to a BERT-style infilling problem with a clean, low-variance training objective. In the uniform-state version, a corrupted token looks like any other token. As the [official explainer's companion analysis](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-diffusiongemma) puts it, the training objective "does not only need to denoise canvases at various noise levels, it also needs to first *identify which tokens are actually noise* in the first place." That extra burden shows up as high-variance gradients and consistently worse perplexity — hence the conventional wisdom.
+
+But masked diffusion buys its trainability with a structural flaw: **absorption is one-way**. Once the sampler commits a mask to a real token, there is no mechanism to un-commit it. If an early, high-confidence guess turns out to clash with context that emerges three steps later, the model must write *around* the mistake rather than fix it. For a paradigm whose whole selling point is "generate 256 tokens in parallel and iteratively refine," refinement that can never touch already-decided tokens is a strange kind of refinement.
+
+Uniform-state diffusion doesn't have that flaw. Since noise and signal live in the same space — both are just vocabulary tokens — the reverse process is free to reconsider *every* position at *every* step. A token that looked right at step 3 can be demoted back to noise at step 7. That is the property DeepMind decided was worth the training pain.
+
+## What DiffusionGemma actually is
+
+DiffusionGemma is a 26B-parameter Mixture-of-Experts model activating ~3.8B parameters per forward pass, built on the Gemma 4 architecture with up to a 256K context window. Generation is **block-autoregressive**: the model denoises a 256-token *canvas* in parallel, commits the finished block to the KV cache, opens a fresh canvas, and repeats. So it is diffusion *within* blocks and autoregression *across* them — a hybrid that keeps parallel generation while still scaling to long outputs. The lineage, per Google, runs through the (never-released) Gemini Diffusion research line.
+
+The four ingredients that make the uniform-state part work are worth walking through one by one.
+
+### 1. Don't train uniform-state diffusion from scratch — adapt an AR model
+
+The hardest part of uniform-state training is the noise-identification problem above, and DiffusionGemma largely sidesteps it: rather than pretraining a diffusion model from random init, it **starts from the pretrained autoregressive Gemma 4 26B A4B checkpoint** and adapts it to the denoising objective. A model that already has strong language priors doesn't need to *learn* what real text looks like before it can tell noise from signal — implausible tokens in context are already low-probability under the prior. The from-scratch identification burden becomes a much easier fine-tuning problem: recognize where the canvas is inconsistent with fluent text, and fix it.
+
+This mirrors what the broader field converged on for masked diffusion (adaptation recipes turning AR checkpoints into diffusion models), but it matters *more* for uniform-state, because the objective it rescues is the noisier one.
+
+### 2. One backbone, two attention modes
+
+A naive diffusion LM throws away the KV cache — bidirectional attention over a changing canvas has nothing stable to cache, which is disastrous for long prompts. DiffusionGemma's answer is an **encoder–denoiser patch** on a single decoder-only backbone that dynamically toggles between two modes:
+
+- **Prefill / incremental prefill (causal):** the prompt — and each completed 256-token block — is processed with ordinary causal attention and written into a KV cache, exactly like an AR model.
+- **Denoising (bidirectional):** every canvas position attends to all other canvas positions *and* reads the cached prefix. Information flows symmetrically across the block being generated.
+
+This is the piece that makes the whole thing deployable: prompts are cached once, finished text is cached incrementally, and only the live 256-token canvas pays the bidirectional price. It's also why the speed numbers hold up — each denoising step is one forward pass that advances all 256 positions at once, shifting single-user inference from memory-bound to compute-bound.
+
+### 3. Self-conditioning: carry the distribution, not the sample
+
+Aggressive re-noising creates an obvious failure mode: oscillation. If the sampler keeps resetting low-confidence positions to fresh random tokens, the model can end up relitigating the same positions forever, since each step only sees the current (partly re-randomized) canvas and remembers nothing about its previous beliefs.
+
+DiffusionGemma stabilizes this with **self-conditioning**: instead of discarding the previous step's output, it takes the full softmax distribution over the vocabulary at each position, converts it into a **probability-weighted average of token embeddings**, and feeds that into the next denoising step alongside the canvas. Soft information — "I was 60/40 between these two candidates" — survives the hard re-noising of the sampled token. The model refines a persistent belief state rather than repeatedly re-deciding from scratch, which is what lets convergence happen in ~12–16 steps instead of drifting.
+
+### 4. The entropy-bounded sampler: accept the confident, re-noise the rest
+
+The default sampler makes the self-correction concrete. Each step:
+
+1. The denoiser produces a distribution at every canvas position; the sampler computes each position's **entropy**.
+2. Positions are sorted from most to least confident, and tokens are **accepted greedily until an accumulated entropy budget** (default 0.1) is exhausted — so the number of tokens committed per step adapts to how sure the model is, rather than being a fixed schedule.
+3. Everything not accepted is **re-noised back to a random token** (via Gumbel-max sampling) and gets reconsidered next step — including positions that were accepted in *earlier* steps but whose probability has since collapsed under new context.
+4. A temperature schedule decays from 0.8 to 0.4 over the trajectory (explore early, commit late), and **adaptive stopping** halts generation when canvas entropy drops below 0.005 and predictions are stable across consecutive steps — typically 12–16 steps against a 48-step maximum.
+
+Step 3 is the payoff of the entire uniform-state bet. In the developer guide's Sudoku demo, you can watch digits that were committed early get demoted back to noise when a later-resolved row makes them illegal — the model literally erases and rewrites its own output. No masked-diffusion sampler can do that.
+
+## Does the bet pay off?
+
+**On speed, unambiguously.** 1,000+ tokens/second on a single H100, 700+ on an RTX 5090, quoted as up to 4× faster than comparable AR generation; quantized, the MoE fits in roughly 18–24 GB of VRAM, i.e. one consumer GPU. There's native NVFP4 support for Blackwell and day-one vLLM integration.
+
+**On self-correction, demonstrably.** The Sudoku case study is the cleanest evidence: the base model solves ~0% of puzzles, but a short supervised fine-tune with the released JAX recipe lifts it to ~80% — while *cutting* denoising steps from 48 to 12, because a specialized model stabilizes faster and adaptive stopping notices. Constraint-satisfaction tasks, where a decision at position 40 depends on position 200, are exactly where bidirectional attention plus revisable commitments should shine, and they do.
+
+**On raw capability, honestly, no — not yet.** The model card's own numbers against its autoregressive parent:
+
+| Benchmark | DiffusionGemma 26B | Gemma 4 26B |
+|---|---|---|
+| MMLU Pro | 77.6 | 82.6 |
+| GPQA Diamond | 73.2 | 82.3 |
+| BigBench Extra Hard | 47.6 | 64.8 |
+| MATH-Vision | 70.5 | 82.4 |
+
+A 5-point gap on knowledge-flavored suites, widening to 17 points on BigBench Extra Hard. The pattern is coherent: the further a task is from "refine a locally-checkable block of text" and the closer to "long serial dependent reasoning," the more the parallel-canvas paradigm gives up. DeepMind positions the model accordingly — low-latency, low-concurrency, local and interactive use — rather than claiming AR parity.
+
+Two independent caveats are worth knowing before over-romanticizing the mechanism. An inference-time interpretability study of the released checkpoint ([arXiv:2606.14620](https://arxiv.org/abs/2606.14620)) found that token *commit order* retains a moderate left-to-right bias (Kendall τ ≈ 0.43–0.60) — the model is "neither strictly parallel nor sequential," so a chunk of the AR inductive bias survives adaptation. And the confidence signal driving the entropy-bounded sampler is well-calibrated on math (AUROC ≈ 0.75) but near chance on factual recall (≈ 0.47): "low entropy" reliably means "correct" only in some domains, which is a real limitation for a sampler whose acceptance rule *is* an entropy threshold.
+
+## The research context: uniform-state was already being rehabilitated
+
+DeepMind's documentation doesn't cite academic lineage, but DiffusionGemma didn't come out of nowhere — the "uniform-state is hopeless" consensus had been eroding in the open literature for a year. The key work is **The Diffusion Duality** (Sahoo et al., ICML 2025, [arXiv:2506.10892](https://arxiv.org/abs/2506.10892)), which showed that uniform-state discrete diffusion *emerges from an underlying Gaussian diffusion* (discrete tokens as the argmax of Gaussian latents), and used that duality to transfer the continuous-diffusion toolbox — a variance-reducing curriculum that doubled training speed, and consistency distillation for few-step generation — to the discrete setting, beating AR models on zero-shot perplexity on 3 of 7 benchmarks. Its ICLR 2026 sequel ([Ψ-samplers, arXiv:2602.21185](https://arxiv.org/abs/2602.21185)) added predictor–corrector samplers under which uniform-state models keep improving with more steps, explicitly challenging the assumption that "masked diffusion is the inevitable future of diffusion-based language modeling."
+
+I want to be careful here: there is no public evidence DiffusionGemma *uses* Duo's techniques, and its robustness recipe (AR adaptation + self-conditioning + entropy-bounded sampling) is a different toolkit than Duo's (Gaussian curriculum + distillation). But both attack the same two weaknesses of uniform-state diffusion — noisy training signal, wasteful sampling — and DiffusionGemma is best read as the first *at-scale, productionized* confirmation of the same thesis: uniform-state's self-correction is real, and its training problems are fixable.
+
+## My take
+
+The main contribution here is not a new equation — every component has precedent — but a **existence proof at 26B scale**: the first open-weights demonstration that uniform-state diffusion, the formulation the field wrote off, becomes competitive once you stop trying to win the pretraining objective on its own terms. The load-bearing insight is that uniform-state's noise-identification problem is only crippling *from scratch*; initialized from a strong AR prior, "which tokens are noise" is nearly free, and what you keep is the one capability masked diffusion can't have. That reframing — treat the formulation choice as a *sampler capability* question rather than a *perplexity* question — is the intellectually interesting move.
+
+I also think the block-autoregressive design deserves more credit than it gets in the headlines. Pure-diffusion LMs kept dying on deployment realities (no KV cache, fixed-length generation); diffusion-inside-blocks, AR-across-blocks quietly concedes that autoregression is right at the document scale while diffusion is right at the paragraph scale. That feels like the shape future hybrids will keep.
+
+The skeptical read is equally available: the model trails its own AR parent everywhere except speed, its "parallelism" is partially left-to-right in disguise, and its confidence signal — the heart of the sampler — is unreliable off-distribution. If your workload is cloud-batched, high-QPS serving, batching already gives AR models their parallelism back, and DiffusionGemma's advantage largely evaporates. The honest pitch is narrower and still compelling: single-user, latency-bound, local inference — the setting where an AR model leaves the GPU 95% idle — plus structured tasks where mid-generation revision genuinely matters. Whether the capability gap closes with diffusion-native pretraining at larger scale, rather than adaptation, is now the obvious next question, and for the first time there's an open model to build that answer on.
+
+## Related
+
+- **The model:** [DiffusionGemma official page](https://deepmind.google/models/gemma/diffusiongemma/) · [developer guide](https://developers.googleblog.com/en/diffusiongemma-the-developer-guide) · [how-it-works explainer](https://ai.google.dev/gemma/docs/diffusiongemma/explained) · [model card](https://ai.google.dev/gemma/docs/diffusiongemma/model_card)
+- **Best independent walkthrough:** Maarten Grootendorst, [*A Visual Guide to DiffusionGemma*](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-diffusiongemma)
+- **The uniform-state rehabilitation line:** Sahoo et al., *The Diffusion Duality*, ICML 2025 — [arXiv:2506.10892](https://arxiv.org/abs/2506.10892); *Chapter II: Ψ-Samplers*, ICLR 2026 — [arXiv:2602.21185](https://arxiv.org/abs/2602.21185)
+- **The critical lens:** inference-time analysis of DiffusionGemma's decoding behavior — [arXiv:2606.14620](https://arxiv.org/abs/2606.14620)
+- **Training recipes:** [Hackable Diffusion (JAX)](https://github.com/google-deepmind/gemma/tree/main/gemma/diffusion) · [vLLM integration](https://vllm-project.github.io/2026/06/10/diffusion-gemma)
