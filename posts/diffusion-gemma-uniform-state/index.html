@@ -7,10 +7,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Jiwoo Shin">
-<meta name="dcterms.date" content="2026-07-08">
-<meta name="description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
+<meta name="dcterms.date" content="2026-07-11">
+<meta name="description" content="Google DeepMind’s DiffusionGemma bets on uniform-state discrete diffusion — the formulation everyone ‘knew’ was worse than masked diffusion — because it is the only one that can self-correct. A look at the four engineering moves that make the bet pay off: adapting a strong autoregressive checkpoint, a dual-mode encoder–denoiser backbone, self-conditioning through distributions, and an entropy-bounded accept/re-noise sampler.">
 
-<title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin</title>
+<title>[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -110,17 +110,17 @@ window.Quarto = {
 </script>
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin">
-<meta property="og:description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png">
+<meta property="og:title" content="[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale – Jiwoo Shin">
+<meta property="og:description" content="Google DeepMind’s DiffusionGemma bets on uniform-state discrete diffusion — the formulation everyone ‘knew’ was worse than masked diffusion — because it is the only one that can self-correct. A look at the four engineering moves that make the bet pay off: adapting a strong autoregressive checkpoint, a dual-mode encoder–denoiser backbone, self-conditioning through distributions, and an entropy-bounded accept/re-noise sampler.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/diffusion-gemma-uniform-state/cover.png">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta property="og:image:height" content="440">
-<meta property="og:image:width" content="795">
-<meta name="twitter:title" content="[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models – Jiwoo Shin">
-<meta name="twitter:description" content="A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png">
-<meta name="twitter:image-height" content="440">
-<meta name="twitter:image-width" content="795">
+<meta property="og:image:height" content="732">
+<meta property="og:image:width" content="1783">
+<meta name="twitter:title" content="[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale – Jiwoo Shin">
+<meta name="twitter:description" content="Google DeepMind’s DiffusionGemma bets on uniform-state discrete diffusion — the formulation everyone ‘knew’ was worse than masked diffusion — because it is the only one that can self-correct. A look at the four engineering moves that make the bet pay off: adapting a strong autoregressive checkpoint, a dual-mode encoder–denoiser backbone, self-conditioning through distributions, and an entropy-bounded accept/re-noise sampler.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/diffusion-gemma-uniform-state/cover.png">
+<meta name="twitter:image-height" content="732">
+<meta name="twitter:image-width" content="1783">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -332,16 +332,15 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</h1>
+      <h1 class="title">[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale</h1>
                   <div>
         <div class="description">
-          A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.
+          Google DeepMind’s DiffusionGemma bets on uniform-state discrete diffusion — the formulation everyone ‘knew’ was worse than masked diffusion — because it is the only one that can self-correct. A look at the four engineering moves that make the bet pay off: adapting a strong autoregressive checkpoint, a dual-mode encoder–denoiser backbone, self-conditioning through distributions, and an entropy-bounded accept/re-noise sampler.
         </div>
       </div>
                           <div class="quarto-categories">
-                <div class="quarto-category">Paper-Review</div>
+                <div class="quarto-category">Model-Review</div>
                 <div class="quarto-category">Diffusion</div>
-                <div class="quarto-category">Safety</div>
                 <div class="quarto-category">LLM</div>
               </div>
                   </div>
@@ -360,7 +359,7 @@ window.Quarto = {
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">July 8, 2026</p>
+        <p class="date">July 11, 2026</p>
       </div>
     </div>
     
@@ -377,15 +376,18 @@ window.Quarto = {
    
   <ul>
   <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
-  <li><a href="#why-this-problem-matters" id="toc-why-this-problem-matters" class="nav-link" data-scroll-target="#why-this-problem-matters">Why this problem matters</a></li>
-  <li><a href="#background-the-safe-denoiser" id="toc-background-the-safe-denoiser" class="nav-link" data-scroll-target="#background-the-safe-denoiser">Background: the safe denoiser</a></li>
-  <li><a href="#method-adapting-the-safe-denoiser-to-masked-text-diffusion" id="toc-method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="nav-link" data-scroll-target="#method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</a></li>
-  <li><a href="#experiments" id="toc-experiments" class="nav-link" data-scroll-target="#experiments">Experiments</a></li>
-  <li><a href="#strengths" id="toc-strengths" class="nav-link" data-scroll-target="#strengths">Strengths</a></li>
-  <li><a href="#weaknesses-open-questions" id="toc-weaknesses-open-questions" class="nav-link" data-scroll-target="#weaknesses-open-questions">Weaknesses / open questions</a></li>
+  <li><a href="#background-why-masked-diffusion-was-supposed-to-win" id="toc-background-why-masked-diffusion-was-supposed-to-win" class="nav-link" data-scroll-target="#background-why-masked-diffusion-was-supposed-to-win">Background: why masked diffusion was supposed to win</a></li>
+  <li><a href="#what-diffusiongemma-actually-is" id="toc-what-diffusiongemma-actually-is" class="nav-link" data-scroll-target="#what-diffusiongemma-actually-is">What DiffusionGemma actually is</a>
+  <ul class="collapse">
+  <li><a href="#dont-train-uniform-state-diffusion-from-scratch-adapt-an-ar-model" id="toc-dont-train-uniform-state-diffusion-from-scratch-adapt-an-ar-model" class="nav-link" data-scroll-target="#dont-train-uniform-state-diffusion-from-scratch-adapt-an-ar-model">1. Don’t train uniform-state diffusion from scratch — adapt an AR model</a></li>
+  <li><a href="#one-backbone-two-attention-modes" id="toc-one-backbone-two-attention-modes" class="nav-link" data-scroll-target="#one-backbone-two-attention-modes">2. One backbone, two attention modes</a></li>
+  <li><a href="#self-conditioning-carry-the-distribution-not-the-sample" id="toc-self-conditioning-carry-the-distribution-not-the-sample" class="nav-link" data-scroll-target="#self-conditioning-carry-the-distribution-not-the-sample">3. Self-conditioning: carry the distribution, not the sample</a></li>
+  <li><a href="#the-entropy-bounded-sampler-accept-the-confident-re-noise-the-rest" id="toc-the-entropy-bounded-sampler-accept-the-confident-re-noise-the-rest" class="nav-link" data-scroll-target="#the-entropy-bounded-sampler-accept-the-confident-re-noise-the-rest">4. The entropy-bounded sampler: accept the confident, re-noise the rest</a></li>
+  </ul></li>
+  <li><a href="#does-the-bet-pay-off" id="toc-does-the-bet-pay-off" class="nav-link" data-scroll-target="#does-the-bet-pay-off">Does the bet pay off?</a></li>
+  <li><a href="#the-research-context-uniform-state-was-already-being-rehabilitated" id="toc-the-research-context-uniform-state-was-already-being-rehabilitated" class="nav-link" data-scroll-target="#the-research-context-uniform-state-was-already-being-rehabilitated">The research context: uniform-state was already being rehabilitated</a></li>
   <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
-  <li><a href="#peer-review-at-a-glance" id="toc-peer-review-at-a-glance" class="nav-link" data-scroll-target="#peer-review-at-a-glance">Peer review at a glance</a></li>
-  <li><a href="#related-papers" id="toc-related-papers" class="nav-link" data-scroll-target="#related-papers">Related papers</a></li>
+  <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
   </ul>
 </nav>
     </div>
@@ -398,176 +400,121 @@ window.Quarto = {
 
 
 <blockquote class="blockquote">
-<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+<p><strong>Model:</strong> Google DeepMind, <em>DiffusionGemma</em> (26B MoE, ~3.8B active), released June 2026. <a href="https://deepmind.google/models/gemma/diffusiongemma/">Official page</a> · <a href="https://developers.googleblog.com/en/diffusiongemma-the-developer-guide">Developer guide</a> · <a href="https://ai.google.dev/gemma/docs/diffusiongemma/explained">Docs &amp; explainer</a> · <a href="https://huggingface.co/google/diffusiongemma-26B-A4B-it">Weights on Hugging Face</a></p>
 </blockquote>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
-<p>Text diffusion models (TDMs) like <a href="https://openreview.net/forum?id=KnqiC0znVF">LLaDA</a> and <a href="https://openreview.net/forum?id=L4uaAR4ArM">MDLM</a> generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as <a href="https://openreview.net/forum?id=rIPeatvPy3">DIJA</a> and <a href="https://openreview.net/forum?id=NWvL280s2l">PAD</a> reach near-100% attack success rates on instruction-tuned TDMs.</p>
-<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the <a href="https://openreview.net/forum?id=QQS7TudonJ">safe denoiser of Kim et al.&nbsp;(NeurIPS 2025)</a>, originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
+<p>For the past two years the discrete-diffusion language-model literature has had a settled hierarchy: masked (absorbing-state) diffusion works, uniform-state diffusion doesn’t. Masked diffusion gives the model an explicit signal about <em>which</em> tokens need fixing, and essentially every competitive diffusion LM — MDLM, LLaDA, and friends — has been built on it. So it was genuinely surprising that <strong>DiffusionGemma</strong>, DeepMind’s first open diffusion language model, is built on <strong>uniform-state diffusion</strong>, where corruption replaces tokens with <em>random vocabulary tokens</em> rather than a <code>[MASK]</code> symbol.</p>
+<p>The reason for the bet is the one property masked diffusion structurally lacks: <strong>self-correction</strong>. In masked diffusion, once a mask is resolved into a word, it is locked in forever. In uniform-state diffusion, <em>any</em> position can be re-noised and revised when later context invalidates it. DiffusionGemma makes that property practical with four moves: (1) it doesn’t train from scratch but <strong>adapts a strong autoregressive checkpoint</strong> (Gemma 4 26B A4B), sidestepping the hardest part of the uniform-state training problem; (2) a <strong>single backbone that toggles between causal and bidirectional attention</strong>, so prompts are prefetched into a KV cache autoregressively while 256-token “canvases” are denoised in parallel; (3) <strong>self-conditioning</strong>, feeding the previous step’s full token <em>distribution</em> forward so aggressive re-noising doesn’t cause oscillation; and (4) an <strong>entropy-bounded sampler</strong> that accepts only confident tokens each step, re-noises the rest, and stops adaptively — typically in 12–16 steps. The payoff is 1,000+ tokens/second on a single H100 (~4× autoregressive) with a visible ability to fix its own mistakes mid-generation; the cost is a 5–15 point drop on reasoning-heavy benchmarks versus its own autoregressive parent.</p>
 </section>
-<section id="why-this-problem-matters" class="level2">
-<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
-<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
+<section id="background-why-masked-diffusion-was-supposed-to-win" class="level2">
+<h2 class="anchored" data-anchor-id="background-why-masked-diffusion-was-supposed-to-win">Background: why masked diffusion was supposed to win</h2>
+<p>Discrete diffusion LMs replace left-to-right decoding with an iterative denoising loop: corrupt text with noise in a forward process, train a model to invert it, then generate by starting from pure noise and denoising a whole block of tokens in parallel. The design choice that defines everything downstream is <em>what the noise is</em>.</p>
+<p><strong>Masked (absorbing-state) diffusion</strong> corrupts by replacing tokens with a special <code>[MASK]</code> token. The forward process for a token <span class="math inline">\(x_0\)</span> interpolates toward a point mass on the mask:</p>
+<p><span class="math display">\[
+q(x_t \mid x_0) = \alpha_t\,\delta_{x_0} + (1-\alpha_t)\,\delta_{[\text{MASK}]}
+\]</span></p>
+<p><strong>Uniform-state diffusion</strong> corrupts by resampling tokens uniformly from the vocabulary:</p>
+<p><span class="math display">\[
+q(x_t \mid x_0) = \alpha_t\,\delta_{x_0} + (1-\alpha_t)\,\mathrm{Uniform}(V)
+\]</span></p>
+<p>The masked version has dominated for a mundane but decisive reason: the model always knows which tokens are noise, because they are literally labeled <code>[MASK]</code>. Denoising reduces to a BERT-style infilling problem with a clean, low-variance training objective. In the uniform-state version, a corrupted token looks like any other token. As the <a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-diffusiongemma">official explainer’s companion analysis</a> puts it, the training objective “does not only need to denoise canvases at various noise levels, it also needs to first <em>identify which tokens are actually noise</em> in the first place.” That extra burden shows up as high-variance gradients and consistently worse perplexity — hence the conventional wisdom.</p>
+<p>But masked diffusion buys its trainability with a structural flaw: <strong>absorption is one-way</strong>. Once the sampler commits a mask to a real token, there is no mechanism to un-commit it. If an early, high-confidence guess turns out to clash with context that emerges three steps later, the model must write <em>around</em> the mistake rather than fix it. For a paradigm whose whole selling point is “generate 256 tokens in parallel and iteratively refine,” refinement that can never touch already-decided tokens is a strange kind of refinement.</p>
+<p>Uniform-state diffusion doesn’t have that flaw. Since noise and signal live in the same space — both are just vocabulary tokens — the reverse process is free to reconsider <em>every</em> position at <em>every</em> step. A token that looked right at step 3 can be demoted back to noise at step 7. That is the property DeepMind decided was worth the training pain.</p>
+</section>
+<section id="what-diffusiongemma-actually-is" class="level2">
+<h2 class="anchored" data-anchor-id="what-diffusiongemma-actually-is">What DiffusionGemma actually is</h2>
+<p>DiffusionGemma is a 26B-parameter Mixture-of-Experts model activating ~3.8B parameters per forward pass, built on the Gemma 4 architecture with up to a 256K context window. Generation is <strong>block-autoregressive</strong>: the model denoises a 256-token <em>canvas</em> in parallel, commits the finished block to the KV cache, opens a fresh canvas, and repeats. So it is diffusion <em>within</em> blocks and autoregression <em>across</em> them — a hybrid that keeps parallel generation while still scaling to long outputs. The lineage, per Google, runs through the (never-released) Gemini Diffusion research line.</p>
+<p>The four ingredients that make the uniform-state part work are worth walking through one by one.</p>
+<section id="dont-train-uniform-state-diffusion-from-scratch-adapt-an-ar-model" class="level3">
+<h3 class="anchored" data-anchor-id="dont-train-uniform-state-diffusion-from-scratch-adapt-an-ar-model">1. Don’t train uniform-state diffusion from scratch — adapt an AR model</h3>
+<p>The hardest part of uniform-state training is the noise-identification problem above, and DiffusionGemma largely sidesteps it: rather than pretraining a diffusion model from random init, it <strong>starts from the pretrained autoregressive Gemma 4 26B A4B checkpoint</strong> and adapts it to the denoising objective. A model that already has strong language priors doesn’t need to <em>learn</em> what real text looks like before it can tell noise from signal — implausible tokens in context are already low-probability under the prior. The from-scratch identification burden becomes a much easier fine-tuning problem: recognize where the canvas is inconsistent with fluent text, and fix it.</p>
+<p>This mirrors what the broader field converged on for masked diffusion (adaptation recipes turning AR checkpoints into diffusion models), but it matters <em>more</em> for uniform-state, because the objective it rescues is the noisier one.</p>
+</section>
+<section id="one-backbone-two-attention-modes" class="level3">
+<h3 class="anchored" data-anchor-id="one-backbone-two-attention-modes">2. One backbone, two attention modes</h3>
+<p>A naive diffusion LM throws away the KV cache — bidirectional attention over a changing canvas has nothing stable to cache, which is disastrous for long prompts. DiffusionGemma’s answer is an <strong>encoder–denoiser patch</strong> on a single decoder-only backbone that dynamically toggles between two modes:</p>
 <ul>
-<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
-<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
-<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
+<li><strong>Prefill / incremental prefill (causal):</strong> the prompt — and each completed 256-token block — is processed with ordinary causal attention and written into a KV cache, exactly like an AR model.</li>
+<li><strong>Denoising (bidirectional):</strong> every canvas position attends to all other canvas positions <em>and</em> reads the cached prefix. Information flows symmetrically across the block being generated.</li>
 </ul>
-<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
+<p>This is the piece that makes the whole thing deployable: prompts are cached once, finished text is cached incrementally, and only the live 256-token canvas pays the bidirectional price. It’s also why the speed numbers hold up — each denoising step is one forward pass that advances all 256 positions at once, shifting single-user inference from memory-bound to compute-bound.</p>
 </section>
-<section id="background-the-safe-denoiser" class="level2">
-<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
-<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <span class="math inline">\(\mathcal{D} = \mathcal{D}_\text{safe} \cup \mathcal{D}_\text{unsafe}\)</span>. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
-<p><span class="math display">\[
-\mathbb{E}_{\mathcal{D}_\text{safe}}[x_0 \mid x_t] = \mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] + \beta^*(x_t)\left(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t] - \mathbb{E}_{\mathcal{D}_\text{unsafe}}[x_0 \mid x_t]\right)
-\]</span></p>
-<p>where <span class="math inline">\(\beta^*(x_t) \ge 0\)</span> grows with the posterior likelihood that the current state <span class="math inline">\(x_t\)</span> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <span class="math inline">\(\mathbb{E}_{\mathcal{D}}[x_0 \mid x_t]\)</span>; the two remaining quantities are approximated from a finite set of unsafe references.</p>
-<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from <a href="https://openreview.net/forum?id=zBPzxhso8M">DiffuGuard</a>.</p>
+<section id="self-conditioning-carry-the-distribution-not-the-sample" class="level3">
+<h3 class="anchored" data-anchor-id="self-conditioning-carry-the-distribution-not-the-sample">3. Self-conditioning: carry the distribution, not the sample</h3>
+<p>Aggressive re-noising creates an obvious failure mode: oscillation. If the sampler keeps resetting low-confidence positions to fresh random tokens, the model can end up relitigating the same positions forever, since each step only sees the current (partly re-randomized) canvas and remembers nothing about its previous beliefs.</p>
+<p>DiffusionGemma stabilizes this with <strong>self-conditioning</strong>: instead of discarding the previous step’s output, it takes the full softmax distribution over the vocabulary at each position, converts it into a <strong>probability-weighted average of token embeddings</strong>, and feeds that into the next denoising step alongside the canvas. Soft information — “I was 60/40 between these two candidates” — survives the hard re-noising of the sampled token. The model refines a persistent belief state rather than repeatedly re-deciding from scratch, which is what lets convergence happen in ~12–16 steps instead of drifting.</p>
 </section>
-<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
-<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
-<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
-<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <span class="math inline">\(N\)</span> unsafe reference sequences <span class="math inline">\(x^{(1)}, \dots, x^{(N)}\)</span> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
-<p><span class="math display">\[
-\hat{\mathbb{E}}_{\mathcal{D}_\text{unsafe}}[x_0 \mid x_t] = \sum_{n=1}^{N} x^{(n)} \frac{q_t(x_t \mid x^{(n)})}{\sum_{m} q_t(x_t \mid x^{(m)})}
-\]</span></p>
-<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
-<p><span class="math display">\[
-q_t(x_t \mid x_0) = \alpha_t^{\#\{\text{matching positions}\}} (1-\alpha_t)^{\#\{\text{masked positions}\}}
-\]</span></p>
-<p>This is computable in <span class="math inline">\(O(L)\)</span> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
-<p><strong>3. Approximating <span class="math inline">\(\beta^*\)</span>.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <span class="math inline">\(\eta \cdot \frac{1}{N}\sum_n q_t(x_t \mid x^{(n)})\)</span> with a tunable strength <span class="math inline">\(\eta\)</span>, applied only during a <strong>time window</strong> <span class="math inline">\(C\)</span> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
-<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
-<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
-</section>
-<section id="experiments" class="level2">
-<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
-<p>Three safety dimensions, on MDLM and the LLaDA/<a href="https://arxiv.org/abs/2508.15487">Dream</a> family:</p>
-<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
-<div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="fig1-tradeoff.png" class="img-fluid figure-img" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Each point is a SAD configuration; going down (fewer unsafe generations) usually costs some perplexity, and the guidance time window (colours) controls where you land on the curve. (Yusuf et al., 2026)
-</figcaption>
-</figure>
-</div>
-<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
-<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <span class="math inline">\(\mathcal{D}_\text{unsafe} = \mathcal{D}_\text{train}\)</span> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <span class="math inline">\(\eta\)</span> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <span class="math inline">\((n,p)\)</span>-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
-<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches <a href="https://proceedings.mlr.press/v267/singhal25b.html">FK Steering</a> (<span class="math inline">\(k{=}8\)</span>) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
-<p><strong>Ablations worth remembering:</strong></p>
-<ul>
-<li><span class="math inline">\(\eta\)</span> is a clean monotonic safety knob once the schedule is fixed.</li>
-<li>The time window <span class="math inline">\(C\)</span> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
-<li>Safety gains saturate at <span class="math inline">\(N \approx 500\text{–}1000\)</span> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
-</ul>
-</section>
-<section id="strengths" class="level2">
-<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<section id="the-entropy-bounded-sampler-accept-the-confident-re-noise-the-rest" class="level3">
+<h3 class="anchored" data-anchor-id="the-entropy-bounded-sampler-accept-the-confident-re-noise-the-rest">4. The entropy-bounded sampler: accept the confident, re-noise the rest</h3>
+<p>The default sampler makes the self-correction concrete. Each step:</p>
 <ol type="1">
-<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
-<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <span class="math inline">\(O(L)\)</span> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
-<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
-<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
+<li>The denoiser produces a distribution at every canvas position; the sampler computes each position’s <strong>entropy</strong>.</li>
+<li>Positions are sorted from most to least confident, and tokens are <strong>accepted greedily until an accumulated entropy budget</strong> (default 0.1) is exhausted — so the number of tokens committed per step adapts to how sure the model is, rather than being a fixed schedule.</li>
+<li>Everything not accepted is <strong>re-noised back to a random token</strong> (via Gumbel-max sampling) and gets reconsidered next step — including positions that were accepted in <em>earlier</em> steps but whose probability has since collapsed under new context.</li>
+<li>A temperature schedule decays from 0.8 to 0.4 over the trajectory (explore early, commit late), and <strong>adaptive stopping</strong> halts generation when canvas entropy drops below 0.005 and predictions are stable across consecutive steps — typically 12–16 steps against a 48-step maximum.</li>
 </ol>
+<p>Step 3 is the payoff of the entire uniform-state bet. In the developer guide’s Sudoku demo, you can watch digits that were committed early get demoted back to noise when a later-resolved row makes them illegal — the model literally erases and rewrites its own output. No masked-diffusion sampler can do that.</p>
 </section>
-<section id="weaknesses-open-questions" class="level2">
-<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
-<ol type="1">
-<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
-<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
-<li><strong>The theory–practice gap around <span class="math inline">\(\beta^*\)</span>.</strong> The provable guarantee holds for the exact <span class="math inline">\(\beta^*(x_t)\)</span>; in practice it’s replaced by a constant <span class="math inline">\(\eta\)</span> inside a hand-tuned time window, with <span class="math inline">\(\eta\)</span> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
-<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
-<li><strong>Scale.</strong> Experiments top out at 8B models and <span class="math inline">\(N{=}5000\)</span> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
-</ol>
 </section>
-<section id="my-take" class="level2">
-<h2 class="anchored" data-anchor-id="my-take">My take</h2>
-<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
-<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
-<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
-</section>
-<section id="peer-review-at-a-glance" class="level2">
-<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
-<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026, reviewed by four reviewers. The scores below are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text is not publicly available (ICML does not post reviews, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> requires sign-in), so they are reproduced here without interpretation.</p>
+<section id="does-the-bet-pay-off" class="level2">
+<h2 class="anchored" data-anchor-id="does-the-bet-pay-off">Does the bet pay off?</h2>
+<p><strong>On speed, unambiguously.</strong> 1,000+ tokens/second on a single H100, 700+ on an RTX 5090, quoted as up to 4× faster than comparable AR generation; quantized, the MoE fits in roughly 18–24 GB of VRAM, i.e.&nbsp;one consumer GPU. There’s native NVFP4 support for Blackwell and day-one vLLM integration.</p>
+<p><strong>On self-correction, demonstrably.</strong> The Sudoku case study is the cleanest evidence: the base model solves ~0% of puzzles, but a short supervised fine-tune with the released JAX recipe lifts it to ~80% — while <em>cutting</em> denoising steps from 48 to 12, because a specialized model stabilizes faster and adaptive stopping notices. Constraint-satisfaction tasks, where a decision at position 40 depends on position 200, are exactly where bidirectional attention plus revisable commitments should shine, and they do.</p>
+<p><strong>On raw capability, honestly, no — not yet.</strong> The model card’s own numbers against its autoregressive parent:</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-</colgroup>
 <thead>
 <tr class="header">
-<th></th>
-<th>Recommendation</th>
-<th>Confidence</th>
-<th>Soundness</th>
-<th>Significance</th>
-<th>Originality</th>
-<th>Presentation</th>
+<th>Benchmark</th>
+<th>DiffusionGemma 26B</th>
+<th>Gemma 4 26B</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Reviewer 9T1S</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>2</td>
-<td>3</td>
+<td>MMLU Pro</td>
+<td>77.6</td>
+<td>82.6</td>
 </tr>
 <tr class="even">
-<td>Reviewer YM1a</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
+<td>GPQA Diamond</td>
+<td>73.2</td>
+<td>82.3</td>
 </tr>
 <tr class="odd">
-<td>Reviewer pAtC</td>
-<td>4</td>
-<td>2</td>
-<td>2</td>
-<td>3</td>
-<td>2</td>
-<td>2</td>
+<td>BigBench Extra Hard</td>
+<td>47.6</td>
+<td>64.8</td>
 </tr>
 <tr class="even">
-<td>Reviewer ddgR</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-</tr>
-<tr class="odd">
-<td><strong>Average</strong></td>
-<td><strong>4.0</strong></td>
-<td>2.75</td>
-<td>2.75</td>
-<td>3.25</td>
-<td>2.5</td>
-<td>2.75</td>
+<td>MATH-Vision</td>
+<td>70.5</td>
+<td>82.4</td>
 </tr>
 </tbody>
 </table>
+<p>A 5-point gap on knowledge-flavored suites, widening to 17 points on BigBench Extra Hard. The pattern is coherent: the further a task is from “refine a locally-checkable block of text” and the closer to “long serial dependent reasoning,” the more the parallel-canvas paradigm gives up. DeepMind positions the model accordingly — low-latency, low-concurrency, local and interactive use — rather than claiming AR parity.</p>
+<p>Two independent caveats are worth knowing before over-romanticizing the mechanism. An inference-time interpretability study of the released checkpoint (<a href="https://arxiv.org/abs/2606.14620">arXiv:2606.14620</a>) found that token <em>commit order</em> retains a moderate left-to-right bias (Kendall τ ≈ 0.43–0.60) — the model is “neither strictly parallel nor sequential,” so a chunk of the AR inductive bias survives adaptation. And the confidence signal driving the entropy-bounded sampler is well-calibrated on math (AUROC ≈ 0.75) but near chance on factual recall (≈ 0.47): “low entropy” reliably means “correct” only in some domains, which is a real limitation for a sampler whose acceptance rule <em>is</em> an entropy threshold.</p>
 </section>
-<section id="related-papers" class="level2">
-<h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
+<section id="the-research-context-uniform-state-was-already-being-rehabilitated" class="level2">
+<h2 class="anchored" data-anchor-id="the-research-context-uniform-state-was-already-being-rehabilitated">The research context: uniform-state was already being rehabilitated</h2>
+<p>DeepMind’s documentation doesn’t cite academic lineage, but DiffusionGemma didn’t come out of nowhere — the “uniform-state is hopeless” consensus had been eroding in the open literature for a year. The key work is <strong>The Diffusion Duality</strong> (Sahoo et al., ICML 2025, <a href="https://arxiv.org/abs/2506.10892">arXiv:2506.10892</a>), which showed that uniform-state discrete diffusion <em>emerges from an underlying Gaussian diffusion</em> (discrete tokens as the argmax of Gaussian latents), and used that duality to transfer the continuous-diffusion toolbox — a variance-reducing curriculum that doubled training speed, and consistency distillation for few-step generation — to the discrete setting, beating AR models on zero-shot perplexity on 3 of 7 benchmarks. Its ICLR 2026 sequel (<a href="https://arxiv.org/abs/2602.21185">Ψ-samplers, arXiv:2602.21185</a>) added predictor–corrector samplers under which uniform-state models keep improving with more steps, explicitly challenging the assumption that “masked diffusion is the inevitable future of diffusion-based language modeling.”</p>
+<p>I want to be careful here: there is no public evidence DiffusionGemma <em>uses</em> Duo’s techniques, and its robustness recipe (AR adaptation + self-conditioning + entropy-bounded sampling) is a different toolkit than Duo’s (Gaussian curriculum + distillation). But both attack the same two weaknesses of uniform-state diffusion — noisy training signal, wasteful sampling — and DiffusionGemma is best read as the first <em>at-scale, productionized</em> confirmation of the same thesis: uniform-state’s self-correction is real, and its training problems are fixable.</p>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>The main contribution here is not a new equation — every component has precedent — but a <strong>existence proof at 26B scale</strong>: the first open-weights demonstration that uniform-state diffusion, the formulation the field wrote off, becomes competitive once you stop trying to win the pretraining objective on its own terms. The load-bearing insight is that uniform-state’s noise-identification problem is only crippling <em>from scratch</em>; initialized from a strong AR prior, “which tokens are noise” is nearly free, and what you keep is the one capability masked diffusion can’t have. That reframing — treat the formulation choice as a <em>sampler capability</em> question rather than a <em>perplexity</em> question — is the intellectually interesting move.</p>
+<p>I also think the block-autoregressive design deserves more credit than it gets in the headlines. Pure-diffusion LMs kept dying on deployment realities (no KV cache, fixed-length generation); diffusion-inside-blocks, AR-across-blocks quietly concedes that autoregression is right at the document scale while diffusion is right at the paragraph scale. That feels like the shape future hybrids will keep.</p>
+<p>The skeptical read is equally available: the model trails its own AR parent everywhere except speed, its “parallelism” is partially left-to-right in disguise, and its confidence signal — the heart of the sampler — is unreliable off-distribution. If your workload is cloud-batched, high-QPS serving, batching already gives AR models their parallelism back, and DiffusionGemma’s advantage largely evaporates. The honest pitch is narrower and still compelling: single-user, latency-bound, local inference — the setting where an AR model leaves the GPU 95% idle — plus structured tasks where mid-generation revision genuinely matters. Whether the capability gap closes with diffusion-native pretraining at larger scale, rather than adaptation, is now the obvious next question, and for the first time there’s an open model to build that answer on.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
 <ul>
-<li><strong>The paper:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">code</a></li>
-<li><strong>The theorem it adapts:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="../safe-denoiser/">my review</a></li>
-<li><strong>The theory behind the time window:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="../safety-guided-flow/">my review</a></li>
+<li><strong>The model:</strong> <a href="https://deepmind.google/models/gemma/diffusiongemma/">DiffusionGemma official page</a> · <a href="https://developers.googleblog.com/en/diffusiongemma-the-developer-guide">developer guide</a> · <a href="https://ai.google.dev/gemma/docs/diffusiongemma/explained">how-it-works explainer</a> · <a href="https://ai.google.dev/gemma/docs/diffusiongemma/model_card">model card</a></li>
+<li><strong>Best independent walkthrough:</strong> Maarten Grootendorst, <a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-diffusiongemma"><em>A Visual Guide to DiffusionGemma</em></a></li>
+<li><strong>The uniform-state rehabilitation line:</strong> Sahoo et al., <em>The Diffusion Duality</em>, ICML 2025 — <a href="https://arxiv.org/abs/2506.10892">arXiv:2506.10892</a>; <em>Chapter II: Ψ-Samplers</em>, ICLR 2026 — <a href="https://arxiv.org/abs/2602.21185">arXiv:2602.21185</a></li>
+<li><strong>The critical lens:</strong> inference-time analysis of DiffusionGemma’s decoding behavior — <a href="https://arxiv.org/abs/2606.14620">arXiv:2606.14620</a></li>
+<li><strong>Training recipes:</strong> <a href="https://github.com/google-deepmind/gemma/tree/main/gemma/diffusion">Hackable Diffusion (JAX)</a> · <a href="https://vllm-project.github.io/2026/06/10/diffusion-gemma">vLLM integration</a></li>
 </ul>
 
 

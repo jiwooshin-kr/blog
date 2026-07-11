@@ -15,7 +15,321 @@
 <link>https://jiwooshin-kr.github.io/blog/</link>
 </image>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Thu, 09 Jul 2026 15:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 10 Jul 2026 15:00:00 GMT</lastBuildDate>
+<item>
+  <title>[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/diffusion-gemma-uniform-state/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Model:</strong> Google DeepMind, <em>DiffusionGemma</em> (26B MoE, ~3.8B active), released June 2026. <a href="https://deepmind.google/models/gemma/diffusiongemma/">Official page</a> · <a href="https://developers.googleblog.com/en/diffusiongemma-the-developer-guide">Developer guide</a> · <a href="https://ai.google.dev/gemma/docs/diffusiongemma/explained">Docs &amp; explainer</a> · <a href="https://huggingface.co/google/diffusiongemma-26B-A4B-it">Weights on Hugging Face</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>For the past two years the discrete-diffusion language-model literature has had a settled hierarchy: masked (absorbing-state) diffusion works, uniform-state diffusion doesn’t. Masked diffusion gives the model an explicit signal about <em>which</em> tokens need fixing, and essentially every competitive diffusion LM — MDLM, LLaDA, and friends — has been built on it. So it was genuinely surprising that <strong>DiffusionGemma</strong>, DeepMind’s first open diffusion language model, is built on <strong>uniform-state diffusion</strong>, where corruption replaces tokens with <em>random vocabulary tokens</em> rather than a <code>[MASK]</code> symbol.</p>
+<p>The reason for the bet is the one property masked diffusion structurally lacks: <strong>self-correction</strong>. In masked diffusion, once a mask is resolved into a word, it is locked in forever. In uniform-state diffusion, <em>any</em> position can be re-noised and revised when later context invalidates it. DiffusionGemma makes that property practical with four moves: (1) it doesn’t train from scratch but <strong>adapts a strong autoregressive checkpoint</strong> (Gemma 4 26B A4B), sidestepping the hardest part of the uniform-state training problem; (2) a <strong>single backbone that toggles between causal and bidirectional attention</strong>, so prompts are prefetched into a KV cache autoregressively while 256-token “canvases” are denoised in parallel; (3) <strong>self-conditioning</strong>, feeding the previous step’s full token <em>distribution</em> forward so aggressive re-noising doesn’t cause oscillation; and (4) an <strong>entropy-bounded sampler</strong> that accepts only confident tokens each step, re-noises the rest, and stops adaptively — typically in 12–16 steps. The payoff is 1,000+ tokens/second on a single H100 (~4× autoregressive) with a visible ability to fix its own mistakes mid-generation; the cost is a 5–15 point drop on reasoning-heavy benchmarks versus its own autoregressive parent.</p>
+</section>
+<section id="background-why-masked-diffusion-was-supposed-to-win" class="level2">
+<h2 class="anchored" data-anchor-id="background-why-masked-diffusion-was-supposed-to-win">Background: why masked diffusion was supposed to win</h2>
+<p>Discrete diffusion LMs replace left-to-right decoding with an iterative denoising loop: corrupt text with noise in a forward process, train a model to invert it, then generate by starting from pure noise and denoising a whole block of tokens in parallel. The design choice that defines everything downstream is <em>what the noise is</em>.</p>
+<p><strong>Masked (absorbing-state) diffusion</strong> corrupts by replacing tokens with a special <code>[MASK]</code> token. The forward process for a token <img src="https://latex.codecogs.com/png.latex?x_0"> interpolates toward a point mass on the mask:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Aq(x_t%20%5Cmid%20x_0)%20=%20%5Calpha_t%5C,%5Cdelta_%7Bx_0%7D%20+%20(1-%5Calpha_t)%5C,%5Cdelta_%7B%5B%5Ctext%7BMASK%7D%5D%7D%0A"></p>
+<p><strong>Uniform-state diffusion</strong> corrupts by resampling tokens uniformly from the vocabulary:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Aq(x_t%20%5Cmid%20x_0)%20=%20%5Calpha_t%5C,%5Cdelta_%7Bx_0%7D%20+%20(1-%5Calpha_t)%5C,%5Cmathrm%7BUniform%7D(V)%0A"></p>
+<p>The masked version has dominated for a mundane but decisive reason: the model always knows which tokens are noise, because they are literally labeled <code>[MASK]</code>. Denoising reduces to a BERT-style infilling problem with a clean, low-variance training objective. In the uniform-state version, a corrupted token looks like any other token. As the <a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-diffusiongemma">official explainer’s companion analysis</a> puts it, the training objective “does not only need to denoise canvases at various noise levels, it also needs to first <em>identify which tokens are actually noise</em> in the first place.” That extra burden shows up as high-variance gradients and consistently worse perplexity — hence the conventional wisdom.</p>
+<p>But masked diffusion buys its trainability with a structural flaw: <strong>absorption is one-way</strong>. Once the sampler commits a mask to a real token, there is no mechanism to un-commit it. If an early, high-confidence guess turns out to clash with context that emerges three steps later, the model must write <em>around</em> the mistake rather than fix it. For a paradigm whose whole selling point is “generate 256 tokens in parallel and iteratively refine,” refinement that can never touch already-decided tokens is a strange kind of refinement.</p>
+<p>Uniform-state diffusion doesn’t have that flaw. Since noise and signal live in the same space — both are just vocabulary tokens — the reverse process is free to reconsider <em>every</em> position at <em>every</em> step. A token that looked right at step 3 can be demoted back to noise at step 7. That is the property DeepMind decided was worth the training pain.</p>
+</section>
+<section id="what-diffusiongemma-actually-is" class="level2">
+<h2 class="anchored" data-anchor-id="what-diffusiongemma-actually-is">What DiffusionGemma actually is</h2>
+<p>DiffusionGemma is a 26B-parameter Mixture-of-Experts model activating ~3.8B parameters per forward pass, built on the Gemma 4 architecture with up to a 256K context window. Generation is <strong>block-autoregressive</strong>: the model denoises a 256-token <em>canvas</em> in parallel, commits the finished block to the KV cache, opens a fresh canvas, and repeats. So it is diffusion <em>within</em> blocks and autoregression <em>across</em> them — a hybrid that keeps parallel generation while still scaling to long outputs. The lineage, per Google, runs through the (never-released) Gemini Diffusion research line.</p>
+<p>The four ingredients that make the uniform-state part work are worth walking through one by one.</p>
+<section id="dont-train-uniform-state-diffusion-from-scratch-adapt-an-ar-model" class="level3">
+<h3 class="anchored" data-anchor-id="dont-train-uniform-state-diffusion-from-scratch-adapt-an-ar-model">1. Don’t train uniform-state diffusion from scratch — adapt an AR model</h3>
+<p>The hardest part of uniform-state training is the noise-identification problem above, and DiffusionGemma largely sidesteps it: rather than pretraining a diffusion model from random init, it <strong>starts from the pretrained autoregressive Gemma 4 26B A4B checkpoint</strong> and adapts it to the denoising objective. A model that already has strong language priors doesn’t need to <em>learn</em> what real text looks like before it can tell noise from signal — implausible tokens in context are already low-probability under the prior. The from-scratch identification burden becomes a much easier fine-tuning problem: recognize where the canvas is inconsistent with fluent text, and fix it.</p>
+<p>This mirrors what the broader field converged on for masked diffusion (adaptation recipes turning AR checkpoints into diffusion models), but it matters <em>more</em> for uniform-state, because the objective it rescues is the noisier one.</p>
+</section>
+<section id="one-backbone-two-attention-modes" class="level3">
+<h3 class="anchored" data-anchor-id="one-backbone-two-attention-modes">2. One backbone, two attention modes</h3>
+<p>A naive diffusion LM throws away the KV cache — bidirectional attention over a changing canvas has nothing stable to cache, which is disastrous for long prompts. DiffusionGemma’s answer is an <strong>encoder–denoiser patch</strong> on a single decoder-only backbone that dynamically toggles between two modes:</p>
+<ul>
+<li><strong>Prefill / incremental prefill (causal):</strong> the prompt — and each completed 256-token block — is processed with ordinary causal attention and written into a KV cache, exactly like an AR model.</li>
+<li><strong>Denoising (bidirectional):</strong> every canvas position attends to all other canvas positions <em>and</em> reads the cached prefix. Information flows symmetrically across the block being generated.</li>
+</ul>
+<p>This is the piece that makes the whole thing deployable: prompts are cached once, finished text is cached incrementally, and only the live 256-token canvas pays the bidirectional price. It’s also why the speed numbers hold up — each denoising step is one forward pass that advances all 256 positions at once, shifting single-user inference from memory-bound to compute-bound.</p>
+</section>
+<section id="self-conditioning-carry-the-distribution-not-the-sample" class="level3">
+<h3 class="anchored" data-anchor-id="self-conditioning-carry-the-distribution-not-the-sample">3. Self-conditioning: carry the distribution, not the sample</h3>
+<p>Aggressive re-noising creates an obvious failure mode: oscillation. If the sampler keeps resetting low-confidence positions to fresh random tokens, the model can end up relitigating the same positions forever, since each step only sees the current (partly re-randomized) canvas and remembers nothing about its previous beliefs.</p>
+<p>DiffusionGemma stabilizes this with <strong>self-conditioning</strong>: instead of discarding the previous step’s output, it takes the full softmax distribution over the vocabulary at each position, converts it into a <strong>probability-weighted average of token embeddings</strong>, and feeds that into the next denoising step alongside the canvas. Soft information — “I was 60/40 between these two candidates” — survives the hard re-noising of the sampled token. The model refines a persistent belief state rather than repeatedly re-deciding from scratch, which is what lets convergence happen in ~12–16 steps instead of drifting.</p>
+</section>
+<section id="the-entropy-bounded-sampler-accept-the-confident-re-noise-the-rest" class="level3">
+<h3 class="anchored" data-anchor-id="the-entropy-bounded-sampler-accept-the-confident-re-noise-the-rest">4. The entropy-bounded sampler: accept the confident, re-noise the rest</h3>
+<p>The default sampler makes the self-correction concrete. Each step:</p>
+<ol type="1">
+<li>The denoiser produces a distribution at every canvas position; the sampler computes each position’s <strong>entropy</strong>.</li>
+<li>Positions are sorted from most to least confident, and tokens are <strong>accepted greedily until an accumulated entropy budget</strong> (default 0.1) is exhausted — so the number of tokens committed per step adapts to how sure the model is, rather than being a fixed schedule.</li>
+<li>Everything not accepted is <strong>re-noised back to a random token</strong> (via Gumbel-max sampling) and gets reconsidered next step — including positions that were accepted in <em>earlier</em> steps but whose probability has since collapsed under new context.</li>
+<li>A temperature schedule decays from 0.8 to 0.4 over the trajectory (explore early, commit late), and <strong>adaptive stopping</strong> halts generation when canvas entropy drops below 0.005 and predictions are stable across consecutive steps — typically 12–16 steps against a 48-step maximum.</li>
+</ol>
+<p>Step 3 is the payoff of the entire uniform-state bet. In the developer guide’s Sudoku demo, you can watch digits that were committed early get demoted back to noise when a later-resolved row makes them illegal — the model literally erases and rewrites its own output. No masked-diffusion sampler can do that.</p>
+</section>
+</section>
+<section id="does-the-bet-pay-off" class="level2">
+<h2 class="anchored" data-anchor-id="does-the-bet-pay-off">Does the bet pay off?</h2>
+<p><strong>On speed, unambiguously.</strong> 1,000+ tokens/second on a single H100, 700+ on an RTX 5090, quoted as up to 4× faster than comparable AR generation; quantized, the MoE fits in roughly 18–24 GB of VRAM, i.e.&nbsp;one consumer GPU. There’s native NVFP4 support for Blackwell and day-one vLLM integration.</p>
+<p><strong>On self-correction, demonstrably.</strong> The Sudoku case study is the cleanest evidence: the base model solves ~0% of puzzles, but a short supervised fine-tune with the released JAX recipe lifts it to ~80% — while <em>cutting</em> denoising steps from 48 to 12, because a specialized model stabilizes faster and adaptive stopping notices. Constraint-satisfaction tasks, where a decision at position 40 depends on position 200, are exactly where bidirectional attention plus revisable commitments should shine, and they do.</p>
+<p><strong>On raw capability, honestly, no — not yet.</strong> The model card’s own numbers against its autoregressive parent:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Benchmark</th>
+<th>DiffusionGemma 26B</th>
+<th>Gemma 4 26B</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>MMLU Pro</td>
+<td>77.6</td>
+<td>82.6</td>
+</tr>
+<tr class="even">
+<td>GPQA Diamond</td>
+<td>73.2</td>
+<td>82.3</td>
+</tr>
+<tr class="odd">
+<td>BigBench Extra Hard</td>
+<td>47.6</td>
+<td>64.8</td>
+</tr>
+<tr class="even">
+<td>MATH-Vision</td>
+<td>70.5</td>
+<td>82.4</td>
+</tr>
+</tbody>
+</table>
+<p>A 5-point gap on knowledge-flavored suites, widening to 17 points on BigBench Extra Hard. The pattern is coherent: the further a task is from “refine a locally-checkable block of text” and the closer to “long serial dependent reasoning,” the more the parallel-canvas paradigm gives up. DeepMind positions the model accordingly — low-latency, low-concurrency, local and interactive use — rather than claiming AR parity.</p>
+<p>Two independent caveats are worth knowing before over-romanticizing the mechanism. An inference-time interpretability study of the released checkpoint (<a href="https://arxiv.org/abs/2606.14620">arXiv:2606.14620</a>) found that token <em>commit order</em> retains a moderate left-to-right bias (Kendall τ ≈ 0.43–0.60) — the model is “neither strictly parallel nor sequential,” so a chunk of the AR inductive bias survives adaptation. And the confidence signal driving the entropy-bounded sampler is well-calibrated on math (AUROC ≈ 0.75) but near chance on factual recall (≈ 0.47): “low entropy” reliably means “correct” only in some domains, which is a real limitation for a sampler whose acceptance rule <em>is</em> an entropy threshold.</p>
+</section>
+<section id="the-research-context-uniform-state-was-already-being-rehabilitated" class="level2">
+<h2 class="anchored" data-anchor-id="the-research-context-uniform-state-was-already-being-rehabilitated">The research context: uniform-state was already being rehabilitated</h2>
+<p>DeepMind’s documentation doesn’t cite academic lineage, but DiffusionGemma didn’t come out of nowhere — the “uniform-state is hopeless” consensus had been eroding in the open literature for a year. The key work is <strong>The Diffusion Duality</strong> (Sahoo et al., ICML 2025, <a href="https://arxiv.org/abs/2506.10892">arXiv:2506.10892</a>), which showed that uniform-state discrete diffusion <em>emerges from an underlying Gaussian diffusion</em> (discrete tokens as the argmax of Gaussian latents), and used that duality to transfer the continuous-diffusion toolbox — a variance-reducing curriculum that doubled training speed, and consistency distillation for few-step generation — to the discrete setting, beating AR models on zero-shot perplexity on 3 of 7 benchmarks. Its ICLR 2026 sequel (<a href="https://arxiv.org/abs/2602.21185">Ψ-samplers, arXiv:2602.21185</a>) added predictor–corrector samplers under which uniform-state models keep improving with more steps, explicitly challenging the assumption that “masked diffusion is the inevitable future of diffusion-based language modeling.”</p>
+<p>I want to be careful here: there is no public evidence DiffusionGemma <em>uses</em> Duo’s techniques, and its robustness recipe (AR adaptation + self-conditioning + entropy-bounded sampling) is a different toolkit than Duo’s (Gaussian curriculum + distillation). But both attack the same two weaknesses of uniform-state diffusion — noisy training signal, wasteful sampling — and DiffusionGemma is best read as the first <em>at-scale, productionized</em> confirmation of the same thesis: uniform-state’s self-correction is real, and its training problems are fixable.</p>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>The main contribution here is not a new equation — every component has precedent — but a <strong>existence proof at 26B scale</strong>: the first open-weights demonstration that uniform-state diffusion, the formulation the field wrote off, becomes competitive once you stop trying to win the pretraining objective on its own terms. The load-bearing insight is that uniform-state’s noise-identification problem is only crippling <em>from scratch</em>; initialized from a strong AR prior, “which tokens are noise” is nearly free, and what you keep is the one capability masked diffusion can’t have. That reframing — treat the formulation choice as a <em>sampler capability</em> question rather than a <em>perplexity</em> question — is the intellectually interesting move.</p>
+<p>I also think the block-autoregressive design deserves more credit than it gets in the headlines. Pure-diffusion LMs kept dying on deployment realities (no KV cache, fixed-length generation); diffusion-inside-blocks, AR-across-blocks quietly concedes that autoregression is right at the document scale while diffusion is right at the paragraph scale. That feels like the shape future hybrids will keep.</p>
+<p>The skeptical read is equally available: the model trails its own AR parent everywhere except speed, its “parallelism” is partially left-to-right in disguise, and its confidence signal — the heart of the sampler — is unreliable off-distribution. If your workload is cloud-batched, high-QPS serving, batching already gives AR models their parallelism back, and DiffusionGemma’s advantage largely evaporates. The honest pitch is narrower and still compelling: single-user, latency-bound, local inference — the setting where an AR model leaves the GPU 95% idle — plus structured tasks where mid-generation revision genuinely matters. Whether the capability gap closes with diffusion-native pretraining at larger scale, rather than adaptation, is now the obvious next question, and for the first time there’s an open model to build that answer on.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
+<ul>
+<li><strong>The model:</strong> <a href="https://deepmind.google/models/gemma/diffusiongemma/">DiffusionGemma official page</a> · <a href="https://developers.googleblog.com/en/diffusiongemma-the-developer-guide">developer guide</a> · <a href="https://ai.google.dev/gemma/docs/diffusiongemma/explained">how-it-works explainer</a> · <a href="https://ai.google.dev/gemma/docs/diffusiongemma/model_card">model card</a></li>
+<li><strong>Best independent walkthrough:</strong> Maarten Grootendorst, <a href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-diffusiongemma"><em>A Visual Guide to DiffusionGemma</em></a></li>
+<li><strong>The uniform-state rehabilitation line:</strong> Sahoo et al., <em>The Diffusion Duality</em>, ICML 2025 — <a href="https://arxiv.org/abs/2506.10892">arXiv:2506.10892</a>; <em>Chapter II: Ψ-Samplers</em>, ICLR 2026 — <a href="https://arxiv.org/abs/2602.21185">arXiv:2602.21185</a></li>
+<li><strong>The critical lens:</strong> inference-time analysis of DiffusionGemma’s decoding behavior — <a href="https://arxiv.org/abs/2606.14620">arXiv:2606.14620</a></li>
+<li><strong>Training recipes:</strong> <a href="https://github.com/google-deepmind/gemma/tree/main/gemma/diffusion">Hackable Diffusion (JAX)</a> · <a href="https://vllm-project.github.io/2026/06/10/diffusion-gemma">vLLM integration</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Model-Review</category>
+  <category>Diffusion</category>
+  <category>LLM</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/diffusion-gemma-uniform-state/</guid>
+  <pubDate>Fri, 10 Jul 2026 15:00:00 GMT</pubDate>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/diffusion-gemma-uniform-state/cover.png" medium="image" type="image/png" height="59" width="144"/>
+</item>
+<item>
+  <title>[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/block-diffusion-bd3lm/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Marianne Arriola, Aaron Gokaslan, Justin T. Chiu, Zhihan Yang, Zhixuan Qi, Jiaqi Han, Subham Sekhar Sahoo, Volodymyr Kuleshov. <em>Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models.</em> ICLR 2025. <a href="https://arxiv.org/abs/2503.09573">arXiv:2503.09573</a> · <a href="https://m-arriola.com/bd3lms">project page</a> · <a href="https://github.com/kuleshov-group/bd3lms">code</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Diffusion language models circa 2024 had three chronic problems: they could only generate sequences of a fixed, training-time length; they couldn’t use a KV cache, so they re-encoded the entire sequence at every denoising step; and their perplexity lagged autoregressive models. <strong>BD3-LMs</strong> (Block Discrete Denoising Diffusion Language Models) attack all three with one structural move: be <strong>autoregressive over blocks, diffusion within blocks</strong>. Generate a block of <img src="https://latex.codecogs.com/png.latex?L'"> tokens by parallel denoising, freeze it, cache its keys and values exactly like an AR model caches tokens, then move to the next block — which restores both the KV cache and arbitrary-length generation in one stroke.</p>
+<p>The subtler half of the paper is about the perplexity gap, and it contains the result I find most instructive: a BD3-LM with block size 1 is <em>mathematically equivalent</em> to an AR model in expectation, yet trains to a two-point-worse perplexity. The culprit is not the objective but the <strong>variance of its Monte Carlo estimator</strong> — and the noise schedule, which famously doesn’t affect the diffusion ELBO’s <em>value</em>, turns out to control that variance entirely. Their fix, <strong>clipped schedules</strong> that only sample masking rates inside a data-driven band <img src="https://latex.codecogs.com/png.latex?%5B%5Cbeta,%20%5Comega%5D">, cuts gradient variance dramatically and sets a then-state-of-the-art perplexity for discrete diffusion (within ~15% of AR on OpenWebText). If you read my <a href="../diffusion-gemma-uniform-state/">DiffusionGemma post</a>, this paper is the academic blueprint of that model’s block-autoregressive skeleton — worth understanding on its own terms.</p>
+</section>
+<section id="the-setup-two-paradigms-complementary-failure-modes" class="level2">
+<h2 class="anchored" data-anchor-id="the-setup-two-paradigms-complementary-failure-modes">The setup: two paradigms, complementary failure modes</h2>
+<p>An autoregressive model factorizes <img src="https://latex.codecogs.com/png.latex?%5Clog%20p_%5Ctheta(x)%20=%20%5Csum_%5Cell%20%5Clog%20p_%5Ctheta(x%5E%5Cell%20%5Cmid%20x%5E%7B%3C%5Cell%7D)"> and pays for its quality with strict seriality: <img src="https://latex.codecogs.com/png.latex?L"> tokens take <img src="https://latex.codecogs.com/png.latex?L"> forward passes. A discrete diffusion model (D3PM-style, and its masked-diffusion refinements like MDLM) denoises all <img src="https://latex.codecogs.com/png.latex?L"> positions in parallel — but it commits to a canvas of fixed width <img src="https://latex.codecogs.com/png.latex?L"> at training time, and because every position is still in flux at every step, <em>nothing can ever be cached</em>.</p>
+<p>BD3-LM’s move is to put a dial between the two. Partition the sequence into <img src="https://latex.codecogs.com/png.latex?B"> blocks of length <img src="https://latex.codecogs.com/png.latex?L'"> and factorize</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Clog%20p_%5Ctheta(x)%20%5C;=%5C;%20%5Csum_%7Bb=1%7D%5E%7BB%7D%20%5Clog%20p_%5Ctheta(x%5Eb%20%5Cmid%20x%5E%7B%3Cb%7D),%0A"></p>
+<p>where each conditional <img src="https://latex.codecogs.com/png.latex?p_%5Ctheta(x%5Eb%20%5Cmid%20x%5E%7B%3Cb%7D)"> is itself a masked diffusion model over just the <img src="https://latex.codecogs.com/png.latex?L'"> tokens of block <img src="https://latex.codecogs.com/png.latex?b">, conditioned on all <em>clean, finished</em> previous blocks. Set <img src="https://latex.codecogs.com/png.latex?L'%20=%201"> and you recover an AR model; set <img src="https://latex.codecogs.com/png.latex?L'%20=%20L"> and you recover vanilla diffusion; everything in between is new territory. One transformer with a <strong>block-causal attention mask</strong> parameterizes all <img src="https://latex.codecogs.com/png.latex?B"> conditionals at once: tokens in block <img src="https://latex.codecogs.com/png.latex?b"> attend to blocks <img src="https://latex.codecogs.com/png.latex?1"> through <img src="https://latex.codecogs.com/png.latex?b">, bidirectionally within their own block, causally across blocks.</p>
+<p>Here is the metaphor I’ll use for the rest of the post. An AR model is a <strong>typewriter</strong>: one keystroke at a time, ink permanent, and the growing manuscript sits in a binder next to you for reference. A vanilla diffusion model is a <strong>whiteboard</strong>: the whole essay is sketched at once in erasable marker and revised in sweeps — wonderfully parallel, but since <em>any</em> word might still change, you can never file anything away, and every revision pass means re-reading the entire board. BD3-LM writes on <strong>whiteboard panels the size of a paragraph</strong>: draft the current panel in erasable marker, and the moment it’s done, laminate it, file it in the binder, and start a fresh panel. The binder is the KV cache.</p>
+</section>
+<section id="part-i-why-diffusion-models-couldnt-have-a-kv-cache-and-how-blocks-restore-it" class="level2">
+<h2 class="anchored" data-anchor-id="part-i-why-diffusion-models-couldnt-have-a-kv-cache-and-how-blocks-restore-it">Part I: why diffusion models couldn’t have a KV cache — and how blocks restore it</h2>
+<section id="caching-requires-immutability" class="level3">
+<h3 class="anchored" data-anchor-id="caching-requires-immutability">Caching requires immutability</h3>
+<p>The KV cache is such a fixture of AR inference that it’s easy to forget what makes it <em>valid</em>: keys and values for position <img src="https://latex.codecogs.com/png.latex?%5Cell"> can be stored and reused only because token <img src="https://latex.codecogs.com/png.latex?%5Cell"> <strong>never changes again</strong>. The cache is a ledger of settled facts. Vanilla diffusion violates this at every step — position 3 at denoising step 7 may hold a different token than at step 6, and with bidirectional attention its key/value vectors also depend on every <em>other</em> position, which is also changing. Every entry in the would-be cache is stale the moment you write it. So diffusion models recompute attention over all <img src="https://latex.codecogs.com/png.latex?L"> positions at all <img src="https://latex.codecogs.com/png.latex?T"> steps: the whole whiteboard, re-read for every sweep of the marker.</p>
+<p>Block diffusion restores the ledger by restoring immutability — at block granularity. During generation (their Algorithm 2):</p>
+<ol type="1">
+<li>Denoise block <img src="https://latex.codecogs.com/png.latex?b">’s canvas over some number of diffusion steps, with cross-attention into the cached keys/values <img src="https://latex.codecogs.com/png.latex?K%5E%7B1:b-1%7D,%20V%5E%7B1:b-1%7D"> of all finished blocks.</li>
+<li>When the block is done, run one clean forward pass over it to produce <img src="https://latex.codecogs.com/png.latex?K%5Eb,%20V%5Eb">, and append them to the cache — laminate the panel, file it.</li>
+<li>Open the next canvas.</li>
+</ol>
+<p>The finished prefix is now exactly as cheap as it is for an AR model, while the live canvas keeps diffusion’s parallelism (all <img src="https://latex.codecogs.com/png.latex?L'"> tokens per denoising step). And since blocks are appended one after another with no fixed horizon, generation runs until an <code>[EOS]</code> appears — the fixed-length straitjacket is gone for free. In their OpenWebText experiments this is dramatic: SEDD, trained on 1024-token contexts, can emit at most 1024 tokens; BD3-LM sampled documents up to <strong>~9,982 tokens</strong> — roughly 10× its training context — because “context length” now only bounds the binder the model was <em>trained</em> to read, not the number of panels it can file.</p>
+</section>
+<section id="the-training-time-twist-every-block-must-be-seen-twice" class="level3">
+<h3 class="anchored" data-anchor-id="the-training-time-twist-every-block-must-be-seen-twice">The training-time twist: every block must be seen twice</h3>
+<p>There’s a wrinkle that makes <em>training</em> less obvious than sampling, and the paper’s engineering contribution lives here. To compute the loss for block <img src="https://latex.codecogs.com/png.latex?b"> you need the model’s denoising prediction on the <strong>noisy</strong> <img src="https://latex.codecogs.com/png.latex?x%5Eb_t"> — but to condition blocks <img src="https://latex.codecogs.com/png.latex?b%7B+%7D1,%20%5Cdots,%20B"> you need keys/values from the <strong>clean</strong> <img src="https://latex.codecogs.com/png.latex?x%5Eb">. Same block, two roles, two different inputs. A single standard forward pass can’t produce both, so naively you’d loop over blocks <img src="https://latex.codecogs.com/png.latex?B"> times.</p>
+<p>Their vectorized solution: concatenate the noisy and clean sequences into one input <img src="https://latex.codecogs.com/png.latex?x_%7B%5Ctext%7Bnoisy%7D%7D%20%5Coplus%20x"> of length <img src="https://latex.codecogs.com/png.latex?2L"> and run a <em>single</em> forward pass under a specialized attention mask stitched from three pieces:</p>
+<ul>
+<li><img src="https://latex.codecogs.com/png.latex?M_%7BBD%7D"> (block-diagonal): noisy tokens attend to noisy tokens <strong>within their own block</strong> — the live panel is coherent with itself;</li>
+<li><img src="https://latex.codecogs.com/png.latex?M_%7BOBC%7D"> (offset block-causal): noisy tokens attend to <strong>clean tokens of strictly earlier blocks</strong> — the panel may consult the binder, but only the laminated pages, never a clean copy of <em>itself</em> (that would be the answer key for the very exercise being graded);</li>
+<li><img src="https://latex.codecogs.com/png.latex?M_%7BBC%7D"> (block-causal): clean tokens attend to clean tokens of their own and earlier blocks — this builds the binder itself.</li>
+</ul>
+<p>The resulting <img src="https://latex.codecogs.com/png.latex?2L%20%5Ctimes%202L"> mask is extremely sparse, and they exploit that with a fused FlexAttention kernel: up to ~5× faster than a naively masked <code>scaled_dot_product_attention</code> on the attention op, ~20–25% end-to-end training speedup over the two-pass alternative, and overall training that stays within 2× the cost of ordinary diffusion training. Each token still passes through the network twice in effect — that’s the irreducible price of playing both student and answer key — but the two passes share one kernel launch and one attention computation.</p>
+</section>
+</section>
+<section id="part-ii-the-noise-schedule-is-a-variance-knob" class="level2">
+<h2 class="anchored" data-anchor-id="part-ii-the-noise-schedule-is-a-variance-knob">Part II: the noise schedule is a variance knob</h2>
+<p>This is the half of the paper I’d assign to students. It starts with an experiment that should be a null result and isn’t.</p>
+<section id="the-puzzle-an-equivalence-that-fails-in-practice" class="level3">
+<h3 class="anchored" data-anchor-id="the-puzzle-an-equivalence-that-fails-in-practice">The puzzle: an equivalence that fails in practice</h3>
+<p>Set <img src="https://latex.codecogs.com/png.latex?L'%20=%201">. Every “block” is a single token, the within-block diffusion collapses, and the paper proves (their Suppl. B.4) that the block-diffusion NELBO is <strong>equal in expectation to the AR negative log-likelihood</strong>. Same model class, same objective in expectation — training should give the same perplexity. It doesn’t: on LM1B, AR reaches 22.88 while the <img src="https://latex.codecogs.com/png.latex?L'=1"> BD3-LM stalls at ≤ 25.56.</p>
+<p>The diagnosis is beautiful in its mundanity. Under the standard linear masking schedule, the mask rate at a uniformly sampled time <img src="https://latex.codecogs.com/png.latex?t"> averages 50% — so on any given batch, the diffusion loss is computed <strong>only on the ~half of tokens that happen to be masked</strong>. The AR model gets a gradient signal from every token in the batch; the diffusion model gets a gradient estimated from a random half. Both estimators are unbiased. One is twice as noisy. The authors make the point with a killer control: train an AR model with a <em>randomized batch size</em> and its perplexity degrades to 24.37 — most of the way to the diffusion number. The “diffusion gap” at <img src="https://latex.codecogs.com/png.latex?L'=1"> was never about diffusion; it was about <strong>gradient variance</strong>.</p>
+<p>The metaphor: imagine two teachers estimating a student’s ability. One grades the <em>entire</em> exam every week. The other rolls a die and grades a random subset of questions — sometimes three questions, sometimes forty. Their long-run averages agree exactly, but the second teacher’s weekly reports swing wildly, and if you adjust your teaching (your gradient step) after every report, the noisy reports send you zigzagging. SGD is that teacher: what matters isn’t only the expected loss but how much the estimate jitters batch to batch.</p>
+<p>And here’s the twist that turns diagnosis into cure: for <img src="https://latex.codecogs.com/png.latex?L'=1">, if you change the forward process to <strong>always mask the token</strong> (<img src="https://latex.codecogs.com/png.latex?q(x_t%20=%20m%20%5Cmid%20x)%20=%201">), the diffusion objective becomes <em>literally</em> next-token prediction — every “worksheet” is exactly the AR exercise — and the perplexity gap closes to zero: 22.88, matching AR to the second decimal. Measured NELBO variance drops from 1.52 to 0.11. The schedule didn’t change what the model was learning in expectation; it changed how noisily the model was told about it.</p>
+</section>
+<section id="why-extreme-mask-rates-are-wasted-worksheets" class="level3">
+<h3 class="anchored" data-anchor-id="why-extreme-mask-rates-are-wasted-worksheets">Why extreme mask rates are wasted worksheets</h3>
+<p>For <img src="https://latex.codecogs.com/png.latex?L'%20%3E%201">, always-mask-everything is no longer the answer (the model must learn to denoise <em>partial</em> corruption to sample well). But the variance logic generalizes into an intuition about which masking rates are worth training on. Think of each training example as a fill-in-the-blank worksheet, with the schedule deciding how many blanks:</p>
+<ul>
+<li><strong>Almost no blanks:</strong> the exercise is copy-the-context; reconstruction is trivial, loss ≈ 0, gradient ≈ nothing. A wasted worksheet.</li>
+<li><strong>All blanks:</strong> with no context at all inside the block, the best possible answer is the marginal statistics of the language — guess “the,” guess “of.” That’s learnable in the first hour of training and never again informative. Also wasted.</li>
+<li><strong>The middle band:</strong> enough context to reason from, enough blanks to be forced to. All the learning signal lives here.</li>
+</ul>
+<p>A linear schedule samples mask rates uniformly on <img src="https://latex.codecogs.com/png.latex?%5B0,1%5D">, so it keeps printing worksheets from both wasted extremes — and those near-zero-signal batches are precisely what inflates the variance of the gradient estimator. The fix is almost embarrassingly simple: <strong>clipped schedules</strong>, which sample the mask rate <img src="https://latex.codecogs.com/png.latex?1%20-%20%5Calpha_t%20%5Csim%20%5Cmathcal%7BU%7D%5B%5Cbeta,%20%5Comega%5D"> and simply refuse to train outside the productive band.</p>
+<p>The subtle part — and the reason this is a <em>contribution</em> rather than a hack — is the theoretical status of the schedule. The masked-diffusion NELBO is provably <strong>invariant to the noise schedule</strong> in expectation (a known MDLM-era result), which had licensed everyone to treat the schedule as a don’t-care. The paper’s point is that this invariance holds for the <em>value</em> of the objective, not for the <em>variance of its Monte Carlo estimator</em>. The schedule is not a modeling choice at all; it is a <strong>variance-reduction dial</strong> hiding in plain sight. (Two teachers again: both unbiased, but you get to choose which one grades you.)</p>
+</section>
+<section id="data-driven-clipping-the-right-band-depends-on-the-block-size" class="level3">
+<h3 class="anchored" data-anchor-id="data-driven-clipping-the-right-band-depends-on-the-block-size">Data-driven clipping: the right band depends on the block size</h3>
+<p>Where should <img src="https://latex.codecogs.com/png.latex?%5B%5Cbeta,%20%5Comega%5D"> sit? Not anywhere universal. Their Table 8 is worth staring at: for <img src="https://latex.codecogs.com/png.latex?L'%20=%204">, heavy masking <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BU%7D%5B0.45,%200.95%5D"> is best; for <img src="https://latex.codecogs.com/png.latex?L'%20=%2016">, a moderate band <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BU%7D%5B0.3,%200.8%5D"> wins. The pattern makes sense through the worksheet lens: a small block sits inside lots of clean, laminated left-context, so even a nearly-blank worksheet is still solvable from the binder — you can crank the difficulty up. A big block is more self-referential, so all-blanks degenerates toward marginal-guessing faster — the productive band sits lower.</p>
+<p>Rather than hand-tune this, they make it adaptive: since gradient variance itself is expensive to estimate, they use the <strong>variance of the NELBO estimator as a proxy</strong>, and grid-search <img src="https://latex.codecogs.com/png.latex?%5Cbeta,%20%5Comega"> to minimize it at every validation epoch (~every 5K steps) during training. Variance of the loss turns out to correlate cleanly with final test perplexity across schedules — which is itself a nice empirical finding: you can <em>select</em> schedules by a statistic that never touches held-out data.</p>
+</section>
+</section>
+<section id="does-it-work" class="level2">
+<h2 class="anchored" data-anchor-id="does-it-work">Does it work?</h2>
+<p>On likelihoods, yes, and monotonically in the direction the theory predicts (smaller blocks → closer to AR): on LM1B (65B tokens), BD3-LM reaches PPL ≤ 30.60 / 29.83 / 28.23 for <img src="https://latex.codecogs.com/png.latex?L'%20=%2016/8/4">, versus MDLM’s 31.78 — up to a 13% improvement and a new discrete-diffusion state of the art at the time. On OpenWebText (524B tokens): ≤ 22.27 / 21.68 / 20.73 versus MDLM’s 22.98, with AR at 17.54. The gap to AR is narrowed, not closed — the NELBO is provably looser as <img src="https://latex.codecogs.com/png.latex?L'"> grows, so some of the remaining gap is structural.</p>
+<p>On sample quality, the ordering is the same: generative perplexity 25.7 (<img src="https://latex.codecogs.com/png.latex?L'=4">) versus MDLM’s 46.8 at matched compute (1K function evaluations), and an order of magnitude fewer network calls than SSD-LM, the earlier Gaussian-embedding block-diffusion approach, at far better quality. And the arbitrary-length capability is qualitative: ~10× longer samples than any fixed-canvas diffusion baseline.</p>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>The lasting contribution here isn’t the architecture — “semi-autoregressive” generation existed — it’s two conceptual clarifications that outlived the specific model. First, the observation that <strong>caching and revision are fundamentally in tension</strong>, and that the block is the natural truce line: revise freely inside the panel, laminate at the boundary. Every deployed diffusion LM I’m aware of has since adopted exactly this shape — <a href="../diffusion-gemma-uniform-state/">DiffusionGemma’s</a> 256-token canvases committed to a KV cache, with causal/bidirectional mode switching, is this paper’s Figure-1 diagram productionized (with the within-block noise swapped from masking to uniform-state, trading the tight NELBO for self-correction — the two posts are really about the two halves of one design space). It’s also no coincidence: BD3-LM comes from the Kuleshov group, whose <em>Diffusion Duality</em> line supplied the uniform-state half of that story too.</p>
+<p>Second, and more transferable: <strong>“invariant in expectation” is not “irrelevant in practice.”</strong> The noise-schedule result is a small masterclass in a failure pattern that recurs all over ML — an objective is proven invariant to some choice, the community stops thinking about that choice, and the choice quietly dominates optimization through second-order statistics. The <img src="https://latex.codecogs.com/png.latex?L'=1"> experiment is the cleanest demonstration I’ve seen: two provably-equivalent objectives, a two-point perplexity gap, and a one-line schedule change that closes it exactly. If you keep one thing from this paper, keep the habit of asking not “does this choice change my loss?” but “does it change the <em>variance of my estimator</em> of my loss?”</p>
+<p>The honest limitations are the ones the authors state: training costs up to ~2× standard diffusion (every block plays both student and answer key), small blocks reinherit AR’s seriality, and the optimal block size is task-dependent with no principle yet for choosing it. And the perplexity gap to AR, while narrowed, remains — closed only in the degenerate <img src="https://latex.codecogs.com/png.latex?L'=1"> limit where you’ve rebuilt an AR model. Interpolation, it turns out, means inheriting a weighted average of the weaknesses too. But as a piece of analysis that turned “diffusion LMs are worse and nobody quite knows why” into “here is the variance, here is the knob, here is the recipe,” it’s one of the most useful diffusion-LM papers of its year.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
+<ul>
+<li><strong>The paper:</strong> Arriola et al.&nbsp;<em>Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models.</em> ICLR 2025 — <a href="https://arxiv.org/abs/2503.09573">arXiv:2503.09573</a> · <a href="https://m-arriola.com/bd3lms">project page &amp; blog</a> · <a href="https://github.com/kuleshov-group/bd3lms">code</a></li>
+<li><strong>The masked-diffusion foundation it builds on:</strong> Sahoo et al.&nbsp;<em>Simple and Effective Masked Diffusion Language Models</em> (MDLM), NeurIPS 2024 — <a href="https://openreview.net/forum?id=L4uaAR4ArM">OpenReview</a></li>
+<li><strong>Where the design shipped:</strong> my review of <a href="../diffusion-gemma-uniform-state/">DiffusionGemma</a>, whose block-autoregressive canvas + KV-cache design is this paper’s skeleton at 26B scale</li>
+<li><strong>The same group’s uniform-state line:</strong> Sahoo et al.&nbsp;<em>The Diffusion Duality</em>, ICML 2025 — <a href="https://arxiv.org/abs/2506.10892">arXiv:2506.10892</a></li>
+<li><strong>The Gaussian-embedding predecessor it improves on:</strong> Han et al.&nbsp;<em>SSD-LM</em>, 2022 — <a href="https://arxiv.org/abs/2210.17432">arXiv:2210.17432</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Paper-Review</category>
+  <category>Diffusion</category>
+  <category>LLM</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/block-diffusion-bd3lm/</guid>
+  <pubDate>Fri, 10 Jul 2026 15:00:00 GMT</pubDate>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/block-diffusion-bd3lm/cover.png" medium="image" type="image/png" height="64" width="144"/>
+</item>
+<item>
+  <title>[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/coconut-continuous-latent-reasoning/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Shibo Hao, Sainbayar Sukhbaatar, DiJia Su, Xian Li, Zhiting Hu, Jason Weston, Yuandong Tian. <em>Training Large Language Models to Reason in a Continuous Latent Space.</em> COLM 2025. <a href="https://arxiv.org/abs/2412.06769">arXiv:2412.06769</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Chain-of-thought forces a model to think in <em>words</em>, but most tokens in a reasoning trace are there for grammatical glue, not computation — and words force the model to commit to one path at each step. <strong>Coconut (Chain of Continuous Thought)</strong> removes the words: it takes the LLM’s last hidden state and feeds it back in as the <em>next input embedding</em>, so the model reasons in its own continuous representation space instead of decoding to text and re-encoding. The payoff is that a continuous thought is not a single token but a distribution — it can hold several candidate next steps at once, letting the model do something like a breadth-first search over a reasoning graph rather than greedily picking one branch. On planning-heavy logical tasks Coconut matches or beats CoT while emitting far fewer tokens; the cost is a fiddly multi-stage training curriculum and reasoning traces no human can read.</p>
+</section>
+<section id="why-this-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-matters">Why this matters</h2>
+<p>Chain-of-thought works, but it is a strange thing to demand of a model. To “reason,” the model must serialize its internal state into a sequence of natural-language tokens, then re-read those tokens to continue. Two problems fall out of this. First, it is wasteful: in a sentence like “so the next number we need to check is 12, which means…”, the tokens carrying reasoning content are a small fraction of the whole; the rest is textual coherence. Second, and more fundamentally, <em>language is committal</em>. Sampling a token is a hard decision — the moment the model writes “12,” it has thrown away the alternative that it should have checked 15. For problems that require search or backtracking, this premature commitment is exactly the failure mode.</p>
+<p>Coconut’s premise is that the reasoning state does not need to pass through the vocabulary bottleneck at all. The natural place for a transformer to keep its “state” is the hidden vector it already computes — a point in <img src="https://latex.codecogs.com/png.latex?%5Cmathbb%7BR%7D%5Ed">, not a one-hot over the vocabulary. Why round that vector to the nearest word and then re-embed it, when you can just hand it back to the model directly?</p>
+</section>
+<section id="the-core-idea-feed-the-hidden-state-back-dont-decode-it" class="level2">
+<h2 class="anchored" data-anchor-id="the-core-idea-feed-the-hidden-state-back-dont-decode-it">The core idea: feed the hidden state back, don’t decode it</h2>
+<p>In ordinary autoregressive decoding, the input embedding at each step comes from the previously generated <em>token</em>. Coconut adds a second mode. Special markers <code>&lt;bot&gt;</code> and <code>&lt;eot&gt;</code> (begin/end of thought) bracket a stretch of <em>latent</em> reasoning. Inside that stretch, the input embedding at step <img src="https://latex.codecogs.com/png.latex?t"> is not a token embedding — it is the last hidden state from the previous step:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Ax_t%20%5C;=%5C;%0A%5Cbegin%7Bcases%7D%0A%5Ctext%7BEmbed%7D(w_t)%20&amp;%20%5Ctext%7B(language%20mode)%7D%5C%5C%5B4pt%5D%0Ah_%7Bt-1%7D%20&amp;%20%5Ctext%7B(latent%20mode,%20between%20%7D%5Ctexttt%7B%3Cbot%3E%7D%5Ctext%7B%20and%20%7D%5Ctexttt%7B%3Ceot%3E%7D%5Ctext%7B)%7D%0A%5Cend%7Bcases%7D%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?h_%7Bt-1%7D"> is the final-layer hidden state produced at the previous position. No softmax, no token sampling, no re-embedding — the “continuous thought” is just <img src="https://latex.codecogs.com/png.latex?h_%7Bt-1%7D"> passed forward. After a fixed number of such latent steps, the model emits <code>&lt;eot&gt;</code> and returns to normal language decoding to produce the answer.</p>
+<p>The conceptual consequence is the whole point. A decoded token is a single choice; a hidden state is a dense vector that can carry a <em>superposition</em> of possibilities. The authors show, on a graph-reachability planning task, that the continuous thought behaves like the frontier of a <strong>breadth-first search</strong>: early latent steps keep weight on several candidate next nodes simultaneously, and later steps prune the dead ends. CoT, by contrast, must gamble on one node and hope it can recover if wrong. Reasoning in latent space lets the model <em>defer commitment</em> — it explores in parallel and only collapses to a definite answer when it decodes back to language.</p>
+</section>
+<section id="training-a-curriculum-that-dissolves-the-chain-of-thought" class="level2">
+<h2 class="anchored" data-anchor-id="training-a-curriculum-that-dissolves-the-chain-of-thought">Training: a curriculum that dissolves the chain of thought</h2>
+<p>You cannot supervise a continuous thought directly — there is no ground-truth hidden vector to regress toward. Coconut is trained instead by a <strong>multi-stage curriculum</strong> that gradually replaces language reasoning with latent reasoning, starting from ordinary CoT data.</p>
+<p>At stage <img src="https://latex.codecogs.com/png.latex?0">, the model trains on full written CoT (question, all reasoning steps, answer) as usual. At stage <img src="https://latex.codecogs.com/png.latex?k">, the first <img src="https://latex.codecogs.com/png.latex?k"> reasoning steps are removed from the text and replaced by <img src="https://latex.codecogs.com/png.latex?k%20%5Ccdot%20c"> continuous thoughts, where <img src="https://latex.codecogs.com/png.latex?c"> is the number of latent thoughts substituted per step (a small constant). The loss is computed only on the <em>remaining</em> text — the later reasoning steps and the final answer. The continuous thoughts receive no direct loss; gradients reach them by backpropagating through the recurrence from the tokens that follow. Over stages, more and more of the written reasoning is swallowed into latent space, and the model learns to carry that computation in <img src="https://latex.codecogs.com/png.latex?h_t"> instead of in words.</p>
+<p>One consequence worth flagging for anyone tempted to reproduce it: because each continuous thought depends on the hidden state of the one before, the latent segment cannot be parallelized across positions the way teacher-forced token training can. Generating <img src="https://latex.codecogs.com/png.latex?n"> continuous thoughts requires <img src="https://latex.codecogs.com/png.latex?n"> sequential forward passes, which makes training meaningfully more expensive than standard CoT fine-tuning. This is the practical tax on the whole idea.</p>
+</section>
+<section id="results" class="level2">
+<h2 class="anchored" data-anchor-id="results">Results</h2>
+<p>The evaluation is deliberately built around tasks where <em>search matters</em>: GSM8K for math word problems, and two synthetic logical-reasoning benchmarks, ProntoQA and the harder ProsQA (a graph-structured reachability task designed to demand real planning rather than pattern completion).</p>
+<p>The headline pattern is a favorable accuracy–efficiency trade-off. On the planning-heavy tasks, Coconut with enough continuous thoughts per step <strong>matches or exceeds</strong> written CoT while generating dramatically fewer tokens at inference — the reasoning happens in latent space, so the model does not pay to spell it out. On ProsQA in particular, where the branching structure rewards keeping options open, latent reasoning pulls clearly ahead of CoT; adding more continuous thoughts per step continues to help, consistent with the BFS interpretation. On GSM8K the story is more nuanced — CoT’s explicit arithmetic is a strong baseline — but Coconut still beats a no-reasoning baseline and lands close to CoT at a fraction of the token count.</p>
+<p>The interpretability probe is, to me, the most convincing evidence. When the authors decode what the continuous thoughts <em>would</em> have said, they find the latent state maintaining a spread of plausible next nodes and narrowing it over successive steps — a mechanistic picture of the parallel-then-prune behavior, rather than a claim inferred only from accuracy numbers.</p>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>What I like about Coconut is that it isolates a single, clean idea and follows it honestly: the vocabulary is a bottleneck on reasoning, so route around it. The superposition-enabling-search framing is genuinely illuminating — it reframes CoT’s weakness not as “too few tokens” but as “premature discretization,” which is a more useful diagnosis. It also sits in an interesting relationship with the broader push toward inference-time compute: everyone is trying to buy more “thinking,” and Coconut argues some of that thinking is cheaper and better done in latent space than in text.</p>
+<p>The honest caveats are real, though. The sequential training cost is the obvious one, and it partly explains why the paper stays at the scale it does. The curriculum is delicate — the method is a recipe as much as an architecture, and how gracefully it transfers to large pretrained reasoners without heavy per-task staging is still open. And the interpretability loss cuts against a major reason CoT became popular in the first place: a readable trace you can audit. A model that reasons in vectors is, by construction, harder to oversee.</p>
+<p>The reason I’m reviewing an early-2025 paper as a “hot” pick is that the line it opened is unmistakably where a chunk of 2026 reasoning research now lives. The continuous-latent-reasoning direction — looped and recurrent-depth transformers, “pondering” in embedding space, and theoretical work on <em>why</em> continuous chains of thought are more expressive than discrete ones (the superposition analyses) — all trace back to this move. Coconut isn’t the last word on latent reasoning; it’s the paper that made the question respectable. Read it for the idea, not the leaderboard.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
+<ul>
+<li><strong>The paper:</strong> Hao, Sukhbaatar, Su, Li, Hu, Weston &amp; Tian. <em>Training Large Language Models to Reason in a Continuous Latent Space.</em> COLM 2025 — <a href="https://arxiv.org/abs/2412.06769">arXiv:2412.06769</a></li>
+<li><strong>The contrast it’s arguing with:</strong> Wei et al.&nbsp;<em>Chain-of-Thought Prompting Elicits Reasoning in Large Language Models.</em> NeurIPS 2022 — <a href="https://arxiv.org/abs/2201.11903">arXiv:2201.11903</a></li>
+<li><strong>Where the line went next:</strong> a growing 2025–2026 literature on latent/looped reasoning and the training dynamics of continuous chain-of-thought (e.g.&nbsp;the “emergence of superposition” analyses).</li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Paper-Review</category>
+  <category>LLM</category>
+  <category>Planning</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/coconut-continuous-latent-reasoning/</guid>
+  <pubDate>Fri, 10 Jul 2026 15:00:00 GMT</pubDate>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/coconut-continuous-latent-reasoning/cover.png" medium="image" type="image/png" height="78" width="144"/>
+</item>
 <item>
   <title>[Paper Review] Planning with Diffusion for Flexible Behavior Synthesis (Diffuser)</title>
   <dc:creator>Jiwoo Shin</dc:creator>
@@ -394,196 +708,6 @@ Figure&nbsp;2: Figure 1(b) of the paper: memorization mitigation. Left to right:
   <media:content url="https://jiwooshin-kr.github.io/blog/posts/safe-denoiser/fig-scream.png" medium="image" type="image/png" height="95" width="144"/>
 </item>
 <item>
-  <title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</title>
-  <dc:creator>Jiwoo Shin</dc:creator>
-  <link>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-
-<blockquote class="blockquote">
-<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
-</blockquote>
-<section id="tldr" class="level2">
-<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
-<p>Text diffusion models (TDMs) like <a href="https://openreview.net/forum?id=KnqiC0znVF">LLaDA</a> and <a href="https://openreview.net/forum?id=L4uaAR4ArM">MDLM</a> generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as <a href="https://openreview.net/forum?id=rIPeatvPy3">DIJA</a> and <a href="https://openreview.net/forum?id=NWvL280s2l">PAD</a> reach near-100% attack success rates on instruction-tuned TDMs.</p>
-<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the <a href="https://openreview.net/forum?id=QQS7TudonJ">safe denoiser of Kim et al.&nbsp;(NeurIPS 2025)</a>, originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
-</section>
-<section id="why-this-problem-matters" class="level2">
-<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
-<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
-<ul>
-<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
-<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
-<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
-</ul>
-<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
-</section>
-<section id="background-the-safe-denoiser" class="level2">
-<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
-<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%20%5Ccup%20%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D">. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
-<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20+%20%5Cbeta%5E*(x_t)%5Cleft(%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20-%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%5Cright)%0A"></p>
-<p>where <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)%20%5Cge%200"> grows with the posterior likelihood that the current state <img src="https://latex.codecogs.com/png.latex?x_t"> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <img src="https://latex.codecogs.com/png.latex?%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D">; the two remaining quantities are approximated from a finite set of unsafe references.</p>
-<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from <a href="https://openreview.net/forum?id=zBPzxhso8M">DiffuGuard</a>.</p>
-</section>
-<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
-<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
-<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
-<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <img src="https://latex.codecogs.com/png.latex?N"> unsafe reference sequences <img src="https://latex.codecogs.com/png.latex?x%5E%7B(1)%7D,%20%5Cdots,%20x%5E%7B(N)%7D"> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
-<p><img src="https://latex.codecogs.com/png.latex?%0A%5Chat%7B%5Cmathbb%7BE%7D%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Csum_%7Bn=1%7D%5E%7BN%7D%20x%5E%7B(n)%7D%20%5Cfrac%7Bq_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)%7D%7B%5Csum_%7Bm%7D%20q_t(x_t%20%5Cmid%20x%5E%7B(m)%7D)%7D%0A"></p>
-<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
-<p><img src="https://latex.codecogs.com/png.latex?%0Aq_t(x_t%20%5Cmid%20x_0)%20=%20%5Calpha_t%5E%7B%5C#%5C%7B%5Ctext%7Bmatching%20positions%7D%5C%7D%7D%20(1-%5Calpha_t)%5E%7B%5C#%5C%7B%5Ctext%7Bmasked%20positions%7D%5C%7D%7D%0A"></p>
-<p>This is computable in <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
-<p><strong>3. Approximating <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <img src="https://latex.codecogs.com/png.latex?%5Ceta%20%5Ccdot%20%5Cfrac%7B1%7D%7BN%7D%5Csum_n%20q_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)"> with a tunable strength <img src="https://latex.codecogs.com/png.latex?%5Ceta">, applied only during a <strong>time window</strong> <img src="https://latex.codecogs.com/png.latex?C"> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
-<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
-<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
-</section>
-<section id="experiments" class="level2">
-<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
-<p>Three safety dimensions, on MDLM and the LLaDA/<a href="https://arxiv.org/abs/2508.15487">Dream</a> family:</p>
-<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
-<div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" class="img-fluid figure-img" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Each point is a SAD configuration; going down (fewer unsafe generations) usually costs some perplexity, and the guidance time window (colours) controls where you land on the curve. (Yusuf et al., 2026)
-</figcaption>
-</figure>
-</div>
-<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
-<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Btrain%7D"> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <img src="https://latex.codecogs.com/png.latex?%5Ceta"> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <img src="https://latex.codecogs.com/png.latex?(n,p)">-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
-<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches <a href="https://proceedings.mlr.press/v267/singhal25b.html">FK Steering</a> (<img src="https://latex.codecogs.com/png.latex?k%7B=%7D8">) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
-<p><strong>Ablations worth remembering:</strong></p>
-<ul>
-<li><img src="https://latex.codecogs.com/png.latex?%5Ceta"> is a clean monotonic safety knob once the schedule is fixed.</li>
-<li>The time window <img src="https://latex.codecogs.com/png.latex?C"> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
-<li>Safety gains saturate at <img src="https://latex.codecogs.com/png.latex?N%20%5Capprox%20500%5Ctext%7B%E2%80%93%7D1000"> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
-</ul>
-</section>
-<section id="strengths" class="level2">
-<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
-<ol type="1">
-<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
-<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
-<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
-<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
-</ol>
-</section>
-<section id="weaknesses-open-questions" class="level2">
-<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
-<ol type="1">
-<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
-<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
-<li><strong>The theory–practice gap around <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The provable guarantee holds for the exact <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)">; in practice it’s replaced by a constant <img src="https://latex.codecogs.com/png.latex?%5Ceta"> inside a hand-tuned time window, with <img src="https://latex.codecogs.com/png.latex?%5Ceta"> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
-<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
-<li><strong>Scale.</strong> Experiments top out at 8B models and <img src="https://latex.codecogs.com/png.latex?N%7B=%7D5000"> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
-</ol>
-</section>
-<section id="my-take" class="level2">
-<h2 class="anchored" data-anchor-id="my-take">My take</h2>
-<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
-<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
-<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
-</section>
-<section id="peer-review-at-a-glance" class="level2">
-<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
-<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026, reviewed by four reviewers. The scores below are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text is not publicly available (ICML does not post reviews, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> requires sign-in), so they are reproduced here without interpretation.</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-</colgroup>
-<thead>
-<tr class="header">
-<th></th>
-<th>Recommendation</th>
-<th>Confidence</th>
-<th>Soundness</th>
-<th>Significance</th>
-<th>Originality</th>
-<th>Presentation</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Reviewer 9T1S</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>2</td>
-<td>3</td>
-</tr>
-<tr class="even">
-<td>Reviewer YM1a</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-</tr>
-<tr class="odd">
-<td>Reviewer pAtC</td>
-<td>4</td>
-<td>2</td>
-<td>2</td>
-<td>3</td>
-<td>2</td>
-<td>2</td>
-</tr>
-<tr class="even">
-<td>Reviewer ddgR</td>
-<td>4</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-<td>3</td>
-</tr>
-<tr class="odd">
-<td><strong>Average</strong></td>
-<td><strong>4.0</strong></td>
-<td>2.75</td>
-<td>2.75</td>
-<td>3.25</td>
-<td>2.5</td>
-<td>2.75</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="related-papers" class="level2">
-<h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
-<ul>
-<li><strong>The paper:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">code</a></li>
-<li><strong>The theorem it adapts:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="../safe-denoiser/">my review</a></li>
-<li><strong>The theory behind the time window:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="../safety-guided-flow/">my review</a></li>
-</ul>
-
-
-</section>
-
- ]]></description>
-  <category>Paper-Review</category>
-  <category>Diffusion</category>
-  <category>Safety</category>
-  <category>LLM</category>
-  <guid>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</guid>
-  <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
-  <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" medium="image" type="image/png" height="80" width="144"/>
-</item>
-<item>
   <title>[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation</title>
   <dc:creator>Jiwoo Shin</dc:creator>
   <link>https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/</link>
@@ -788,6 +912,196 @@ Figure&nbsp;3: Safe generations from SAFREE + SGF (Figure G.5 of the paper) on a
   <guid>https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/</guid>
   <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
   <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-guided-flow/fig1-teaser.png" medium="image" type="image/png" height="84" width="144"/>
+</item>
+<item>
+  <title>[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</title>
+  <dc:creator>Jiwoo Shin</dc:creator>
+  <link>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Amman Yusuf, Zhejun Jiang, Mijung Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 (PMLR 306, Poster). <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> · <a href="https://github.com/ParkLabML/SAD">Code</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Text diffusion models (TDMs) like <a href="https://openreview.net/forum?id=KnqiC0znVF">LLaDA</a> and <a href="https://openreview.net/forum?id=L4uaAR4ArM">MDLM</a> generate text by iteratively denoising a fully masked sequence in parallel — which makes them fast, but also makes autoregressive-era safety tooling (post-hoc filters, decoding constraints) a poor fit. Diffusion-native jailbreaks such as <a href="https://openreview.net/forum?id=rIPeatvPy3">DIJA</a> and <a href="https://openreview.net/forum?id=NWvL280s2l">PAD</a> reach near-100% attack success rates on instruction-tuned TDMs.</p>
+<p>This paper proposes the <strong>Safety-Aware Denoiser (SAD)</strong>: a <strong>training-free</strong> modification of the denoising step that steers each intermediate sample away from a small <em>negation set</em> of known-unsafe reference texts. It is the discrete-text adaptation of the <a href="https://openreview.net/forum?id=QQS7TudonJ">safe denoiser of Kim et al.&nbsp;(NeurIPS 2025)</a>, originally developed for image diffusion. Across hazard taxonomy, jailbreak, and memorization evaluations, SAD consistently reduces unsafe generations (e.g., PAD attack ASR on LLaDA-1.5 drops from 43.6% → 29.0%) at essentially no cost to benign generation quality, and with only ~20% throughput overhead.</p>
+</section>
+<section id="why-this-problem-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-problem-matters">Why this problem matters</h2>
+<p>TDMs are no longer a curiosity — LLaDA-8B beats LLaMA3-8B on some reasoning benchmarks, and Dream, MMaDA, and DiffuCoder are scaling the paradigm. But almost all safety infrastructure assumes left-to-right decoding:</p>
+<ul>
+<li><strong>Post-hoc filtering</strong> only sees the final output; it can’t undo an unsafe trajectory the sampler committed to early.</li>
+<li><strong>AR jailbreak defenses</strong> don’t transfer: DIJA exploits bidirectional infilling by “baking in” a malicious context around a masked span, forcing the model to complete it harmfully for consistency. PAD exploits parallel decoding directly.</li>
+<li><strong>Retraining or safety fine-tuning</strong> is expensive and inflexible, especially as frozen checkpoints proliferate and safety requirements evolve.</li>
+</ul>
+<p>So the target is a lightweight, inference-time mechanism that acts <em>inside</em> the denoising loop.</p>
+</section>
+<section id="background-the-safe-denoiser" class="level2">
+<h2 class="anchored" data-anchor-id="background-the-safe-denoiser">Background: the safe denoiser</h2>
+<p>The starting point is Theorem 3.2 of Kim et al.&nbsp;(2025). Partition the data distribution into safe and unsafe parts, <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%20%5Ccup%20%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D">. Then the <em>safe</em> denoiser can be written in terms of the model’s ordinary denoiser and an <em>unsafe</em> denoiser:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20+%20%5Cbeta%5E*(x_t)%5Cleft(%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20-%20%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%5Cright)%0A"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)%20%5Cge%200"> grows with the posterior likelihood that the current state <img src="https://latex.codecogs.com/png.latex?x_t"> originated from the unsafe set. Intuitively: subtract the “unsafe direction” from the model’s prediction, with a weight that adapts to how unsafe the current state looks. The pretrained model already gives <img src="https://latex.codecogs.com/png.latex?%5Cmathbb%7BE%7D_%7B%5Cmathcal%7BD%7D%7D%5Bx_0%20%5Cmid%20x_t%5D">; the two remaining quantities are approximated from a finite set of unsafe references.</p>
+<p>This is <em>provable</em> guidance toward the safe distribution — not a heuristic token penalty — which is the paper’s main conceptual distinction from <a href="https://openreview.net/forum?id=zBPzxhso8M">DiffuGuard</a>.</p>
+</section>
+<section id="method-adapting-the-safe-denoiser-to-masked-text-diffusion" class="level2">
+<h2 class="anchored" data-anchor-id="method-adapting-the-safe-denoiser-to-masked-text-diffusion">Method: adapting the safe denoiser to masked text diffusion</h2>
+<p>The original safe denoiser lives in continuous space with Gaussian forward kernels. The paper’s technical contribution is porting it to masked (absorbing-state) discrete diffusion:</p>
+<p><strong>1. Unsafe denoiser via Monte Carlo.</strong> Given <img src="https://latex.codecogs.com/png.latex?N"> unsafe reference sequences <img src="https://latex.codecogs.com/png.latex?x%5E%7B(1)%7D,%20%5Cdots,%20x%5E%7B(N)%7D"> (e.g., ToxiGen samples, copyrighted documents, training data):</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0A%5Chat%7B%5Cmathbb%7BE%7D%7D_%7B%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%7D%5Bx_0%20%5Cmid%20x_t%5D%20=%20%5Csum_%7Bn=1%7D%5E%7BN%7D%20x%5E%7B(n)%7D%20%5Cfrac%7Bq_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)%7D%7B%5Csum_%7Bm%7D%20q_t(x_t%20%5Cmid%20x%5E%7B(m)%7D)%7D%0A"></p>
+<p><strong>2. A discrete kernel replaces the Gaussian.</strong> The key derivation is the sequence-level forward transition probability under masked diffusion. Since tokens are corrupted independently, it factorizes into a simple closed form:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%0Aq_t(x_t%20%5Cmid%20x_0)%20=%20%5Calpha_t%5E%7B%5C#%5C%7B%5Ctext%7Bmatching%20positions%7D%5C%7D%7D%20(1-%5Calpha_t)%5E%7B%5C#%5C%7B%5Ctext%7Bmasked%20positions%7D%5C%7D%7D%0A"></p>
+<p>This is computable in <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference by just counting matches and masks — no gradients, no auxiliary classifier.</p>
+<p><strong>3. Approximating <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The exact weight is intractable (its denominator integrates over the entire safe distribution), so it is approximated as <img src="https://latex.codecogs.com/png.latex?%5Ceta%20%5Ccdot%20%5Cfrac%7B1%7D%7BN%7D%5Csum_n%20q_t(x_t%20%5Cmid%20x%5E%7B(n)%7D)"> with a tunable strength <img src="https://latex.codecogs.com/png.latex?%5Ceta">, applied only during a <strong>time window</strong> <img src="https://latex.codecogs.com/png.latex?C"> early in denoising (guidance that runs too long or too late degrades quality — consistent with prior guided-diffusion findings).</p>
+<p><strong>4. Prompt-agnostic negation.</strong> When generating conditioned on a prompt, SAD acts only on the continuation tokens and evaluates the negation set with an <em>empty</em> prompt. This makes a single negation set work universally across test prompts — including adversarial jailbreak prompts whose distribution can’t be anticipated. A nice modularity decision.</p>
+<p>The whole thing is ~4 extra lines in the sampling loop (Algorithm 1 in the paper).</p>
+</section>
+<section id="experiments" class="level2">
+<h2 class="anchored" data-anchor-id="experiments">Experiments</h2>
+<p>Three safety dimensions, on MDLM and the LLaDA/<a href="https://arxiv.org/abs/2508.15487">Dream</a> family:</p>
+<p><strong>Hazardous generation (RealToxicityPrompts, judged by Llama-Guard-3-8B).</strong> SAD cuts unsafe rate by ~5–6 points absolute (MDLM: 38.4% → 32.6%; LLaDA: 19.8% → 14.8%) while BERTScore on benign prompts is essentially unchanged. The negation set matters: matching the negation distribution to what you want to avoid (RTP-as-negation for RTP prompts) works best.</p>
+<div id="fig-tradeoff" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" class="img-fluid figure-img" alt="Scatter plot of change in unsafe rate versus change in perplexity for different SAD time-window configurations, showing safety improvements trading off against perplexity">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tradeoff-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Figure 1 of the paper: the safety–utility tradeoff on MDLM. Each point is a SAD configuration; going down (fewer unsafe generations) usually costs some perplexity, and the guidance time window (colours) controls where you land on the curve. (Yusuf et al., 2026)
+</figcaption>
+</figure>
+</div>
+<p><strong>Jailbreaks (DIJA, PAD, zero-shot; WildJailbreak/HarmBench/etc.).</strong> The largest gains are against <strong>PAD</strong>, the parallel-decoding attack: on LLaDA-1.5, HarmBench ASR drops 43.6% → 29.0% with SAD alone, and SAD still adds 10–17% relative reduction <em>on top of</em> DiffuGuard’s audit-and-repair. Gains against DIJA are modest (1–7 points) — more on that below. Importantly, SAD composes cleanly with existing defenses (PPL filtering, self-reminder, DiffuGuard).</p>
+<p><strong>Memorization (MDLM fine-tuned on WikiText-103).</strong> Setting <img src="https://latex.codecogs.com/png.latex?%5Cmathcal%7BD%7D_%5Ctext%7Bunsafe%7D%20=%20%5Cmathcal%7BD%7D_%5Ctext%7Btrain%7D"> turns SAD into a privacy mechanism: fuzzy 10-gram overlap with training data drops well below the 18.6% baseline as <img src="https://latex.codecogs.com/png.latex?%5Ceta"> grows, with BERTScore degrading only 0.515 → 0.511. Under the stronger <img src="https://latex.codecogs.com/png.latex?(n,p)">-discoverable extraction framework, mem@50% under random 10% masking falls from 62.2% → 11.0%. This dual-use of the same mechanism for both toxicity and privacy is one of the more elegant aspects of the paper.</p>
+<p><strong>Cost.</strong> Against training-free baselines on MDLM, SAD matches <a href="https://proceedings.mlr.press/v267/singhal25b.html">FK Steering</a> (<img src="https://latex.codecogs.com/png.latex?k%7B=%7D8">) safety at <strong>34× lower wall-clock</strong> (18 min vs 8.7 hr on their setup) and with better perplexity (34.6 vs 42.6). Throughput overhead is driven by the number of active guidance steps, not the negation set size — going from 100 to 5,000 references changes throughput by at most 2.3%.</p>
+<p><strong>Ablations worth remembering:</strong></p>
+<ul>
+<li><img src="https://latex.codecogs.com/png.latex?%5Ceta"> is a clean monotonic safety knob once the schedule is fixed.</li>
+<li>The time window <img src="https://latex.codecogs.com/png.latex?C"> has the largest qualitative effect: short, <em>early</em> activation preserves utility; windows past the first quarter of denoising do little.</li>
+<li>Safety gains saturate at <img src="https://latex.codecogs.com/png.latex?N%20%5Capprox%20500%5Ctext%7B%E2%80%93%7D1000"> references; beyond that, performance slightly <em>degrades</em> due to weight dilution in the softmax over references.</li>
+</ul>
+</section>
+<section id="strengths" class="level2">
+<h2 class="anchored" data-anchor-id="strengths">Strengths</h2>
+<ol type="1">
+<li><strong>Principled, not heuristic.</strong> SAD inherits a formal guarantee from the safe denoiser theorem, in contrast to DiffuGuard’s heuristic audit-and-repair. The discrete kernel factorization is simple but is exactly the piece that couldn’t be ported from the image domain.</li>
+<li><strong>Genuinely lightweight.</strong> Training-free, gradient-free, classifier-free, <img src="https://latex.codecogs.com/png.latex?O(L)"> per reference, sub-linear in negation set size, and a single negation set works across prompts. The FK Steering comparison (equal safety at 1/34th the cost) is the most persuasive result in the paper.</li>
+<li><strong>One mechanism, three threat models.</strong> Hazard reduction, jailbreak robustness, and memorization/privacy all fall out of the same negative-guidance primitive by swapping the negation set. The practitioner story — “curate ~500–1000 examples of what you don’t want” — is refreshingly concrete.</li>
+<li><strong>Honest evaluation.</strong> The appendix carefully dissects the cases where SAD <em>increases</em> the measured unsafe rate (classifier artifacts from output-style shifts, run-to-run variance) and reports refusal rates alongside ASR to disambiguate genuine failures from judge false positives.</li>
+</ol>
+</section>
+<section id="weaknesses-open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="weaknesses-open-questions">Weaknesses / open questions</h2>
+<ol type="1">
+<li><strong>Weak against DIJA.</strong> SAD shines against PAD but barely dents DIJA (e.g., 59.5% → 57.4% on LLaDA-Instruct). The authors’ framing — SAD works best on “attacks whose ASR depends on early trajectory commitment” — is fair, but it means the strongest known TDM jailbreak remains largely unmitigated by this method alone. PPL filtering does most of the work there.</li>
+<li><strong>Coverage is bounded by the negation set.</strong> The Monte Carlo unsafe denoiser can only push away from <em>lexically similar</em> sequences — the kernel counts exact token matches. Paraphrased or novel unsafe content that doesn’t resemble any reference should slip through. This is acknowledged implicitly (negation-set choice matters) but never stress-tested with, say, paraphrase attacks on the negation set.</li>
+<li><strong>The theory–practice gap around <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*">.</strong> The provable guarantee holds for the exact <img src="https://latex.codecogs.com/png.latex?%5Cbeta%5E*(x_t)">; in practice it’s replaced by a constant <img src="https://latex.codecogs.com/png.latex?%5Ceta"> inside a hand-tuned time window, with <img src="https://latex.codecogs.com/png.latex?%5Ceta"> ranging from 0.5 to 128 across experiments. The “provably safe” framing should be read with that asterisk — what’s provable is the decomposition, not the deployed approximation.</li>
+<li><strong>A curious side effect on refusals.</strong> In the zero-shot jailbreak setting, SAD drops refusal rates dramatically (LLaDA-Instruct: 87.4% → 6.6%) while keeping ASR roughly flat — i.e., the model answers instead of refusing, just not harmfully. The paper frames this as reduced over-refusal, which is plausible, but it deserves a closer behavioral analysis than a footnote: are those answers actually helpful, or borderline?</li>
+<li><strong>Scale.</strong> Experiments top out at 8B models and <img src="https://latex.codecogs.com/png.latex?N%7B=%7D5000"> references. Whether a fixed reference set can cover the unsafe modes of a much more capable TDM is untested.</li>
+</ol>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>This is a solid “right tool, right paradigm” paper. The core idea is a transplant from image diffusion, but the transplant is done carefully — the discrete kernel derivation, the prompt-agnostic negation design, and the time-window scheduling are the kind of details that make an inference-time method actually usable. The efficiency result against particle-based steering (FK Steering) is the headline for practitioners: negative guidance from a finite reference set is <em>cheap</em> in the masked-diffusion setting because the forward kernel is just match-counting.</p>
+<p>The bigger question the paper leaves open is whether reference-based negative guidance can ever be a primary defense rather than a complementary one. Its blind spot — unsafe content that is semantically harmful but lexically far from every reference — is exactly where DIJA-style attacks live. A natural follow-up is replacing the token-matching kernel with a semantic kernel (embeddings, or the model’s own hidden states à la <a href="https://arxiv.org/abs/2601.21647">ILRR</a>) while keeping the safe-denoiser decomposition. If that works, this line of research could give TDMs a safety story that AR models arguably still lack: a defense that acts on the <em>entire generation trajectory</em> rather than on tokens after the fact.</p>
+<p><strong>Verdict:</strong> a well-executed first principled step for diffusion-native text safety — best understood as one strong layer in a defense stack, and a foundation clearly worth building on.</p>
+</section>
+<section id="peer-review-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="peer-review-at-a-glance">Peer review at a glance</h2>
+<p>SAD was accepted as a <strong>Poster</strong> at ICML 2026, reviewed by four reviewers. The scores below are from <a href="https://github.com/papercopilot/paperlists">Paper Copilot’s open dataset</a>; the review text is not publicly available (ICML does not post reviews, and <a href="https://openreview.net/forum?id=dw5BM3OQfZ">OpenReview</a> requires sign-in), so they are reproduced here without interpretation.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Recommendation</th>
+<th>Confidence</th>
+<th>Soundness</th>
+<th>Significance</th>
+<th>Originality</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Reviewer 9T1S</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>Reviewer YM1a</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Reviewer pAtC</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>3</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Reviewer ddgR</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td><strong>Average</strong></td>
+<td><strong>4.0</strong></td>
+<td>2.75</td>
+<td>2.75</td>
+<td>3.25</td>
+<td>2.5</td>
+<td>2.75</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="related-papers" class="level2">
+<h2 class="anchored" data-anchor-id="related-papers">Related papers</h2>
+<ul>
+<li><strong>The paper:</strong> Yusuf, Jiang &amp; Park. <em>The Safety-Aware Denoiser for Text Diffusion Models.</em> ICML 2026 — <a href="https://arxiv.org/abs/2605.08116">arXiv:2605.08116</a> · <a href="https://github.com/ParkLabML/SAD">code</a></li>
+<li><strong>The theorem it adapts:</strong> Kim et al.&nbsp;<em>Training-Free Safe Denoisers for Safe Use of Diffusion Models.</em> NeurIPS 2025 — <a href="../safe-denoiser/">my review</a></li>
+<li><strong>The theory behind the time window:</strong> Kim, Kim &amp; Park. <em>Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation.</em> ICLR 2026 — <a href="../safety-guided-flow/">my review</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Paper-Review</category>
+  <category>Diffusion</category>
+  <category>Safety</category>
+  <category>LLM</category>
+  <guid>https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/</guid>
+  <pubDate>Tue, 07 Jul 2026 15:00:00 GMT</pubDate>
+  <media:content url="https://jiwooshin-kr.github.io/blog/posts/safety-aware-denoiser/fig1-tradeoff.png" medium="image" type="image/png" height="80" width="144"/>
 </item>
 </channel>
 </rss>

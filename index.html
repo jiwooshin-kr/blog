@@ -47,9 +47,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-85329ba1582bd894883eda7c9f3de3b0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -139,10 +139,14 @@ window.Quarto = {
 
 <link rel="stylesheet" href="styles.css">
 <link rel="alternate" type="application/rss+xml" title="Jiwoo Shin" href="index.xml" data-external="1"><meta property="og:title" content="Blog | Jiwoo Shin">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/profile.jpg">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/diffusion-gemma-uniform-state/cover.png">
 <meta property="og:site_name" content="Jiwoo Shin">
+<meta property="og:image:height" content="732">
+<meta property="og:image:width" content="1783">
 <meta name="twitter:title" content="Blog | Jiwoo Shin">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/profile.jpg">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/diffusion-gemma-uniform-state/cover.png">
+<meta name="twitter:image-height" content="732">
+<meta name="twitter:image-width" content="1783">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -355,7 +359,7 @@ window.Quarto = {
 <!-- sidebar -->
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-    <h5 class="quarto-listing-category-title">Categories</h5><div class="quarto-listing-category category-default"><div class="category" data-category="">All <span class="quarto-category-count">(4)</span></div><div class="category" data-category="RGlmZnVzaW9u">Diffusion <span class="quarto-category-count">(4)</span></div><div class="category" data-category="Rmxvdy1NYXRjaGluZw==">Flow-Matching <span class="quarto-category-count">(1)</span></div><div class="category" data-category="TExN">LLM <span class="quarto-category-count">(1)</span></div><div class="category" data-category="UGFwZXItUmV2aWV3">Paper-Review <span class="quarto-category-count">(4)</span></div><div class="category" data-category="UGxhbm5pbmc=">Planning <span class="quarto-category-count">(1)</span></div><div class="category" data-category="UmVpbmZvcmNlbWVudC1MZWFybmluZw==">Reinforcement-Learning <span class="quarto-category-count">(1)</span></div><div class="category" data-category="U2FmZXR5">Safety <span class="quarto-category-count">(3)</span></div><div class="category" data-category="VGV4dC10by1JbWFnZQ==">Text-to-Image <span class="quarto-category-count">(1)</span></div></div></div>
+    <h5 class="quarto-listing-category-title">Categories</h5><div class="quarto-listing-category category-default"><div class="category" data-category="">All <span class="quarto-category-count">(7)</span></div><div class="category" data-category="RGlmZnVzaW9u">Diffusion <span class="quarto-category-count">(6)</span></div><div class="category" data-category="Rmxvdy1NYXRjaGluZw==">Flow-Matching <span class="quarto-category-count">(1)</span></div><div class="category" data-category="TExN">LLM <span class="quarto-category-count">(4)</span></div><div class="category" data-category="TW9kZWwtUmV2aWV3">Model-Review <span class="quarto-category-count">(1)</span></div><div class="category" data-category="UGFwZXItUmV2aWV3">Paper-Review <span class="quarto-category-count">(6)</span></div><div class="category" data-category="UGxhbm5pbmc=">Planning <span class="quarto-category-count">(2)</span></div><div class="category" data-category="UmVpbmZvcmNlbWVudC1MZWFybmluZw==">Reinforcement-Learning <span class="quarto-category-count">(1)</span></div><div class="category" data-category="U2FmZXR5">Safety <span class="quarto-category-count">(3)</span></div><div class="category" data-category="VGV4dC10by1JbWFnZQ==">Text-to-Image <span class="quarto-category-count">(1)</span></div></div></div>
 <!-- main -->
 <main class="content column-page-left" id="quarto-document-content">
 
@@ -428,7 +432,112 @@ window.Quarto = {
 
 <div class="quarto-listing quarto-listing-container-default" id="listing-listing">
 <div class="list quarto-listing-default">
-<div class="quarto-post image-right" data-index="0" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDUmVpbmZvcmNlbWVudC1MZWFybmluZyUyQ1BsYW5uaW5n" data-listing-date-sort="1783609200000" data-listing-file-modified-sort="1783655851433" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="13" data-listing-word-count-sort="2497">
+<div class="quarto-post image-right" data-index="0" data-categories="TW9kZWwtUmV2aWV3JTJDRGlmZnVzaW9uJTJDTExN" data-listing-date-sort="1783695600000" data-listing-file-modified-sort="1783758477348" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="12" data-listing-word-count-sort="2309">
+<div class="thumbnail"><a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">
+
+<img loading="lazy" src="./posts/diffusion-gemma-uniform-state/cover.png" class="thumbnail-image">
+
+</a></div>
+<div class="body">
+<h3 class="no-anchor listing-title">
+<a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale</a>
+</h3>
+<div class="listing-categories">
+
+<div class="listing-category" onclick="window.quartoListingCategory('TW9kZWwtUmV2aWV3'); return false;">Model-Review</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
+
+</div>
+<div class="delink listing-description"><a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">
+<p>Google DeepMind’s DiffusionGemma bets on uniform-state discrete diffusion — the formulation everyone ‘knew’ was worse than masked diffusion — because it is the only one that can self-correct. A look at the four engineering moves that make the bet pay off: adapting a strong autoregressive checkpoint, a dual-mode encoder–denoiser backbone, self-conditioning through distributions, and an entropy-bounded accept/re-noise sampler.</p>
+</a></div>
+</div>
+<div class="metadata">
+<a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">
+<div class="listing-date">
+Jul 11, 2026
+</div>
+<div class="listing-author">
+Jiwoo Shin
+</div>
+<div class="listing-reading-time">12 min</div>
+</a>
+</div>
+</div>
+<div class="quarto-post image-right" data-index="1" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDTExN" data-listing-date-sort="1783695600000" data-listing-file-modified-sort="1783758477346" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="14" data-listing-word-count-sort="2663">
+<div class="thumbnail"><a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">
+
+<img loading="lazy" src="./posts/block-diffusion-bd3lm/cover.png" class="thumbnail-image">
+
+</a></div>
+<div class="body">
+<h3 class="no-anchor listing-title">
+<a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models</a>
+</h3>
+<div class="listing-categories">
+
+<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
+
+</div>
+<div class="delink listing-description"><a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">
+<p>The BD3-LM paper asks: what if we stop treating autoregression and diffusion as rivals and make the <em>block</em> the unit of autoregression and the <em>token</em> the unit of diffusion? A close read of the two parts that make it work — why diffusion models couldn’t have a KV cache until now, and why the noise schedule turns out to be a variance knob, not a modeling choice.</p>
+</a></div>
+</div>
+<div class="metadata">
+<a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">
+<div class="listing-date">
+Jul 11, 2026
+</div>
+<div class="listing-author">
+Jiwoo Shin
+</div>
+<div class="listing-reading-time">14 min</div>
+</a>
+</div>
+</div>
+<div class="quarto-post image-right" data-index="2" data-categories="UGFwZXItUmV2aWV3JTJDTExNJTJDUGxhbm5pbmc=" data-listing-date-sort="1783695600000" data-listing-file-modified-sort="1783758477347" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="7" data-listing-word-count-sort="1391">
+<div class="thumbnail"><a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">
+
+<img loading="lazy" src="./posts/coconut-continuous-latent-reasoning/cover.png" class="thumbnail-image">
+
+</a></div>
+<div class="body">
+<h3 class="no-anchor listing-title">
+<a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space</a>
+</h3>
+<div class="listing-categories">
+
+<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('UGxhbm5pbmc='); return false;">Planning</div>
+
+</div>
+<div class="delink listing-description"><a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">
+<p>The paper that started the continuous-latent-reasoning line: instead of decoding a chain-of-thought into words, feed the LLM’s last hidden state straight back as the next input embedding — turning a single reasoning trajectory into a superposition that can search breadth-first.</p>
+</a></div>
+</div>
+<div class="metadata">
+<a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">
+<div class="listing-date">
+Jul 11, 2026
+</div>
+<div class="listing-author">
+Jiwoo Shin
+</div>
+<div class="listing-reading-time">7 min</div>
+</a>
+</div>
+</div>
+<div class="quarto-post image-right" data-index="3" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDUmVpbmZvcmNlbWVudC1MZWFybmluZyUyQ1BsYW5uaW5n" data-listing-date-sort="1783609200000" data-listing-file-modified-sort="1783758477337" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="13" data-listing-word-count-sort="2497">
 <div class="thumbnail"><a href="./posts/diffuser-planning/index.html" class="no-external">
 
 <img loading="lazy" src="./posts/diffuser-planning/fig2-teaser.png" class="thumbnail-image">
@@ -465,7 +574,7 @@ Jiwoo Shin
 </a>
 </div>
 </div>
-<div class="quarto-post image-right" data-index="1" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDVGV4dC10by1JbWFnZQ==" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783655851410" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="19" data-listing-word-count-sort="3693">
+<div class="quarto-post image-right" data-index="4" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDVGV4dC10by1JbWFnZQ==" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783520854143" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="19" data-listing-word-count-sort="3693">
 <div class="thumbnail"><a href="./posts/safe-denoiser/index.html" class="no-external">
 
 <img loading="lazy" src="./posts/safe-denoiser/fig-scream.png" class="thumbnail-image">
@@ -502,44 +611,7 @@ Jiwoo Shin
 </a>
 </div>
 </div>
-<div class="quarto-post image-right" data-index="2" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDTExN" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783655851410" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="10" data-listing-word-count-sort="1872">
-<div class="thumbnail"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/safety-aware-denoiser/fig1-tradeoff.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('U2FmZXR5'); return false;">Safety</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<p>A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<div class="listing-date">
-Jul 8, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">10 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="3" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDRmxvdy1NYXRjaGluZw==" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783655851433" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="16" data-listing-word-count-sort="3066">
+<div class="quarto-post image-right" data-index="5" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDRmxvdy1NYXRjaGluZw==" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783758477337" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="16" data-listing-word-count-sort="3066">
 <div class="thumbnail"><a href="./posts/safety-guided-flow/index.html" class="no-external">
 
 <img loading="lazy" src="./posts/safety-guided-flow/fig1-teaser.png" class="thumbnail-image">
@@ -573,6 +645,43 @@ Jul 8, 2026
 Jiwoo Shin
 </div>
 <div class="listing-reading-time">16 min</div>
+</a>
+</div>
+</div>
+<div class="quarto-post image-right" data-index="6" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDTExN" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783520365501" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="10" data-listing-word-count-sort="1872">
+<div class="thumbnail"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
+
+<img loading="lazy" src="./posts/safety-aware-denoiser/fig1-tradeoff.png" class="thumbnail-image">
+
+</a></div>
+<div class="body">
+<h3 class="no-anchor listing-title">
+<a href="./posts/safety-aware-denoiser/index.html" class="no-external">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</a>
+</h3>
+<div class="listing-categories">
+
+<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('U2FmZXR5'); return false;">Safety</div>
+
+<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
+
+</div>
+<div class="delink listing-description"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
+<p>A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.</p>
+</a></div>
+</div>
+<div class="metadata">
+<a href="./posts/safety-aware-denoiser/index.html" class="no-external">
+<div class="listing-date">
+Jul 8, 2026
+</div>
+<div class="listing-author">
+Jiwoo Shin
+</div>
+<div class="listing-reading-time">10 min</div>
 </a>
 </div>
 </div>

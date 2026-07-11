@@ -6,10 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Harlow Malloc">
-<meta name="dcterms.date" content="2026-07-07">
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-07-11">
+<meta name="description" content="The BD3-LM paper asks: what if we stop treating autoregression and diffusion as rivals and make the block the unit of autoregression and the token the unit of diffusion? A close read of the two parts that make it work — why diffusion models couldn’t have a KV cache until now, and why the noise schedule turns out to be a variance knob, not a modeling choice.">
 
-<title>Quarto Basics – Jiwoo Shin</title>
+<title>[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -24,41 +25,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -82,9 +48,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-85329ba1582bd894883eda7c9f3de3b0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -113,15 +79,48 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   }
 }</script>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="Quarto Basics – Jiwoo Shin">
-<meta property="og:description" content="AI research notes and paper reviews by Jiwoo Shin">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/welcome/thumbnail.jpg">
+<meta property="og:title" content="[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models – Jiwoo Shin">
+<meta property="og:description" content="The BD3-LM paper asks: what if we stop treating autoregression and diffusion as rivals and make the block the unit of autoregression and the token the unit of diffusion? A close read of the two parts that make it work — why diffusion models couldn’t have a KV cache until now, and why the noise schedule turns out to be a variance knob, not a modeling choice.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/block-diffusion-bd3lm/cover.png">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta name="twitter:title" content="Quarto Basics – Jiwoo Shin">
-<meta name="twitter:description" content="AI research notes and paper reviews by Jiwoo Shin">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/welcome/thumbnail.jpg">
+<meta property="og:image:height" content="686">
+<meta property="og:image:width" content="1546">
+<meta name="twitter:title" content="[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models – Jiwoo Shin">
+<meta name="twitter:description" content="The BD3-LM paper asks: what if we stop treating autoregression and diffusion as rivals and make the block the unit of autoregression and the token the unit of diffusion? A close read of the two parts that make it work — why diffusion models couldn’t have a KV cache until now, and why the noise schedule turns out to be a variance knob, not a modeling choice.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/block-diffusion-bd3lm/cover.png">
+<meta name="twitter:image-height" content="686">
+<meta name="twitter:image-width" content="1546">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -333,12 +332,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">Quarto Basics</h1>
-                                <div class="quarto-categories">
-                <div class="quarto-category">news</div>
-                <div class="quarto-category">code</div>
-                <div class="quarto-category">analysis</div>
-                <div class="quarto-category">study</div>
+      <h1 class="title">[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models</h1>
+                  <div>
+        <div class="description">
+          The BD3-LM paper asks: what if we stop treating autoregression and diffusion as rivals and make the <em>block</em> the unit of autoregression and the <em>token</em> the unit of diffusion? A close read of the two parts that make it work — why diffusion models couldn’t have a KV cache until now, and why the noise schedule turns out to be a variance knob, not a modeling choice.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Paper-Review</div>
+                <div class="quarto-category">Diffusion</div>
+                <div class="quarto-category">LLM</div>
               </div>
                   </div>
   </div>
@@ -349,14 +352,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div>
       <div class="quarto-title-meta-heading">Author</div>
       <div class="quarto-title-meta-contents">
-               <p>Harlow Malloc </p>
+               <p>Jiwoo Shin </p>
             </div>
     </div>
       
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">July 7, 2026</p>
+        <p class="date">July 11, 2026</p>
       </div>
     </div>
     
@@ -367,8 +370,29 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#the-setup-two-paradigms-complementary-failure-modes" id="toc-the-setup-two-paradigms-complementary-failure-modes" class="nav-link" data-scroll-target="#the-setup-two-paradigms-complementary-failure-modes">The setup: two paradigms, complementary failure modes</a></li>
+  <li><a href="#part-i-why-diffusion-models-couldnt-have-a-kv-cache-and-how-blocks-restore-it" id="toc-part-i-why-diffusion-models-couldnt-have-a-kv-cache-and-how-blocks-restore-it" class="nav-link" data-scroll-target="#part-i-why-diffusion-models-couldnt-have-a-kv-cache-and-how-blocks-restore-it">Part I: why diffusion models couldn’t have a KV cache — and how blocks restore it</a>
+  <ul class="collapse">
+  <li><a href="#caching-requires-immutability" id="toc-caching-requires-immutability" class="nav-link" data-scroll-target="#caching-requires-immutability">Caching requires immutability</a></li>
+  <li><a href="#the-training-time-twist-every-block-must-be-seen-twice" id="toc-the-training-time-twist-every-block-must-be-seen-twice" class="nav-link" data-scroll-target="#the-training-time-twist-every-block-must-be-seen-twice">The training-time twist: every block must be seen twice</a></li>
+  </ul></li>
+  <li><a href="#part-ii-the-noise-schedule-is-a-variance-knob" id="toc-part-ii-the-noise-schedule-is-a-variance-knob" class="nav-link" data-scroll-target="#part-ii-the-noise-schedule-is-a-variance-knob">Part II: the noise schedule is a variance knob</a>
+  <ul class="collapse">
+  <li><a href="#the-puzzle-an-equivalence-that-fails-in-practice" id="toc-the-puzzle-an-equivalence-that-fails-in-practice" class="nav-link" data-scroll-target="#the-puzzle-an-equivalence-that-fails-in-practice">The puzzle: an equivalence that fails in practice</a></li>
+  <li><a href="#why-extreme-mask-rates-are-wasted-worksheets" id="toc-why-extreme-mask-rates-are-wasted-worksheets" class="nav-link" data-scroll-target="#why-extreme-mask-rates-are-wasted-worksheets">Why extreme mask rates are wasted worksheets</a></li>
+  <li><a href="#data-driven-clipping-the-right-band-depends-on-the-block-size" id="toc-data-driven-clipping-the-right-band-depends-on-the-block-size" class="nav-link" data-scroll-target="#data-driven-clipping-the-right-band-depends-on-the-block-size">Data-driven clipping: the right band depends on the block size</a></li>
+  </ul></li>
+  <li><a href="#does-it-work" id="toc-does-it-work" class="nav-link" data-scroll-target="#does-it-work">Does it work?</a></li>
+  <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
+  <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content quarto-banner-title-block" id="quarto-document-content">
@@ -378,38 +402,99 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<p>For a demonstration of a line plot on a polar axis, see <a href="#fig-polar" class="quarto-xref">Figure&nbsp;1</a>.</p>
-<div id="cell-fig-polar" class="cell" data-execution_count="1">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> np.arange(<span class="dv">0</span>, <span class="dv">2</span>, <span class="fl">0.01</span>)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>theta <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> np.pi <span class="op">*</span> r</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  subplot_kw <span class="op">=</span> {<span class="st">'projection'</span>: <span class="st">'polar'</span>} </span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>ax.plot(theta, r)</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>ax.set_rticks([<span class="fl">0.5</span>, <span class="dv">1</span>, <span class="fl">1.5</span>, <span class="dv">2</span>])</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>ax.grid(<span class="va">True</span>)</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</details>
-<div class="cell-output cell-output-display">
-<div id="fig-polar" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-polar-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="index_files/figure-html/fig-polar-output-1.png" width="450" height="439" class="figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-polar-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: A line plot on a polar axis
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Marianne Arriola, Aaron Gokaslan, Justin T. Chiu, Zhihan Yang, Zhixuan Qi, Jiaqi Han, Subham Sekhar Sahoo, Volodymyr Kuleshov. <em>Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models.</em> ICLR 2025. <a href="https://arxiv.org/abs/2503.09573">arXiv:2503.09573</a> · <a href="https://m-arriola.com/bd3lms">project page</a> · <a href="https://github.com/kuleshov-group/bd3lms">code</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Diffusion language models circa 2024 had three chronic problems: they could only generate sequences of a fixed, training-time length; they couldn’t use a KV cache, so they re-encoded the entire sequence at every denoising step; and their perplexity lagged autoregressive models. <strong>BD3-LMs</strong> (Block Discrete Denoising Diffusion Language Models) attack all three with one structural move: be <strong>autoregressive over blocks, diffusion within blocks</strong>. Generate a block of <span class="math inline">\(L'\)</span> tokens by parallel denoising, freeze it, cache its keys and values exactly like an AR model caches tokens, then move to the next block — which restores both the KV cache and arbitrary-length generation in one stroke.</p>
+<p>The subtler half of the paper is about the perplexity gap, and it contains the result I find most instructive: a BD3-LM with block size 1 is <em>mathematically equivalent</em> to an AR model in expectation, yet trains to a two-point-worse perplexity. The culprit is not the objective but the <strong>variance of its Monte Carlo estimator</strong> — and the noise schedule, which famously doesn’t affect the diffusion ELBO’s <em>value</em>, turns out to control that variance entirely. Their fix, <strong>clipped schedules</strong> that only sample masking rates inside a data-driven band <span class="math inline">\([\beta, \omega]\)</span>, cuts gradient variance dramatically and sets a then-state-of-the-art perplexity for discrete diffusion (within ~15% of AR on OpenWebText). If you read my <a href="../diffusion-gemma-uniform-state/">DiffusionGemma post</a>, this paper is the academic blueprint of that model’s block-autoregressive skeleton — worth understanding on its own terms.</p>
+</section>
+<section id="the-setup-two-paradigms-complementary-failure-modes" class="level2">
+<h2 class="anchored" data-anchor-id="the-setup-two-paradigms-complementary-failure-modes">The setup: two paradigms, complementary failure modes</h2>
+<p>An autoregressive model factorizes <span class="math inline">\(\log p_\theta(x) = \sum_\ell \log p_\theta(x^\ell \mid x^{&lt;\ell})\)</span> and pays for its quality with strict seriality: <span class="math inline">\(L\)</span> tokens take <span class="math inline">\(L\)</span> forward passes. A discrete diffusion model (D3PM-style, and its masked-diffusion refinements like MDLM) denoises all <span class="math inline">\(L\)</span> positions in parallel — but it commits to a canvas of fixed width <span class="math inline">\(L\)</span> at training time, and because every position is still in flux at every step, <em>nothing can ever be cached</em>.</p>
+<p>BD3-LM’s move is to put a dial between the two. Partition the sequence into <span class="math inline">\(B\)</span> blocks of length <span class="math inline">\(L'\)</span> and factorize</p>
+<p><span class="math display">\[
+\log p_\theta(x) \;=\; \sum_{b=1}^{B} \log p_\theta(x^b \mid x^{&lt;b}),
+\]</span></p>
+<p>where each conditional <span class="math inline">\(p_\theta(x^b \mid x^{&lt;b})\)</span> is itself a masked diffusion model over just the <span class="math inline">\(L'\)</span> tokens of block <span class="math inline">\(b\)</span>, conditioned on all <em>clean, finished</em> previous blocks. Set <span class="math inline">\(L' = 1\)</span> and you recover an AR model; set <span class="math inline">\(L' = L\)</span> and you recover vanilla diffusion; everything in between is new territory. One transformer with a <strong>block-causal attention mask</strong> parameterizes all <span class="math inline">\(B\)</span> conditionals at once: tokens in block <span class="math inline">\(b\)</span> attend to blocks <span class="math inline">\(1\)</span> through <span class="math inline">\(b\)</span>, bidirectionally within their own block, causally across blocks.</p>
+<p>Here is the metaphor I’ll use for the rest of the post. An AR model is a <strong>typewriter</strong>: one keystroke at a time, ink permanent, and the growing manuscript sits in a binder next to you for reference. A vanilla diffusion model is a <strong>whiteboard</strong>: the whole essay is sketched at once in erasable marker and revised in sweeps — wonderfully parallel, but since <em>any</em> word might still change, you can never file anything away, and every revision pass means re-reading the entire board. BD3-LM writes on <strong>whiteboard panels the size of a paragraph</strong>: draft the current panel in erasable marker, and the moment it’s done, laminate it, file it in the binder, and start a fresh panel. The binder is the KV cache.</p>
+</section>
+<section id="part-i-why-diffusion-models-couldnt-have-a-kv-cache-and-how-blocks-restore-it" class="level2">
+<h2 class="anchored" data-anchor-id="part-i-why-diffusion-models-couldnt-have-a-kv-cache-and-how-blocks-restore-it">Part I: why diffusion models couldn’t have a KV cache — and how blocks restore it</h2>
+<section id="caching-requires-immutability" class="level3">
+<h3 class="anchored" data-anchor-id="caching-requires-immutability">Caching requires immutability</h3>
+<p>The KV cache is such a fixture of AR inference that it’s easy to forget what makes it <em>valid</em>: keys and values for position <span class="math inline">\(\ell\)</span> can be stored and reused only because token <span class="math inline">\(\ell\)</span> <strong>never changes again</strong>. The cache is a ledger of settled facts. Vanilla diffusion violates this at every step — position 3 at denoising step 7 may hold a different token than at step 6, and with bidirectional attention its key/value vectors also depend on every <em>other</em> position, which is also changing. Every entry in the would-be cache is stale the moment you write it. So diffusion models recompute attention over all <span class="math inline">\(L\)</span> positions at all <span class="math inline">\(T\)</span> steps: the whole whiteboard, re-read for every sweep of the marker.</p>
+<p>Block diffusion restores the ledger by restoring immutability — at block granularity. During generation (their Algorithm 2):</p>
+<ol type="1">
+<li>Denoise block <span class="math inline">\(b\)</span>’s canvas over some number of diffusion steps, with cross-attention into the cached keys/values <span class="math inline">\(K^{1:b-1}, V^{1:b-1}\)</span> of all finished blocks.</li>
+<li>When the block is done, run one clean forward pass over it to produce <span class="math inline">\(K^b, V^b\)</span>, and append them to the cache — laminate the panel, file it.</li>
+<li>Open the next canvas.</li>
+</ol>
+<p>The finished prefix is now exactly as cheap as it is for an AR model, while the live canvas keeps diffusion’s parallelism (all <span class="math inline">\(L'\)</span> tokens per denoising step). And since blocks are appended one after another with no fixed horizon, generation runs until an <code>[EOS]</code> appears — the fixed-length straitjacket is gone for free. In their OpenWebText experiments this is dramatic: SEDD, trained on 1024-token contexts, can emit at most 1024 tokens; BD3-LM sampled documents up to <strong>~9,982 tokens</strong> — roughly 10× its training context — because “context length” now only bounds the binder the model was <em>trained</em> to read, not the number of panels it can file.</p>
+</section>
+<section id="the-training-time-twist-every-block-must-be-seen-twice" class="level3">
+<h3 class="anchored" data-anchor-id="the-training-time-twist-every-block-must-be-seen-twice">The training-time twist: every block must be seen twice</h3>
+<p>There’s a wrinkle that makes <em>training</em> less obvious than sampling, and the paper’s engineering contribution lives here. To compute the loss for block <span class="math inline">\(b\)</span> you need the model’s denoising prediction on the <strong>noisy</strong> <span class="math inline">\(x^b_t\)</span> — but to condition blocks <span class="math inline">\(b{+}1, \dots, B\)</span> you need keys/values from the <strong>clean</strong> <span class="math inline">\(x^b\)</span>. Same block, two roles, two different inputs. A single standard forward pass can’t produce both, so naively you’d loop over blocks <span class="math inline">\(B\)</span> times.</p>
+<p>Their vectorized solution: concatenate the noisy and clean sequences into one input <span class="math inline">\(x_{\text{noisy}} \oplus x\)</span> of length <span class="math inline">\(2L\)</span> and run a <em>single</em> forward pass under a specialized attention mask stitched from three pieces:</p>
+<ul>
+<li><span class="math inline">\(M_{BD}\)</span> (block-diagonal): noisy tokens attend to noisy tokens <strong>within their own block</strong> — the live panel is coherent with itself;</li>
+<li><span class="math inline">\(M_{OBC}\)</span> (offset block-causal): noisy tokens attend to <strong>clean tokens of strictly earlier blocks</strong> — the panel may consult the binder, but only the laminated pages, never a clean copy of <em>itself</em> (that would be the answer key for the very exercise being graded);</li>
+<li><span class="math inline">\(M_{BC}\)</span> (block-causal): clean tokens attend to clean tokens of their own and earlier blocks — this builds the binder itself.</li>
+</ul>
+<p>The resulting <span class="math inline">\(2L \times 2L\)</span> mask is extremely sparse, and they exploit that with a fused FlexAttention kernel: up to ~5× faster than a naively masked <code>scaled_dot_product_attention</code> on the attention op, ~20–25% end-to-end training speedup over the two-pass alternative, and overall training that stays within 2× the cost of ordinary diffusion training. Each token still passes through the network twice in effect — that’s the irreducible price of playing both student and answer key — but the two passes share one kernel launch and one attention computation.</p>
+</section>
+</section>
+<section id="part-ii-the-noise-schedule-is-a-variance-knob" class="level2">
+<h2 class="anchored" data-anchor-id="part-ii-the-noise-schedule-is-a-variance-knob">Part II: the noise schedule is a variance knob</h2>
+<p>This is the half of the paper I’d assign to students. It starts with an experiment that should be a null result and isn’t.</p>
+<section id="the-puzzle-an-equivalence-that-fails-in-practice" class="level3">
+<h3 class="anchored" data-anchor-id="the-puzzle-an-equivalence-that-fails-in-practice">The puzzle: an equivalence that fails in practice</h3>
+<p>Set <span class="math inline">\(L' = 1\)</span>. Every “block” is a single token, the within-block diffusion collapses, and the paper proves (their Suppl. B.4) that the block-diffusion NELBO is <strong>equal in expectation to the AR negative log-likelihood</strong>. Same model class, same objective in expectation — training should give the same perplexity. It doesn’t: on LM1B, AR reaches 22.88 while the <span class="math inline">\(L'=1\)</span> BD3-LM stalls at ≤ 25.56.</p>
+<p>The diagnosis is beautiful in its mundanity. Under the standard linear masking schedule, the mask rate at a uniformly sampled time <span class="math inline">\(t\)</span> averages 50% — so on any given batch, the diffusion loss is computed <strong>only on the ~half of tokens that happen to be masked</strong>. The AR model gets a gradient signal from every token in the batch; the diffusion model gets a gradient estimated from a random half. Both estimators are unbiased. One is twice as noisy. The authors make the point with a killer control: train an AR model with a <em>randomized batch size</em> and its perplexity degrades to 24.37 — most of the way to the diffusion number. The “diffusion gap” at <span class="math inline">\(L'=1\)</span> was never about diffusion; it was about <strong>gradient variance</strong>.</p>
+<p>The metaphor: imagine two teachers estimating a student’s ability. One grades the <em>entire</em> exam every week. The other rolls a die and grades a random subset of questions — sometimes three questions, sometimes forty. Their long-run averages agree exactly, but the second teacher’s weekly reports swing wildly, and if you adjust your teaching (your gradient step) after every report, the noisy reports send you zigzagging. SGD is that teacher: what matters isn’t only the expected loss but how much the estimate jitters batch to batch.</p>
+<p>And here’s the twist that turns diagnosis into cure: for <span class="math inline">\(L'=1\)</span>, if you change the forward process to <strong>always mask the token</strong> (<span class="math inline">\(q(x_t = m \mid x) = 1\)</span>), the diffusion objective becomes <em>literally</em> next-token prediction — every “worksheet” is exactly the AR exercise — and the perplexity gap closes to zero: 22.88, matching AR to the second decimal. Measured NELBO variance drops from 1.52 to 0.11. The schedule didn’t change what the model was learning in expectation; it changed how noisily the model was told about it.</p>
+</section>
+<section id="why-extreme-mask-rates-are-wasted-worksheets" class="level3">
+<h3 class="anchored" data-anchor-id="why-extreme-mask-rates-are-wasted-worksheets">Why extreme mask rates are wasted worksheets</h3>
+<p>For <span class="math inline">\(L' &gt; 1\)</span>, always-mask-everything is no longer the answer (the model must learn to denoise <em>partial</em> corruption to sample well). But the variance logic generalizes into an intuition about which masking rates are worth training on. Think of each training example as a fill-in-the-blank worksheet, with the schedule deciding how many blanks:</p>
+<ul>
+<li><strong>Almost no blanks:</strong> the exercise is copy-the-context; reconstruction is trivial, loss ≈ 0, gradient ≈ nothing. A wasted worksheet.</li>
+<li><strong>All blanks:</strong> with no context at all inside the block, the best possible answer is the marginal statistics of the language — guess “the,” guess “of.” That’s learnable in the first hour of training and never again informative. Also wasted.</li>
+<li><strong>The middle band:</strong> enough context to reason from, enough blanks to be forced to. All the learning signal lives here.</li>
+</ul>
+<p>A linear schedule samples mask rates uniformly on <span class="math inline">\([0,1]\)</span>, so it keeps printing worksheets from both wasted extremes — and those near-zero-signal batches are precisely what inflates the variance of the gradient estimator. The fix is almost embarrassingly simple: <strong>clipped schedules</strong>, which sample the mask rate <span class="math inline">\(1 - \alpha_t \sim \mathcal{U}[\beta, \omega]\)</span> and simply refuse to train outside the productive band.</p>
+<p>The subtle part — and the reason this is a <em>contribution</em> rather than a hack — is the theoretical status of the schedule. The masked-diffusion NELBO is provably <strong>invariant to the noise schedule</strong> in expectation (a known MDLM-era result), which had licensed everyone to treat the schedule as a don’t-care. The paper’s point is that this invariance holds for the <em>value</em> of the objective, not for the <em>variance of its Monte Carlo estimator</em>. The schedule is not a modeling choice at all; it is a <strong>variance-reduction dial</strong> hiding in plain sight. (Two teachers again: both unbiased, but you get to choose which one grades you.)</p>
+</section>
+<section id="data-driven-clipping-the-right-band-depends-on-the-block-size" class="level3">
+<h3 class="anchored" data-anchor-id="data-driven-clipping-the-right-band-depends-on-the-block-size">Data-driven clipping: the right band depends on the block size</h3>
+<p>Where should <span class="math inline">\([\beta, \omega]\)</span> sit? Not anywhere universal. Their Table 8 is worth staring at: for <span class="math inline">\(L' = 4\)</span>, heavy masking <span class="math inline">\(\mathcal{U}[0.45, 0.95]\)</span> is best; for <span class="math inline">\(L' = 16\)</span>, a moderate band <span class="math inline">\(\mathcal{U}[0.3, 0.8]\)</span> wins. The pattern makes sense through the worksheet lens: a small block sits inside lots of clean, laminated left-context, so even a nearly-blank worksheet is still solvable from the binder — you can crank the difficulty up. A big block is more self-referential, so all-blanks degenerates toward marginal-guessing faster — the productive band sits lower.</p>
+<p>Rather than hand-tune this, they make it adaptive: since gradient variance itself is expensive to estimate, they use the <strong>variance of the NELBO estimator as a proxy</strong>, and grid-search <span class="math inline">\(\beta, \omega\)</span> to minimize it at every validation epoch (~every 5K steps) during training. Variance of the loss turns out to correlate cleanly with final test perplexity across schedules — which is itself a nice empirical finding: you can <em>select</em> schedules by a statistic that never touches held-out data.</p>
+</section>
+</section>
+<section id="does-it-work" class="level2">
+<h2 class="anchored" data-anchor-id="does-it-work">Does it work?</h2>
+<p>On likelihoods, yes, and monotonically in the direction the theory predicts (smaller blocks → closer to AR): on LM1B (65B tokens), BD3-LM reaches PPL ≤ 30.60 / 29.83 / 28.23 for <span class="math inline">\(L' = 16/8/4\)</span>, versus MDLM’s 31.78 — up to a 13% improvement and a new discrete-diffusion state of the art at the time. On OpenWebText (524B tokens): ≤ 22.27 / 21.68 / 20.73 versus MDLM’s 22.98, with AR at 17.54. The gap to AR is narrowed, not closed — the NELBO is provably looser as <span class="math inline">\(L'\)</span> grows, so some of the remaining gap is structural.</p>
+<p>On sample quality, the ordering is the same: generative perplexity 25.7 (<span class="math inline">\(L'=4\)</span>) versus MDLM’s 46.8 at matched compute (1K function evaluations), and an order of magnitude fewer network calls than SSD-LM, the earlier Gaussian-embedding block-diffusion approach, at far better quality. And the arbitrary-length capability is qualitative: ~10× longer samples than any fixed-canvas diffusion baseline.</p>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>The lasting contribution here isn’t the architecture — “semi-autoregressive” generation existed — it’s two conceptual clarifications that outlived the specific model. First, the observation that <strong>caching and revision are fundamentally in tension</strong>, and that the block is the natural truce line: revise freely inside the panel, laminate at the boundary. Every deployed diffusion LM I’m aware of has since adopted exactly this shape — <a href="../diffusion-gemma-uniform-state/">DiffusionGemma’s</a> 256-token canvases committed to a KV cache, with causal/bidirectional mode switching, is this paper’s Figure-1 diagram productionized (with the within-block noise swapped from masking to uniform-state, trading the tight NELBO for self-correction — the two posts are really about the two halves of one design space). It’s also no coincidence: BD3-LM comes from the Kuleshov group, whose <em>Diffusion Duality</em> line supplied the uniform-state half of that story too.</p>
+<p>Second, and more transferable: <strong>“invariant in expectation” is not “irrelevant in practice.”</strong> The noise-schedule result is a small masterclass in a failure pattern that recurs all over ML — an objective is proven invariant to some choice, the community stops thinking about that choice, and the choice quietly dominates optimization through second-order statistics. The <span class="math inline">\(L'=1\)</span> experiment is the cleanest demonstration I’ve seen: two provably-equivalent objectives, a two-point perplexity gap, and a one-line schedule change that closes it exactly. If you keep one thing from this paper, keep the habit of asking not “does this choice change my loss?” but “does it change the <em>variance of my estimator</em> of my loss?”</p>
+<p>The honest limitations are the ones the authors state: training costs up to ~2× standard diffusion (every block plays both student and answer key), small blocks reinherit AR’s seriality, and the optimal block size is task-dependent with no principle yet for choosing it. And the perplexity gap to AR, while narrowed, remains — closed only in the degenerate <span class="math inline">\(L'=1\)</span> limit where you’ve rebuilt an AR model. Interpolation, it turns out, means inheriting a weighted average of the weaknesses too. But as a piece of analysis that turned “diffusion LMs are worse and nobody quite knows why” into “here is the variance, here is the knob, here is the recipe,” it’s one of the most useful diffusion-LM papers of its year.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
+<ul>
+<li><strong>The paper:</strong> Arriola et al.&nbsp;<em>Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models.</em> ICLR 2025 — <a href="https://arxiv.org/abs/2503.09573">arXiv:2503.09573</a> · <a href="https://m-arriola.com/bd3lms">project page &amp; blog</a> · <a href="https://github.com/kuleshov-group/bd3lms">code</a></li>
+<li><strong>The masked-diffusion foundation it builds on:</strong> Sahoo et al.&nbsp;<em>Simple and Effective Masked Diffusion Language Models</em> (MDLM), NeurIPS 2024 — <a href="https://openreview.net/forum?id=L4uaAR4ArM">OpenReview</a></li>
+<li><strong>Where the design shipped:</strong> my review of <a href="../diffusion-gemma-uniform-state/">DiffusionGemma</a>, whose block-autoregressive canvas + KV-cache design is this paper’s skeleton at 26B scale</li>
+<li><strong>The same group’s uniform-state line:</strong> Sahoo et al.&nbsp;<em>The Diffusion Duality</em>, ICML 2025 — <a href="https://arxiv.org/abs/2506.10892">arXiv:2506.10892</a></li>
+<li><strong>The Gaussian-embedding predecessor it improves on:</strong> Han et al.&nbsp;<em>SSD-LM</em>, 2022 — <a href="https://arxiv.org/abs/2210.17432">arXiv:2210.17432</a></li>
+</ul>
 
 
+</section>
 
 </main> <!-- /main -->
 <script>

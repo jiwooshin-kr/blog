@@ -2,10 +2,13 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/diffusion-gemma-uniform-state/index.html",
+      "/posts/block-diffusion-bd3lm/index.html",
+      "/posts/coconut-continuous-latent-reasoning/index.html",
       "/posts/diffuser-planning/index.html",
       "/posts/safe-denoiser/index.html",
-      "/posts/safety-aware-denoiser/index.html",
-      "/posts/safety-guided-flow/index.html"
+      "/posts/safety-guided-flow/index.html",
+      "/posts/safety-aware-denoiser/index.html"
     ]
   }
 ]

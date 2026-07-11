@@ -6,11 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Harlow Malloc">
-<meta name="dcterms.date" content="2026-07-07">
-<meta name="description" content="A short summary of the post shows up here — write it as description in the front matter.">
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-07-11">
+<meta name="description" content="The paper that started the continuous-latent-reasoning line: instead of decoding a chain-of-thought into words, feed the LLM’s last hidden state straight back as the next input embedding — turning a single reasoning trajectory into a superposition that can search breadth-first.">
 
-<title>Post With Code – Jiwoo Shin</title>
+<title>[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -48,9 +48,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-85329ba1582bd894883eda7c9f3de3b0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -79,15 +79,48 @@ ul.task-list li input[type="checkbox"] {
   }
 }</script>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="Post With Code – Jiwoo Shin">
-<meta property="og:description" content="A short summary of the post shows up here — write it as description in the front matter.">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/post-with-code/image.jpg">
+<meta property="og:title" content="[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space – Jiwoo Shin">
+<meta property="og:description" content="The paper that started the continuous-latent-reasoning line: instead of decoding a chain-of-thought into words, feed the LLM’s last hidden state straight back as the next input embedding — turning a single reasoning trajectory into a superposition that can search breadth-first.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/coconut-continuous-latent-reasoning/cover.png">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta name="twitter:title" content="Post With Code – Jiwoo Shin">
-<meta name="twitter:description" content="A short summary of the post shows up here — write it as description in the front matter.">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/post-with-code/image.jpg">
+<meta property="og:image:height" content="565">
+<meta property="og:image:width" content="1042">
+<meta name="twitter:title" content="[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space – Jiwoo Shin">
+<meta name="twitter:description" content="The paper that started the continuous-latent-reasoning line: instead of decoding a chain-of-thought into words, feed the LLM’s last hidden state straight back as the next input embedding — turning a single reasoning trajectory into a superposition that can search breadth-first.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/coconut-continuous-latent-reasoning/cover.png">
+<meta name="twitter:image-height" content="565">
+<meta name="twitter:image-width" content="1042">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -299,16 +332,16 @@ ul.task-list li input[type="checkbox"] {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">Post With Code</h1>
+      <h1 class="title">[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space</h1>
                   <div>
         <div class="description">
-          A short summary of the post shows up here — write it as <code>description</code> in the front matter.
+          The paper that started the continuous-latent-reasoning line: instead of decoding a chain-of-thought into words, feed the LLM’s last hidden state straight back as the next input embedding — turning a single reasoning trajectory into a superposition that can search breadth-first.
         </div>
       </div>
                           <div class="quarto-categories">
-                <div class="quarto-category">news</div>
-                <div class="quarto-category">code</div>
-                <div class="quarto-category">analysis</div>
+                <div class="quarto-category">Paper-Review</div>
+                <div class="quarto-category">LLM</div>
+                <div class="quarto-category">Planning</div>
               </div>
                   </div>
   </div>
@@ -319,14 +352,14 @@ ul.task-list li input[type="checkbox"] {
       <div>
       <div class="quarto-title-meta-heading">Author</div>
       <div class="quarto-title-meta-contents">
-               <p>Harlow Malloc </p>
+               <p>Jiwoo Shin </p>
             </div>
     </div>
       
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">July 7, 2026</p>
+        <p class="date">July 11, 2026</p>
       </div>
     </div>
     
@@ -337,8 +370,20 @@ ul.task-list li input[type="checkbox"] {
   </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link" data-scroll-target="#why-this-matters">Why this matters</a></li>
+  <li><a href="#the-core-idea-feed-the-hidden-state-back-dont-decode-it" id="toc-the-core-idea-feed-the-hidden-state-back-dont-decode-it" class="nav-link" data-scroll-target="#the-core-idea-feed-the-hidden-state-back-dont-decode-it">The core idea: feed the hidden state back, don’t decode it</a></li>
+  <li><a href="#training-a-curriculum-that-dissolves-the-chain-of-thought" id="toc-training-a-curriculum-that-dissolves-the-chain-of-thought" class="nav-link" data-scroll-target="#training-a-curriculum-that-dissolves-the-chain-of-thought">Training: a curriculum that dissolves the chain of thought</a></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">Results</a></li>
+  <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
+  <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content quarto-banner-title-block" id="quarto-document-content">
@@ -348,9 +393,59 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<p>This is a post with executable code.</p>
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Shibo Hao, Sainbayar Sukhbaatar, DiJia Su, Xian Li, Zhiting Hu, Jason Weston, Yuandong Tian. <em>Training Large Language Models to Reason in a Continuous Latent Space.</em> COLM 2025. <a href="https://arxiv.org/abs/2412.06769">arXiv:2412.06769</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Chain-of-thought forces a model to think in <em>words</em>, but most tokens in a reasoning trace are there for grammatical glue, not computation — and words force the model to commit to one path at each step. <strong>Coconut (Chain of Continuous Thought)</strong> removes the words: it takes the LLM’s last hidden state and feeds it back in as the <em>next input embedding</em>, so the model reasons in its own continuous representation space instead of decoding to text and re-encoding. The payoff is that a continuous thought is not a single token but a distribution — it can hold several candidate next steps at once, letting the model do something like a breadth-first search over a reasoning graph rather than greedily picking one branch. On planning-heavy logical tasks Coconut matches or beats CoT while emitting far fewer tokens; the cost is a fiddly multi-stage training curriculum and reasoning traces no human can read.</p>
+</section>
+<section id="why-this-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-matters">Why this matters</h2>
+<p>Chain-of-thought works, but it is a strange thing to demand of a model. To “reason,” the model must serialize its internal state into a sequence of natural-language tokens, then re-read those tokens to continue. Two problems fall out of this. First, it is wasteful: in a sentence like “so the next number we need to check is 12, which means…”, the tokens carrying reasoning content are a small fraction of the whole; the rest is textual coherence. Second, and more fundamentally, <em>language is committal</em>. Sampling a token is a hard decision — the moment the model writes “12,” it has thrown away the alternative that it should have checked 15. For problems that require search or backtracking, this premature commitment is exactly the failure mode.</p>
+<p>Coconut’s premise is that the reasoning state does not need to pass through the vocabulary bottleneck at all. The natural place for a transformer to keep its “state” is the hidden vector it already computes — a point in <span class="math inline">\(\mathbb{R}^d\)</span>, not a one-hot over the vocabulary. Why round that vector to the nearest word and then re-embed it, when you can just hand it back to the model directly?</p>
+</section>
+<section id="the-core-idea-feed-the-hidden-state-back-dont-decode-it" class="level2">
+<h2 class="anchored" data-anchor-id="the-core-idea-feed-the-hidden-state-back-dont-decode-it">The core idea: feed the hidden state back, don’t decode it</h2>
+<p>In ordinary autoregressive decoding, the input embedding at each step comes from the previously generated <em>token</em>. Coconut adds a second mode. Special markers <code>&lt;bot&gt;</code> and <code>&lt;eot&gt;</code> (begin/end of thought) bracket a stretch of <em>latent</em> reasoning. Inside that stretch, the input embedding at step <span class="math inline">\(t\)</span> is not a token embedding — it is the last hidden state from the previous step:</p>
+<p><span class="math display">\[
+x_t \;=\;
+\begin{cases}
+\text{Embed}(w_t) &amp; \text{(language mode)}\\[4pt]
+h_{t-1} &amp; \text{(latent mode, between }\texttt{&lt;bot&gt;}\text{ and }\texttt{&lt;eot&gt;}\text{)}
+\end{cases}
+\]</span></p>
+<p>where <span class="math inline">\(h_{t-1}\)</span> is the final-layer hidden state produced at the previous position. No softmax, no token sampling, no re-embedding — the “continuous thought” is just <span class="math inline">\(h_{t-1}\)</span> passed forward. After a fixed number of such latent steps, the model emits <code>&lt;eot&gt;</code> and returns to normal language decoding to produce the answer.</p>
+<p>The conceptual consequence is the whole point. A decoded token is a single choice; a hidden state is a dense vector that can carry a <em>superposition</em> of possibilities. The authors show, on a graph-reachability planning task, that the continuous thought behaves like the frontier of a <strong>breadth-first search</strong>: early latent steps keep weight on several candidate next nodes simultaneously, and later steps prune the dead ends. CoT, by contrast, must gamble on one node and hope it can recover if wrong. Reasoning in latent space lets the model <em>defer commitment</em> — it explores in parallel and only collapses to a definite answer when it decodes back to language.</p>
+</section>
+<section id="training-a-curriculum-that-dissolves-the-chain-of-thought" class="level2">
+<h2 class="anchored" data-anchor-id="training-a-curriculum-that-dissolves-the-chain-of-thought">Training: a curriculum that dissolves the chain of thought</h2>
+<p>You cannot supervise a continuous thought directly — there is no ground-truth hidden vector to regress toward. Coconut is trained instead by a <strong>multi-stage curriculum</strong> that gradually replaces language reasoning with latent reasoning, starting from ordinary CoT data.</p>
+<p>At stage <span class="math inline">\(0\)</span>, the model trains on full written CoT (question, all reasoning steps, answer) as usual. At stage <span class="math inline">\(k\)</span>, the first <span class="math inline">\(k\)</span> reasoning steps are removed from the text and replaced by <span class="math inline">\(k \cdot c\)</span> continuous thoughts, where <span class="math inline">\(c\)</span> is the number of latent thoughts substituted per step (a small constant). The loss is computed only on the <em>remaining</em> text — the later reasoning steps and the final answer. The continuous thoughts receive no direct loss; gradients reach them by backpropagating through the recurrence from the tokens that follow. Over stages, more and more of the written reasoning is swallowed into latent space, and the model learns to carry that computation in <span class="math inline">\(h_t\)</span> instead of in words.</p>
+<p>One consequence worth flagging for anyone tempted to reproduce it: because each continuous thought depends on the hidden state of the one before, the latent segment cannot be parallelized across positions the way teacher-forced token training can. Generating <span class="math inline">\(n\)</span> continuous thoughts requires <span class="math inline">\(n\)</span> sequential forward passes, which makes training meaningfully more expensive than standard CoT fine-tuning. This is the practical tax on the whole idea.</p>
+</section>
+<section id="results" class="level2">
+<h2 class="anchored" data-anchor-id="results">Results</h2>
+<p>The evaluation is deliberately built around tasks where <em>search matters</em>: GSM8K for math word problems, and two synthetic logical-reasoning benchmarks, ProntoQA and the harder ProsQA (a graph-structured reachability task designed to demand real planning rather than pattern completion).</p>
+<p>The headline pattern is a favorable accuracy–efficiency trade-off. On the planning-heavy tasks, Coconut with enough continuous thoughts per step <strong>matches or exceeds</strong> written CoT while generating dramatically fewer tokens at inference — the reasoning happens in latent space, so the model does not pay to spell it out. On ProsQA in particular, where the branching structure rewards keeping options open, latent reasoning pulls clearly ahead of CoT; adding more continuous thoughts per step continues to help, consistent with the BFS interpretation. On GSM8K the story is more nuanced — CoT’s explicit arithmetic is a strong baseline — but Coconut still beats a no-reasoning baseline and lands close to CoT at a fraction of the token count.</p>
+<p>The interpretability probe is, to me, the most convincing evidence. When the authors decode what the continuous thoughts <em>would</em> have said, they find the latent state maintaining a spread of plausible next nodes and narrowing it over successive steps — a mechanistic picture of the parallel-then-prune behavior, rather than a claim inferred only from accuracy numbers.</p>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>What I like about Coconut is that it isolates a single, clean idea and follows it honestly: the vocabulary is a bottleneck on reasoning, so route around it. The superposition-enabling-search framing is genuinely illuminating — it reframes CoT’s weakness not as “too few tokens” but as “premature discretization,” which is a more useful diagnosis. It also sits in an interesting relationship with the broader push toward inference-time compute: everyone is trying to buy more “thinking,” and Coconut argues some of that thinking is cheaper and better done in latent space than in text.</p>
+<p>The honest caveats are real, though. The sequential training cost is the obvious one, and it partly explains why the paper stays at the scale it does. The curriculum is delicate — the method is a recipe as much as an architecture, and how gracefully it transfers to large pretrained reasoners without heavy per-task staging is still open. And the interpretability loss cuts against a major reason CoT became popular in the first place: a readable trace you can audit. A model that reasons in vectors is, by construction, harder to oversee.</p>
+<p>The reason I’m reviewing an early-2025 paper as a “hot” pick is that the line it opened is unmistakably where a chunk of 2026 reasoning research now lives. The continuous-latent-reasoning direction — looped and recurrent-depth transformers, “pondering” in embedding space, and theoretical work on <em>why</em> continuous chains of thought are more expressive than discrete ones (the superposition analyses) — all trace back to this move. Coconut isn’t the last word on latent reasoning; it’s the paper that made the question respectable. Read it for the idea, not the leaderboard.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
+<ul>
+<li><strong>The paper:</strong> Hao, Sukhbaatar, Su, Li, Hu, Weston &amp; Tian. <em>Training Large Language Models to Reason in a Continuous Latent Space.</em> COLM 2025 — <a href="https://arxiv.org/abs/2412.06769">arXiv:2412.06769</a></li>
+<li><strong>The contrast it’s arguing with:</strong> Wei et al.&nbsp;<em>Chain-of-Thought Prompting Elicits Reasoning in Large Language Models.</em> NeurIPS 2022 — <a href="https://arxiv.org/abs/2201.11903">arXiv:2201.11903</a></li>
+<li><strong>Where the line went next:</strong> a growing 2025–2026 literature on latent/looped reasoning and the training dynamics of continuous chain-of-thought (e.g.&nbsp;the “emergence of superposition” analyses).</li>
+</ul>
 
 
+</section>
 
 </main> <!-- /main -->
 <script>
