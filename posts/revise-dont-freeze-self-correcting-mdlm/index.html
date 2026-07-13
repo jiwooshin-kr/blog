@@ -6,8 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-07-13">
+<meta name="description" content="Masked diffusion LMs re-predict every token at every step, yet standard samplers freeze each token the moment it’s revealed. D3IM + SCOPE unfreezes them — letting the model rewrite its own wrong answers, no extra modules required.">
 
-<title>Blog | Jiwoo Shin – Jiwoo Shin</title>
+<title>[Paper Review] Revise, Don’t Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -26,30 +29,28 @@ ul.task-list li input[type="checkbox"] {
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<link href="./favicon.png" rel="icon" type="image/png">
-<script src="site_libs/quarto-listing/list.min.js"></script>
-<script src="site_libs/quarto-listing/quarto-listing.js"></script>
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-85329ba1582bd894883eda7c9f3de3b0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-85329ba1582bd894883eda7c9f3de3b0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -77,35 +78,6 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
-<script>
-
-  window.document.addEventListener("DOMContentLoaded", function (_event) {
-    const listingTargetEl = window.document.querySelector('#listing-listing .list');
-    if (!listingTargetEl) {
-      // No listing discovered, do not attach.
-      return; 
-    }
-
-    const options = {
-      valueNames: ['listing-date','listing-author','listing-reading-time','listing-title','listing-description','listing-categories','listing-image',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-file-modified-sort'] }],
-      
-      searchColumns: ["listing-date","listing-title","listing-author","listing-image","listing-description","listing-categories"],
-    };
-
-    window['quarto-listings'] = window['quarto-listings'] || {};
-    window['quarto-listings']['listing-listing'] = new List('listing-listing', options);
-
-    if (window['quarto-listing-loaded']) {
-      window['quarto-listing-loaded']();
-    }
-  });
-
-  window.addEventListener('hashchange',() => {
-    if (window['quarto-listing-loaded']) {
-      window['quarto-listing-loaded']();
-    }
-  })
-  </script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -137,11 +109,13 @@ window.Quarto = {
 };
 </script>
 
-<link rel="stylesheet" href="styles.css">
-<link rel="alternate" type="application/rss+xml" title="Jiwoo Shin" href="index.xml" data-external="1"><meta property="og:title" content="Blog | Jiwoo Shin">
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="[Paper Review] Revise, Don’t Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models – Jiwoo Shin">
+<meta property="og:description" content="Masked diffusion LMs re-predict every token at every step, yet standard samplers freeze each token the moment it’s revealed. D3IM + SCOPE unfreezes them — letting the model rewrite its own wrong answers, no extra modules required.">
 <meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/revise-dont-freeze-self-correcting-mdlm/cover.png">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta name="twitter:title" content="Blog | Jiwoo Shin">
+<meta name="twitter:title" content="[Paper Review] Revise, Don’t Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models – Jiwoo Shin">
+<meta name="twitter:description" content="Masked diffusion LMs re-predict every token at every step, yet standard samplers freeze each token the moment it’s revealed. D3IM + SCOPE unfreezes them — letting the model rewrite its own wrong answers, no extra modules required.">
 <meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/revise-dont-freeze-self-correcting-mdlm/cover.png">
 <meta name="twitter:card" content="summary_large_image">
 </head>
@@ -320,11 +294,11 @@ window.Quarto = {
   </script>
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">Notes to Self</span>
     </a>
   </div>
@@ -335,7 +309,7 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="../../index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
@@ -351,374 +325,108 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">[Paper Review] Revise, Don’t Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models</h1>
+                  <div>
+        <div class="description">
+          Masked diffusion LMs re-predict every token at every step, yet standard samplers freeze each token the moment it’s revealed. D3IM + SCOPE unfreezes them — letting the model rewrite its own wrong answers, no extra modules required.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Paper-Review</div>
+                <div class="quarto-category">Diffusion</div>
+                <div class="quarto-category">LLM</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Jiwoo Shin </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 13, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-    <h5 class="quarto-listing-category-title">Categories</h5><div class="quarto-listing-category category-default"><div class="category" data-category="">All <span class="quarto-category-count">(8)</span></div><div class="category" data-category="RGlmZnVzaW9u">Diffusion <span class="quarto-category-count">(7)</span></div><div class="category" data-category="Rmxvdy1NYXRjaGluZw==">Flow-Matching <span class="quarto-category-count">(1)</span></div><div class="category" data-category="TExN">LLM <span class="quarto-category-count">(5)</span></div><div class="category" data-category="TW9kZWwtUmV2aWV3">Model-Review <span class="quarto-category-count">(1)</span></div><div class="category" data-category="UGFwZXItUmV2aWV3">Paper-Review <span class="quarto-category-count">(7)</span></div><div class="category" data-category="UGxhbm5pbmc=">Planning <span class="quarto-category-count">(2)</span></div><div class="category" data-category="UmVpbmZvcmNlbWVudC1MZWFybmluZw==">Reinforcement-Learning <span class="quarto-category-count">(1)</span></div><div class="category" data-category="U2FmZXR5">Safety <span class="quarto-category-count">(3)</span></div><div class="category" data-category="VGV4dC10by1JbWFnZQ==">Text-to-Image <span class="quarto-category-count">(1)</span></div></div></div>
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link" data-scroll-target="#why-this-matters">Why this matters</a></li>
+  <li><a href="#core-technical-idea" id="toc-core-technical-idea" class="nav-link" data-scroll-target="#core-technical-idea">Core technical idea</a></li>
+  <li><a href="#key-results" id="toc-key-results" class="nav-link" data-scroll-target="#key-results">Key results</a></li>
+  <li><a href="#personal-take" id="toc-personal-take" class="nav-link" data-scroll-target="#personal-take">Personal take</a></li>
+  </ul>
+</nav>
+    </div>
 <!-- main -->
-<main class="content column-page-left" id="quarto-document-content">
-
-
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">Notes to Self</h1>
-</div>
-
-
-
-<div class="quarto-title-meta column-page-left">
-
-    
-  
-    
-  </div>
-  
-
-
-</header>
-
-
-<script>
-(() => {
-  const setTitle = () => {
-    document.title = "Blog | Jiwoo Shin";
-  };
-  const setPostCount = () => {
-    const listing = window["quarto-listings"] && window["quarto-listings"]["listing-listing"];
-    const count = listing && listing.items
-      ? listing.items.length
-      : document.querySelectorAll(".quarto-listing-default .quarto-post").length;
-    const countEl = document.querySelector("#post-count-number");
-    if (countEl) {
-      countEl.textContent = String(count);
-    }
-  };
-  const moveAbout = () => {
-    const about = document.getElementById("sidebar-about");
-    const sidebar = document.getElementById("quarto-margin-sidebar");
-    if (about && sidebar) {
-      sidebar.insertBefore(about, sidebar.firstChild);
-    }
-  };
-  setTitle();
-  document.addEventListener("DOMContentLoaded", () => {
-    setPostCount();
-    moveAbout();
-  });
-  window.addEventListener("load", () => {
-    setTitle();
-    setPostCount();
-  });
-})();
-</script>
-<div class="post-count">
-<p>Total posts <span id="post-count-number"></span></p>
-</div>
-<div id="sidebar-about" class="sidebar-about">
-<p><img src="profile.jpg" class="sidebar-about-photo img-fluid"></p>
-<p><strong>Jiwoo Shin</strong></p>
-<p>Incoming M.S. student at KAIST Graduate School of AI.</p>
-<p>Notes on AI research, papers, and everyday things I want to remember.</p>
-<p><a href="https://jiwooshin-kr.github.io/">More about me →</a></p>
-</div>
-
-
-
-
-<div class="quarto-listing quarto-listing-container-default" id="listing-listing">
-<div class="list quarto-listing-default">
-<div class="quarto-post image-right" data-index="0" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDTExN" data-listing-date-sort="1783868400000" data-listing-file-modified-sort="1783912386528" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="6" data-listing-word-count-sort="1171">
-<div class="thumbnail"><a href="./posts/revise-dont-freeze-self-correcting-mdlm/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/revise-dont-freeze-self-correcting-mdlm/cover.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/revise-dont-freeze-self-correcting-mdlm/index.html" class="no-external">[Paper Review] Revise, Don’t Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/revise-dont-freeze-self-correcting-mdlm/index.html" class="no-external">
-<p>Masked diffusion LMs re-predict every token at every step, yet standard samplers freeze each token the moment it’s revealed. D3IM + SCOPE unfreezes them — letting the model rewrite its own wrong answers, no extra modules required.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/revise-dont-freeze-self-correcting-mdlm/index.html" class="no-external">
-<div class="listing-date">
-Jul 13, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">6 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="1" data-categories="TW9kZWwtUmV2aWV3JTJDRGlmZnVzaW9uJTJDTExN" data-listing-date-sort="1783695600000" data-listing-file-modified-sort="1783758477348" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="12" data-listing-word-count-sort="2309">
-<div class="thumbnail"><a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/diffusion-gemma-uniform-state/cover.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">[Model Review] DiffusionGemma: How DeepMind Made Uniform-State Diffusion Work at Scale</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('TW9kZWwtUmV2aWV3'); return false;">Model-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">
-<p>Google DeepMind’s DiffusionGemma bets on uniform-state discrete diffusion — the formulation everyone ‘knew’ was worse than masked diffusion — because it is the only one that can self-correct. A look at the four engineering moves that make the bet pay off: adapting a strong autoregressive checkpoint, a dual-mode encoder–denoiser backbone, self-conditioning through distributions, and an entropy-bounded accept/re-noise sampler.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/diffusion-gemma-uniform-state/index.html" class="no-external">
-<div class="listing-date">
-Jul 11, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">12 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="2" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDTExN" data-listing-date-sort="1783695600000" data-listing-file-modified-sort="1783758477346" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="14" data-listing-word-count-sort="2663">
-<div class="thumbnail"><a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/block-diffusion-bd3lm/cover.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">[Paper Review] Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">
-<p>The BD3-LM paper asks: what if we stop treating autoregression and diffusion as rivals and make the <em>block</em> the unit of autoregression and the <em>token</em> the unit of diffusion? A close read of the two parts that make it work — why diffusion models couldn’t have a KV cache until now, and why the noise schedule turns out to be a variance knob, not a modeling choice.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/block-diffusion-bd3lm/index.html" class="no-external">
-<div class="listing-date">
-Jul 11, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">14 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="3" data-categories="UGFwZXItUmV2aWV3JTJDTExNJTJDUGxhbm5pbmc=" data-listing-date-sort="1783695600000" data-listing-file-modified-sort="1783758477347" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="7" data-listing-word-count-sort="1391">
-<div class="thumbnail"><a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/coconut-continuous-latent-reasoning/cover.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">[Paper Review] Coconut: Training Large Language Models to Reason in a Continuous Latent Space</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGxhbm5pbmc='); return false;">Planning</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">
-<p>The paper that started the continuous-latent-reasoning line: instead of decoding a chain-of-thought into words, feed the LLM’s last hidden state straight back as the next input embedding — turning a single reasoning trajectory into a superposition that can search breadth-first.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/coconut-continuous-latent-reasoning/index.html" class="no-external">
-<div class="listing-date">
-Jul 11, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">7 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="4" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDUmVpbmZvcmNlbWVudC1MZWFybmluZyUyQ1BsYW5uaW5n" data-listing-date-sort="1783609200000" data-listing-file-modified-sort="1783758477337" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="13" data-listing-word-count-sort="2497">
-<div class="thumbnail"><a href="./posts/diffuser-planning/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/diffuser-planning/fig2-teaser.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/diffuser-planning/index.html" class="no-external">[Paper Review] Planning with Diffusion for Flexible Behavior Synthesis (Diffuser)</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('UmVpbmZvcmNlbWVudC1MZWFybmluZw=='); return false;">Reinforcement-Learning</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGxhbm5pbmc='); return false;">Planning</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/diffuser-planning/index.html" class="no-external">
-<p>The paper that turned planning into sampling: a diffusion model that denoises entire state-action trajectories at once, where the initial and terminal states are <em>generated by construction</em> — clamped into the sample at every denoising step, image-inpainting style.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/diffuser-planning/index.html" class="no-external">
-<div class="listing-date">
-Jul 10, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">13 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="5" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDVGV4dC10by1JbWFnZQ==" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783520854143" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="19" data-listing-word-count-sort="3693">
-<div class="thumbnail"><a href="./posts/safe-denoiser/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/safe-denoiser/fig-scream.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/safe-denoiser/index.html" class="no-external">[Paper Review] Training-Free Safe Denoisers for Safe Use of Diffusion Models</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('U2FmZXR5'); return false;">Safety</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('VGV4dC10by1JbWFnZQ=='); return false;">Text-to-Image</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/safe-denoiser/index.html" class="no-external">
-<p>The origin paper of the safe-denoiser research line: an exact Bayes decomposition showing the <em>safe</em> denoiser equals the pretrained denoiser plus a posterior-odds-weighted push away from an unsafe one — with a close look at the three approximations (kernel regression, odds→likelihood weight, tuned kernel and schedule) that turn the identity into a training-free algorithm.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/safe-denoiser/index.html" class="no-external">
-<div class="listing-date">
-Jul 8, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">19 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="6" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDRmxvdy1NYXRjaGluZw==" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783758477337" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="16" data-listing-word-count-sort="3066">
-<div class="thumbnail"><a href="./posts/safety-guided-flow/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/safety-guided-flow/fig1-teaser.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/safety-guided-flow/index.html" class="no-external">[Paper Review] Safety-Guided Flow: A Unified Framework for Negative Guidance in Safe Generation</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('U2FmZXR5'); return false;">Safety</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('Rmxvdy1NYXRjaGluZw=='); return false;">Flow-Matching</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/safety-guided-flow/index.html" class="no-external">
-<p>An energy-based framework (MMD potential + control barrier functions) that explains <em>how</em> and <em>when</em> to steer diffusion/flow models away from unsafe content — unifying Safe Denoiser and Shielded Diffusion, and proving that safety guidance must come early.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/safety-guided-flow/index.html" class="no-external">
-<div class="listing-date">
-Jul 8, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">16 min</div>
-</a>
-</div>
-</div>
-<div class="quarto-post image-right" data-index="7" data-categories="UGFwZXItUmV2aWV3JTJDRGlmZnVzaW9uJTJDU2FmZXR5JTJDTExN" data-listing-date-sort="1783436400000" data-listing-file-modified-sort="1783520365501" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="10" data-listing-word-count-sort="1872">
-<div class="thumbnail"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-
-<img loading="lazy" src="./posts/safety-aware-denoiser/fig1-tradeoff.png" class="thumbnail-image">
-
-</a></div>
-<div class="body">
-<h3 class="no-anchor listing-title">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">[Paper Review] The Safety-Aware Denoiser for Text Diffusion Models</a>
-</h3>
-<div class="listing-categories">
-
-<div class="listing-category" onclick="window.quartoListingCategory('UGFwZXItUmV2aWV3'); return false;">Paper-Review</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('RGlmZnVzaW9u'); return false;">Diffusion</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('U2FmZXR5'); return false;">Safety</div>
-
-<div class="listing-category" onclick="window.quartoListingCategory('TExN'); return false;">LLM</div>
-
-</div>
-<div class="delink listing-description"><a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<p>A training-free, inference-time safety guidance method for text diffusion models (MDLM, LLaDA, Dream) that steers denoising away from a small set of unsafe reference texts — with provable grounding in the safe denoiser framework.</p>
-</a></div>
-</div>
-<div class="metadata">
-<a href="./posts/safety-aware-denoiser/index.html" class="no-external">
-<div class="listing-date">
-Jul 8, 2026
-</div>
-<div class="listing-author">
-Jiwoo Shin
-</div>
-<div class="listing-reading-time">10 min</div>
-</a>
-</div>
-</div>
-</div>
-<div class="listing-no-matching d-none">No matching items</div>
-</div></main> <!-- /main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Longxuan Yu, Shaorong Zhang, Yu Fu, Hui Liu, Yue Dong, Greg Ver Steeg. <em>Revise, Don’t Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models.</em> UC Riverside &amp; Microsoft, May 2026. <a href="https://arxiv.org/abs/2606.01026">arXiv:2606.01026</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Masked diffusion language models (MDLMs) like LLaDA re-predict <em>every</em> position at <em>every</em> denoising step, so they should in principle be able to fix an early mistake later. But the standard sampler throws that ability away: once a token is unmasked, it’s frozen forever. This paper introduces <strong>D3IM</strong>, a parameter-free “clean-slate” sampler that rebuilds each intermediate state purely from the model’s current predictions — letting a visible token be overwritten directly, without first routing it back through <code>[MASK]</code>. Dropping in D3IM alone actually <em>hurts</em>, because the model suffers from <strong>preservation bias</strong>: it confidently reproduces its own wrong tokens. So the authors add <strong>SCOPE</strong>, a lightweight post-training step that feeds the model its own high-confidence errors and teaches it to recover the truth. Together, SCOPE+D3IM lifts LLaDA-8B by <strong>+13.0 on GSM8K</strong> and <strong>+15.3 on HumanEval</strong> — with no architectural changes.</p>
+</section>
+<section id="why-this-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-matters">Why this matters</h2>
+<p>Autoregressive LLMs generate left-to-right and can never revisit a token they’ve emitted. Diffusion LMs were supposed to be different: they denoise the whole sequence in parallel, and the denoiser computes a fresh distribution over <em>all</em> positions on every forward pass. If step 5 produces a wrong digit, step 20 has, on paper, every opportunity to notice and repair it.</p>
+<p>In practice this never happens. The dominant decoding recipe for MDLMs is <strong>monotonic unmasking</strong>: rank the masked positions by confidence, commit the top few to their predicted tokens, and <em>never touch them again</em>. Every prediction the model makes at an already-visible position is silently discarded. So the one structural advantage discrete diffusion has over autoregression — bidirectional, revisable generation — is left completely on the table. On reasoning-heavy tasks this is expensive: a single wrong operator or digit committed early propagates through everything that follows.</p>
+<p>The paper’s framing is that this freezing shows up in <em>two</em> places, and you have to fix both.</p>
+</section>
+<section id="core-technical-idea" class="level2">
+<h2 class="anchored" data-anchor-id="core-technical-idea">Core technical idea</h2>
+<p><strong>Two kinds of “absorption.”</strong> In classical absorbing-state diffusion, once a coordinate becomes visible the clean-token posterior collapses onto it,</p>
+<p><span class="math display">\[p(X_0^i \mid X_t,\, X_t^i \neq m) = \delta_{X_t^i},\]</span></p>
+<p>meaning a visible token literally <em>is</em> the answer and cannot be re-evaluated. LLaDA-style training relaxes this — its loss only supervises masked positions,</p>
+<p><span class="math display">\[\mathcal{L}_{\text{LLaDA}} = -\sum_{i \in \mathcal{M}_t} \log p_\theta(x_i^* \mid \mathbf{x}_t),\]</span></p>
+<p>so there’s no formal constraint forcing a visible token to copy itself. The catch: absorption sneaks back in as <em>learned behavior</em>. In a stress test, LLaDA-8B-Instruct preserves its own wrong visible token <strong>70.1%</strong> of the time and recovers the ground truth only <strong>9.2%</strong>. The authors call this <strong>preservation bias</strong>. So there’s <em>sampler-level</em> absorption (the decoding rule freezes tokens) and <em>behavioral</em> absorption (the model itself won’t let go). D3IM attacks the first; SCOPE the second.</p>
+<p><strong>D3IM: clean-slate remasking.</strong> Instead of editing the previous sequence, D3IM reconstructs each intermediate state from scratch using the model’s current logits. At step <span class="math inline">\(t\)</span> it predicts <em>all</em> active positions, ranks them by confidence, keeps the top <span class="math inline">\(K(t) = \lfloor Lt/T \rfloor\)</span>, and re-masks the rest. Because every candidate is recomputed, a previously committed token can now do one of three things: survive, get demoted back to <code>[MASK]</code>, or be <strong>overwritten directly by a new token</strong>.</p>
+<p>The elegant part is that this is a principled corrector sampler, not a heuristic. In the discrete-flow-matching corrector view, each reverse step mixes three operations weighted by <span class="math inline">\(a_t\)</span> (predict a new token), <span class="math inline">\(b_t\)</span> (remask), and <span class="math inline">\(c_t\)</span> (preserve the current token), with <span class="math inline">\(a_t + b_t + c_t = 1\)</span>. Standard absorbing samplers crank <span class="math inline">\(c_t\)</span> high — that’s what freezes tokens. <strong>D3IM simply sets <span class="math inline">\(c_t = 0\)</span></strong>: no weight on self-preservation, and the masking schedule is carried entirely by <span class="math inline">\(a_t\)</span> and <span class="math inline">\(b_t\)</span>. Visible-to-visible revision falls out for free, with zero new parameters and the same forward pass you were already running.</p>
+<p><strong>SCOPE: training on your own mistakes.</strong> D3IM only works if the model’s confidence actually tracks correctness under self-generated context — and preservation bias says it doesn’t. SCOPE fixes this by simulating D3IM during a short post-training phase. For each step: mask a random subset of positions (rate drawn from <span class="math inline">\(\text{Beta}(2,2)\)</span>), do a no-gradient forward pass, and <em>commit</em> the top <span class="math inline">\(\rho=0.3\)</span> fraction of the model’s own sampled predictions — deliberately including its high-confidence errors. The training input now mixes ground-truth tokens, self-generated (sometimes wrong) committed tokens, and remaining masks. A second, gradient-enabled pass is then supervised to recover the ground truth on the committed and still-masked positions:</p>
+<p><span class="math display">\[\mathcal{L}_{\text{SCOPE}} = \frac{1}{|C \cup M|} \sum_{i \in C \cup M} \text{CE}\big(f_\theta(x_{\text{train}})_i,\, x_i^*\big),\]</span></p>
+<p>where <span class="math inline">\(C\)</span> is the committed self-predictions and <span class="math inline">\(M\)</span> the remaining masks; ground-truth positions are excluded so they don’t dilute the correction signal. Half the time the branch is swapped for ordinary MDLM training to keep base skills intact. The net effect: the model learns to treat its own visible tokens as <em>hypotheses</em>, not fixed context.</p>
+</section>
+<section id="key-results" class="level2">
+<h2 class="anchored" data-anchor-id="key-results">Key results</h2>
+<p>On LLaDA-8B-Instruct at 64 denoising steps, SCOPE+D3IM beats vanilla unmasking by <strong>+13.0 on GSM8K (68.3%)</strong>, <strong>+4.8 on MATH-500 (23.6%)</strong>, <strong>+15.3 on HumanEval (29.3%)</strong>, and <strong>+10.4 on MBPP (30.8%)</strong>. On math and code the gains <em>grow</em> with more denoising steps — exactly what you’d hope from a method whose whole point is using extra steps to revise rather than just fill in blanks.</p>
+<p>The most instructive result is the ablation: <strong>D3IM without SCOPE degrades performance</strong>, and <strong>SCOPE’s benefit is sampler-specific</strong> — it aligns confidence with D3IM’s clean-slate top-<span class="math inline">\(K\)</span> rule and does <em>not</em> automatically transfer to other revokable samplers. The sampler and the training procedure are two halves of one mechanism; neither works alone. That’s the “sampler-matched” in the title.</p>
+</section>
+<section id="personal-take" class="level2">
+<h2 class="anchored" data-anchor-id="personal-take">Personal take</h2>
+<p>What I like here is the diagnosis before the fix. It would have been easy to bolt on another confidence-threshold heuristic or a learned “reviser” module — the related work is full of those (ReMDM, revokable decoding, draft-and-verify). Instead the authors ask a sharper question: LLaDA’s objective <em>already</em> leaves visible positions unconstrained, so why doesn’t revision just happen? The answer — behavioral absorption learned from always seeing clean context — is a clean instance of exposure bias, but in a bidirectional model rather than an autoregressive one. The classic autoregressive exposure-bias story is “the model never saw its own outputs at train time”; SCOPE is essentially scheduled sampling for diffusion LMs, and it’s satisfying to see the same medicine work.</p>
+<p>It also sharpens something worth remembering about discrete diffusion: the sampler and the training objective are not independent knobs. This connects directly to the block-diffusion and remasking ideas I’ve looked at before — the recurring lesson is that a diffusion LM’s real behavior lives in the <em>interaction</em> between how it’s trained and how it’s decoded, not in either one alone. The honest limitation is that SCOPE gains don’t transfer across samplers, so this isn’t a free upgrade you sprinkle on any MDLM — you’re committing to the D3IM decoding regime. Still, “let the model rewrite its own wrong answers, and train it to actually do so” feels like one of those ideas that should have been obvious in hindsight, which is usually the sign of a good paper.</p>
+
+
+</section>
+
+</main> <!-- /main -->
 <script>
 /* GoatCounter: visitor tracking + footer counter (Total / Today / Yesterday).
    Setup: sign up at goatcounter.com, then put your site code below.
@@ -792,6 +500,106 @@ Jiwoo Shin
   } else {
     run();
   }
+})();
+</script>
+<script>
+/* Prev/next + related posts, built from the home listing.
+   Runs on every post page; new posts are picked up automatically. */
+(async () => {
+  const offsetMeta = document.querySelector('meta[name="quarto:offset"]');
+  if (!offsetMeta) return;
+  const indexUrl = new URL(offsetMeta.content + "index.html", window.location.href);
+
+  let doc;
+  try {
+    const res = await fetch(indexUrl.href);
+    if (!res.ok) return;
+    doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  } catch (e) {
+    return;
+  }
+
+  const norm = (p) => p.replace(/index\.html$/, "");
+  const here = norm(window.location.pathname);
+
+  // listing is already sorted date-desc
+  const items = [...doc.querySelectorAll(".quarto-listing-default .quarto-post")]
+    .map((el) => {
+      const a = el.querySelector(".listing-title a");
+      if (!a) return null;
+      const url = new URL(a.getAttribute("href"), indexUrl);
+      let cats = [];
+      try {
+        cats = decodeURIComponent(atob(el.dataset.categories || "")).split(",").filter(Boolean);
+      } catch (e) {}
+      const img = el.querySelector(".thumbnail-image");
+      const dateEl = el.querySelector(".listing-date");
+      return {
+        href: url.href,
+        path: norm(url.pathname),
+        title: a.textContent.trim(),
+        date: dateEl ? dateEl.textContent.trim() : "",
+        image: img ? new URL(img.getAttribute("src"), indexUrl).href : null,
+        cats: cats,
+      };
+    })
+    .filter(Boolean);
+
+  const idx = items.findIndex((it) => it.path === here);
+  if (idx === -1 || items.length < 2) return;
+  const current = items[idx];
+  const newer = idx > 0 ? items[idx - 1] : null;
+  const older = idx < items.length - 1 ? items[idx + 1] : null;
+
+  // related: most shared categories first; ties keep date order
+  const related = items
+    .filter((_, i) => i !== idx)
+    .map((it) => ({ it, s: it.cats.filter((c) => current.cats.includes(c)).length }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 3)
+    .map((x) => x.it);
+
+  const esc = (s) =>
+    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const navItem = (post, cls, label) =>
+    post
+      ? `<a class="post-nav-item ${cls}" href="${post.href}">
+           <span class="post-nav-label">${label}</span>
+           <span class="post-nav-title">${esc(post.title)}</span>
+         </a>`
+      : `<span></span>`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "post-footer-nav";
+  wrap.innerHTML = `
+    <nav class="post-nav">
+      ${navItem(older, "post-nav-prev", "&larr; Older")}
+      ${navItem(newer, "post-nav-next", "Newer &rarr;")}
+    </nav>
+    ${
+      related.length
+        ? `<section class="related-posts">
+             <div class="related-posts-title">Related posts</div>
+             <div class="related-posts-grid">
+               ${related
+                 .map(
+                   (r) => `
+                 <a class="related-card" href="${r.href}">
+                   ${r.image ? `<img class="related-card-image" src="${r.image}" alt="">` : ""}
+                   <span class="related-card-title">${esc(r.title)}</span>
+                   <span class="related-card-date">${esc(r.date)}</span>
+                 </a>`
+                 )
+                 .join("")}
+             </div>
+           </section>`
+        : ""
+    }
+  `;
+
+  const main = document.getElementById("quarto-document-content");
+  if (main) main.appendChild(wrap);
 })();
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
@@ -1207,6 +1015,38 @@ Jiwoo Shin
     }
   });
   </script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      if (authorPrefersDark) {
+          [baseTheme, altTheme] = [altTheme, baseTheme];
+      }
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "jiwooshin-kr/blog";
+    script.dataset.repoId = "R_kgDOTPVNpg";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDOTPVNps4DAq0B";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">

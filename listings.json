@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/revise-dont-freeze-self-correcting-mdlm/index.html",
       "/posts/diffusion-gemma-uniform-state/index.html",
       "/posts/block-diffusion-bd3lm/index.html",
       "/posts/coconut-continuous-latent-reasoning/index.html",
