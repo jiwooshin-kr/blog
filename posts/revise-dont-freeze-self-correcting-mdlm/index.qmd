@@ -1,0 +1,56 @@
+---
+title: "[Paper Review] Revise, Don't Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models"
+description: "Masked diffusion LMs re-predict every token at every step, yet standard samplers freeze each token the moment it's revealed. D3IM + SCOPE unfreezes them — letting the model rewrite its own wrong answers, no extra modules required."
+author: "Jiwoo Shin"
+date: "2026-07-13"
+categories: [Paper-Review, Diffusion, LLM]
+image: "cover.png"
+---
+
+> **Paper:** Longxuan Yu, Shaorong Zhang, Yu Fu, Hui Liu, Yue Dong, Greg Ver Steeg. *Revise, Don't Freeze: Sampler-Matched Training for Self-Correcting Masked Diffusion Language Models.* UC Riverside & Microsoft, May 2026. [arXiv:2606.01026](https://arxiv.org/abs/2606.01026)
+
+## TL;DR
+
+Masked diffusion language models (MDLMs) like LLaDA re-predict *every* position at *every* denoising step, so they should in principle be able to fix an early mistake later. But the standard sampler throws that ability away: once a token is unmasked, it's frozen forever. This paper introduces **D3IM**, a parameter-free "clean-slate" sampler that rebuilds each intermediate state purely from the model's current predictions — letting a visible token be overwritten directly, without first routing it back through `[MASK]`. Dropping in D3IM alone actually *hurts*, because the model suffers from **preservation bias**: it confidently reproduces its own wrong tokens. So the authors add **SCOPE**, a lightweight post-training step that feeds the model its own high-confidence errors and teaches it to recover the truth. Together, SCOPE+D3IM lifts LLaDA-8B by **+13.0 on GSM8K** and **+15.3 on HumanEval** — with no architectural changes.
+
+## Why this matters
+
+Autoregressive LLMs generate left-to-right and can never revisit a token they've emitted. Diffusion LMs were supposed to be different: they denoise the whole sequence in parallel, and the denoiser computes a fresh distribution over *all* positions on every forward pass. If step 5 produces a wrong digit, step 20 has, on paper, every opportunity to notice and repair it.
+
+In practice this never happens. The dominant decoding recipe for MDLMs is **monotonic unmasking**: rank the masked positions by confidence, commit the top few to their predicted tokens, and *never touch them again*. Every prediction the model makes at an already-visible position is silently discarded. So the one structural advantage discrete diffusion has over autoregression — bidirectional, revisable generation — is left completely on the table. On reasoning-heavy tasks this is expensive: a single wrong operator or digit committed early propagates through everything that follows.
+
+The paper's framing is that this freezing shows up in *two* places, and you have to fix both.
+
+## Core technical idea
+
+**Two kinds of "absorption."** In classical absorbing-state diffusion, once a coordinate becomes visible the clean-token posterior collapses onto it,
+
+$$p(X_0^i \mid X_t,\, X_t^i \neq m) = \delta_{X_t^i},$$
+
+meaning a visible token literally *is* the answer and cannot be re-evaluated. LLaDA-style training relaxes this — its loss only supervises masked positions,
+
+$$\mathcal{L}_{\text{LLaDA}} = -\sum_{i \in \mathcal{M}_t} \log p_\theta(x_i^* \mid \mathbf{x}_t),$$
+
+so there's no formal constraint forcing a visible token to copy itself. The catch: absorption sneaks back in as *learned behavior*. In a stress test, LLaDA-8B-Instruct preserves its own wrong visible token **70.1%** of the time and recovers the ground truth only **9.2%**. The authors call this **preservation bias**. So there's *sampler-level* absorption (the decoding rule freezes tokens) and *behavioral* absorption (the model itself won't let go). D3IM attacks the first; SCOPE the second.
+
+**D3IM: clean-slate remasking.** Instead of editing the previous sequence, D3IM reconstructs each intermediate state from scratch using the model's current logits. At step $t$ it predicts *all* active positions, ranks them by confidence, keeps the top $K(t) = \lfloor Lt/T \rfloor$, and re-masks the rest. Because every candidate is recomputed, a previously committed token can now do one of three things: survive, get demoted back to `[MASK]`, or be **overwritten directly by a new token**.
+
+The elegant part is that this is a principled corrector sampler, not a heuristic. In the discrete-flow-matching corrector view, each reverse step mixes three operations weighted by $a_t$ (predict a new token), $b_t$ (remask), and $c_t$ (preserve the current token), with $a_t + b_t + c_t = 1$. Standard absorbing samplers crank $c_t$ high — that's what freezes tokens. **D3IM simply sets $c_t = 0$**: no weight on self-preservation, and the masking schedule is carried entirely by $a_t$ and $b_t$. Visible-to-visible revision falls out for free, with zero new parameters and the same forward pass you were already running.
+
+**SCOPE: training on your own mistakes.** D3IM only works if the model's confidence actually tracks correctness under self-generated context — and preservation bias says it doesn't. SCOPE fixes this by simulating D3IM during a short post-training phase. For each step: mask a random subset of positions (rate drawn from $\text{Beta}(2,2)$), do a no-gradient forward pass, and *commit* the top $\rho=0.3$ fraction of the model's own sampled predictions — deliberately including its high-confidence errors. The training input now mixes ground-truth tokens, self-generated (sometimes wrong) committed tokens, and remaining masks. A second, gradient-enabled pass is then supervised to recover the ground truth on the committed and still-masked positions:
+
+$$\mathcal{L}_{\text{SCOPE}} = \frac{1}{|C \cup M|} \sum_{i \in C \cup M} \text{CE}\big(f_\theta(x_{\text{train}})_i,\, x_i^*\big),$$
+
+where $C$ is the committed self-predictions and $M$ the remaining masks; ground-truth positions are excluded so they don't dilute the correction signal. Half the time the branch is swapped for ordinary MDLM training to keep base skills intact. The net effect: the model learns to treat its own visible tokens as *hypotheses*, not fixed context.
+
+## Key results
+
+On LLaDA-8B-Instruct at 64 denoising steps, SCOPE+D3IM beats vanilla unmasking by **+13.0 on GSM8K (68.3%)**, **+4.8 on MATH-500 (23.6%)**, **+15.3 on HumanEval (29.3%)**, and **+10.4 on MBPP (30.8%)**. On math and code the gains *grow* with more denoising steps — exactly what you'd hope from a method whose whole point is using extra steps to revise rather than just fill in blanks.
+
+The most instructive result is the ablation: **D3IM without SCOPE degrades performance**, and **SCOPE's benefit is sampler-specific** — it aligns confidence with D3IM's clean-slate top-$K$ rule and does *not* automatically transfer to other revokable samplers. The sampler and the training procedure are two halves of one mechanism; neither works alone. That's the "sampler-matched" in the title.
+
+## Personal take
+
+What I like here is the diagnosis before the fix. It would have been easy to bolt on another confidence-threshold heuristic or a learned "reviser" module — the related work is full of those (ReMDM, revokable decoding, draft-and-verify). Instead the authors ask a sharper question: LLaDA's objective *already* leaves visible positions unconstrained, so why doesn't revision just happen? The answer — behavioral absorption learned from always seeing clean context — is a clean instance of exposure bias, but in a bidirectional model rather than an autoregressive one. The classic autoregressive exposure-bias story is "the model never saw its own outputs at train time"; SCOPE is essentially scheduled sampling for diffusion LMs, and it's satisfying to see the same medicine work.
+
+It also sharpens something worth remembering about discrete diffusion: the sampler and the training objective are not independent knobs. This connects directly to the block-diffusion and remasking ideas I've looked at before — the recurring lesson is that a diffusion LM's real behavior lives in the *interaction* between how it's trained and how it's decoded, not in either one alone. The honest limitation is that SCOPE gains don't transfer across samplers, so this isn't a free upgrade you sprinkle on any MDLM — you're committing to the D3IM decoding regime. Still, "let the model rewrite its own wrong answers, and train it to actually do so" feels like one of those ideas that should have been obvious in hindsight, which is usually the sign of a good paper.
