@@ -1,0 +1,250 @@
+---
+title: "[Paper Review] Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking"
+description: "EB-Sampler asks: if a half-finished sequence already *forces* the values of several masked tokens, why spend one forward pass per token? A close read of the paper's KL error decomposition — total error splits exactly into model error plus joint dependence error, the latter bounded by a sum-minus-max of entropies — worked through line by line, since the four-line algorithm is the theorem wearing a PyTorch costume."
+author: "Jiwoo Shin"
+date: "2026-07-14"
+categories: [Paper-Review, Diffusion, LLM]
+image: "cover.png"
+---
+
+> **Paper:** Heli Ben-Hamu, Itai Gat, Daniel Severo, Niklas Nolte, Brian Karrer (FAIR at Meta). *Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking.* 2025. [arXiv:2505.24857](https://arxiv.org/abs/2505.24857)
+
+## TL;DR
+
+Masked diffusion models (MDMs) like LLaDa and Dream match similarly sized autoregressive models on code and math — but only when sampled **one token per forward pass**, which forfeits the entire parallelism argument for diffusion. Unmasking a fixed $k > 1$ tokens per step (Top-$k$) degrades quality fast, because tokens sampled independently in the same step may in truth be strongly dependent. This paper's observation is that the number of tokens you can *safely* unmask together is not a constant — it's a property of the current state, and the model already tells you what it is: when several masked tokens are predicted with (near-)zero entropy, they are predicted to be (near-)deterministic given the context, hence (near-)independent of each other, hence free to unmask in parallel.
+
+**EB-Sampler** turns this into a four-line change to existing samplers: sort masked positions by an error proxy (confidence/entropy/margin — exactly what LLaDa and Dream already use), then unmask the longest prefix whose predicted entropies satisfy $\sum_l H_l - \max_l H_l \le \gamma$. The specific *sum-minus-max* form is not a heuristic: the paper proves total sampling error decomposes into **model error** plus **joint dependence error**, and sum-minus-max of entropies is a rigorous upper bound on the latter. The result is 2–3× fewer function evaluations on HumanEval/MBPP/GSM8K/MATH at equal accuracy, with no training, and near-lossless 5–8× step reductions on maze and Sudoku solvers. Since I want to actually *learn* the math in this one, the middle section works through the error decomposition and the entropy bound at full rigor — every marginalization step included.
+
+The metaphor for this paper is the one its own Sudoku experiment hands you. A cautious solver re-scans the whole grid after penciling in every single digit. A good solver knows that one deduction often forces a *cascade* of cells — and fills in the entire forced cascade before bothering to re-scan. Re-scanning is the expensive forward pass; the cascade is the set of low-entropy tokens; and $\gamma$ is how much non-forcedness you're willing to tolerate per pass before you insist on looking at the board again.
+
+## Setup: what an MDM actually learns
+
+Sequences live in $\mathcal{S} = \mathcal{T}^d$ with vocabulary $\mathcal{T} = [K]$, index set $I = [d]$, and an extra mask token $m$. The key fact (Ou et al., 2025; Zheng et al., 2024) is that masked diffusion training — despite the diffusion framing — provably learns the **clean-data conditionals**: for every set of unmasked indices $\bar{M} \subseteq I$ and every masked position $l$, the network outputs $p^\theta(x^l \mid x^{\bar{M}})$, ideally equal to the true conditional $q(x^l \mid x^{\bar{M}})$ of the data distribution $q$. One forward pass with full attention produces these factorized conditionals *for all masked positions at once* — that's the resource the whole paper is about spending wisely.
+
+The baseline sampler unmasks one position at a time: pick an index, sample from its conditional, repeat $d$ times. Two facts about this procedure set up the problem.
+
+**Fact 1: order doesn't matter for a perfect model, but no model is perfect.** For the optimal predictor, the chain rule guarantees order-invariance: for any two unmasking permutations $\sigma, \sigma'$,
+
+$$
+p^\theta_\sigma(x) = p^\theta_{\sigma'}(x), \qquad p^\theta_\sigma(x) = \prod_{l=1}^{d} p^\theta\!\left(x^{\sigma(l)} \,\middle|\, x^{\cup_{j<l}\sigma(j)}\right).
+$$
+
+But a trained $p^\theta$ has **local model error** $D_{\mathrm{KL}}\!\big(q(x^l \mid x^{\bar{M}}),\, p^\theta(x^l \mid x^{\bar{M}})\big) > 0$, unevenly distributed across contexts and positions — so the total error of the sampled distribution *does* depend on the order. Empirically, model-chosen orders crush random ones: LLaDa 8B jumps from ~20% to ~40% on MBPP just by unmasking in a smart order. The orders that work are greedy on a per-token **error proxy**:
+
+$$
+\begin{aligned}
+\text{Confidence:}\quad & l = \arg\max_{l' \in M} \big[\max_{x^{l'}} p^\theta(x^{l'} \mid x^{\bar{M}})\big] \\
+\text{Entropy:}\quad & l = \arg\min_{l' \in M} \big[H(X^{l'} \mid X^{\bar{M}} = x^{\bar{M}})\big] \\
+\text{Margin:}\quad & l = \arg\max_{l' \in M} \big[p^\theta(X^{l'}\!=y_1 \mid x^{\bar{M}}) - p^\theta(X^{l'}\!=y_2 \mid x^{\bar{M}})\big]
+\end{aligned}
+$$
+
+with $(y_1, y_2)$ the top-2 predictions. None of these is a theorem — they're empirical proxies for "where is my local model error small?" — but Figure 2 of the paper shows all three work and are nearly interchangeable.
+
+**Fact 2: fixed-$k$ parallel unmasking buys speed with a hidden currency.** Top-$k$ samplers take the $k$ best positions under the proxy and sample them *independently* from their factorized conditionals. If those tokens are actually dependent under $q$ given the context, independent sampling is simply drawing from the wrong joint — the paper names this **joint dependence error**, and Figure 3 shows accuracy on MBPP collapsing as $k$ grows from 1 to 16. The failure isn't that the model got worse; it's that a *fixed* $k$ ignores that dependence varies wildly from state to state. Sometimes the grid forces twelve cells; sometimes it forces none.
+
+## The EB-Sampler in one equation
+
+At each step, sort the masked positions ascending by error proxy (same as Top-$k$), then choose the **largest prefix** $U$ of that order satisfying the entropy budget
+
+$$
+\sum_{l \in U} H\big(p^\theta(x^l \mid x^{\bar{M}})\big) \;-\; \max_{l \in U} H\big(p^\theta(x^l \mid x^{\bar{M}})\big) \;\le\; \gamma,
+\tag{EB}
+$$
+
+and sample every token in $U$ independently from its conditional. In PyTorch this is literally four added lines — compute per-token entropies in sorted order, take `cumsum` and `cummax`, and set $k = \#\{\text{prefixes with } \texttt{cumsum} - \texttt{cummax} \le \gamma\}$.
+
+Three structural remarks that repay a moment of care:
+
+- **The prefix rule is well-posed because the budget statistic is monotone.** Let $g(U) = \sum_{l\in U} H_l - \max_{l \in U} H_l$ and extend the prefix by a token with entropy $h$, with current sum $S$ and max $M$. If $h \le M$ the statistic increases by $h \ge 0$; if $h > M$ it becomes $S + h - h = S$, an increase of $M \ge 0$. Either way $g$ is non-decreasing along the sorted order, so "the largest prefix under budget" is exactly what the single vectorized comparison `cumsum − cummax ≤ γ` computes — no search needed.
+- **The $-\max$ term is the license to always make progress.** For a singleton, $g(\{l\}) = 0 \le \gamma$ regardless of how uncertain the token is — so the sampler never stalls, and at $\gamma = 0$ it degenerates to (essentially) the one-token-per-step greedy sampler, except that any *exactly deterministic* tokens ($H = 0$) still ride along for free. That free-rider clause is the paper's opening observation formalized: tokens whose values are already forced by the visible context cost nothing to unmask, in the precise sense that they contribute nothing to the budget.
+- **$\gamma$ interpolates the whole spectrum**: $\gamma = 0$ is one-real-token-per-step; $\gamma = \infty$ unmasks everything in a single evaluation. In between, the number of tokens per step is *adaptive*: many when the state is predicted simple, few when it's predicted contentious. Compute concentrates exactly where the model claims the sequence is still undecided.
+
+The obvious question is why *this* statistic — why sum-minus-max of entropies rather than, say, sum, or max, or the product of confidences. That's what the theory section answers, and it's the part of the paper worth studying closely.
+
+## The math: adaptive unmasking samplers, with proofs
+
+This section is Section 5 + Appendix A.1 of the paper, reconstructed with every step spelled out.
+
+### The object: ordered partitions and the sampler family
+
+A multi-token unmasking schedule is encoded as an **ordered partition** $z = (z_1, \dots, z_d)$ of the index set: $\bigcup_i z_i = I$, $z_i \cap z_j = \emptyset$ for $i \neq j$, where $z_i \subseteq I$ is the set of positions unmasked at step $i$ (padding with $z_i = \emptyset$ allowed, so every schedule fits in exactly $d$ slots). Write $z_{<i} = (z_1, \dots, z_{i-1})$ and, for an ordered sub-partition $s$, let $x^s$ denote the tokens at indices $I_s = \bigcup_j s_j$.
+
+A **sampler** is a conditional distribution $\phi(z_i \mid x^{z_{<i}}, z_{<i})$: given everything unmasked so far (both the *values* $x^{z_{<i}}$ and the *history of choices* $z_{<i}$), it picks which set of positions to unmask next. WLOG $\phi$ picks $z_i = \emptyset$ only when everything is already unmasked. Running $\phi$ with the learned conditionals defines a joint distribution over (sequence, schedule):
+
+$$
+p^{\phi}(x, z) \;=\; \prod_{i=1}^{d} \Bigg( \prod_{l \in z_i} p^\theta\big(x^l \mid x^{z_{<i}}\big) \Bigg)\, \phi\big(z_i \mid x^{z_{<i}}, z_{<i}\big),
+\tag{5}
+$$
+
+— the inner product over $l \in z_i$ is precisely the "sample this step's tokens independently" operation. The idealized reference process replaces the independent learned conditionals with the *true joint* conditional:
+
+$$
+q^{\phi}(x, z) \;=\; \prod_{i=1}^{d} q\big(x^{z_i} \mid x^{z_{<i}}\big)\, \phi\big(z_i \mid x^{z_{<i}}, z_{<i}\big).
+\tag{6}
+$$
+
+**Lemma (schedule-invariance of $q^\phi$).** $\displaystyle\sum_z q^{\phi}(x, z) = q(x)$ for *every* $\phi$.
+
+*Proof.* For any fixed partition $z$, the chain rule gives $\prod_i q(x^{z_i} \mid x^{z_{<i}}) = q(x)$ — the true conditionals compose to the true joint no matter how you group and order the coordinates. Hence $q^{\phi}(x, z) = q(x) \prod_i \phi(z_i \mid x^{z_{<i}}, z_{<i})$, and summing the product of normalized conditionals $\phi$ over all $z$ (telescoping step by step, since each factor sums to 1 given its past) yields $q(x)$. $\blacksquare$
+
+This lemma is the family's correctness guarantee and the justification for using a *pretrained* MDM with *any* new sampler: if $p^\theta = q$ exactly, then by the same argument $\sum_z p^{\phi}(x,z) = q(x)$ for every $\phi$ — the zero-model-error optimum is shared across the entire family, so choosing $\phi$ is purely a question of how errors compound, not of what the target is. Note also how expressive the family is: Top-$k$ with any proxy, random-order unmasking, LLaDa's semi-autoregressive block sampling, and EB-Sampler are all particular (deterministic) choices of $\phi$.
+
+### Step 1: the ELBO-style bound
+
+We care about the mismatch between the data distribution and what the sampler actually produces, $p^{\phi}(x) = \sum_z p^{\phi}(x,z)$. The first move is standard but worth doing precisely. By the chain rule for KL divergence applied to the joint,
+
+$$
+D_{\mathrm{KL}}\big(q^{\phi}(x,z),\, p^{\phi}(x,z)\big)
+= D_{\mathrm{KL}}\big(q^{\phi}(x),\, p^{\phi}(x)\big)
++ \mathbb{E}_{q(x)}\Big[ D_{\mathrm{KL}}\big(q^{\phi}(z \mid x),\, p^{\phi}(z \mid x)\big) \Big],
+$$
+
+and since the lemma gives $q^{\phi}(x) = q(x)$ and the second term is non-negative,
+
+$$
+D_{\mathrm{KL}}\big(q(x),\, p^{\phi}(x)\big) \;\le\; D_{\mathrm{KL}}\big(q^{\phi}(x,z),\, p^{\phi}(x,z)\big).
+\tag{10a}
+$$
+
+This is the same maneuver that produces the ELBO in a VAE — bound an intractable marginal divergence by a tractable joint one. The joint divergence now factorizes beautifully: plugging (5) and (6) into the log-ratio, **the $\phi$ factors cancel** (they appear identically in both joints), leaving
+
+$$
+D_{\mathrm{KL}}\big(q^{\phi}(x,z),\, p^{\phi}(x,z)\big)
+= \sum_{i=1}^{d} \mathbb{E}_{q^{\phi}}\Bigg[ \ln q\big(x^{z_i} \mid x^{z_{<i}}\big) - \sum_{l \in z_i} \ln p^\theta\big(x^l \mid x^{z_{<i}}\big) \Bigg].
+\tag{10b}
+$$
+
+Each summand compares the *true joint* conditional of step $i$'s tokens against the *product of learned marginals* actually sampled — the two ways one step can go wrong, still entangled.
+
+### Step 2: the exact error decomposition
+
+**Theorem (error decomposition, Eq. 7 of the paper).**
+
+$$
+D_{\mathrm{KL}}\big(q^{\phi}, p^{\phi}\big)
+= \sum_{i=1}^{d} \mathbb{E}_{q^{\phi}}\Bigg[
+\underbrace{\sum_{l \in z_i} D_{\mathrm{KL}}\Big(q(x^l \mid x^{z_{<i}}),\, p^\theta(x^l \mid x^{z_{<i}})\Big)}_{\textbf{model error}}
+\;+\;
+\underbrace{D_{\mathrm{KL}}\Big(q(x^{z_i} \mid x^{z_{<i}}),\, \textstyle\prod_{l \in z_i} q(x^l \mid x^{z_{<i}})\Big)}_{\textbf{joint dependence error}}
+\Bigg].
+$$
+
+*Proof.* Add and subtract $\sum_{l \in z_i} \ln q(x^l \mid x^{z_{<i}})$ inside each summand of (10b):
+
+$$
+\ln q\big(x^{z_i} \mid x^{z_{<i}}\big) - \sum_{l \in z_i} \ln p^\theta\big(x^l \mid x^{z_{<i}}\big)
+= \sum_{l \in z_i} \ln \frac{q(x^l \mid x^{z_{<i}})}{p^\theta(x^l \mid x^{z_{<i}})}
++ \ln \frac{q(x^{z_i} \mid x^{z_{<i}})}{\prod_{l \in z_i} q(x^l \mid x^{z_{<i}})}.
+\tag{11}
+$$
+
+It remains to show each term's expectation under $q^{\phi}$ is the corresponding KL. Both reductions use the same two facts, so let me state them once:
+
+- **(∗) Irrelevant-coordinate marginalization.** The $i$-th summand depends only on $(z_{\le i}, x^{z_{\le i}})$, so the expectation over the full $q^{\phi}(x, z)$ collapses to one over $q^{\phi}(z_{\le i}, x^{z_{\le i}})$ — the future of the trajectory integrates out.
+- **(∗∗) The reference process samples true conditionals.** Under $q^{\phi}$, conditioned on the visible prefix and the choice history, the newly revealed tokens are distributed as the data conditional:
+$$
+q^{\phi}\big(x^{z_i} \mid x^{z_{<i}}, z_{\le i}\big) = q\big(x^{z_i} \mid x^{z_{<i}}\big).
+$$
+This is by construction in (6) — and it is *not* trivial: it holds because $\phi$ selects $z_i$ using only $(x^{z_{<i}}, z_{<i})$, never peeking at masked values, so conditioning on the choice $z_i$ adds no information about $x^{z_i}$ beyond the visible tokens. This measurability restriction on $\phi$ is where the family definition earns its keep.
+
+**Right term of (11) → joint dependence error.** By (∗), then splitting the expectation over $x^{z_i}$ via (∗∗):
+
+$$
+\mathbb{E}_{q^{\phi}}\!\left[ \ln \frac{q(x^{z_i} \mid x^{z_{<i}})}{\prod_l q(x^l \mid x^{z_{<i}})} \right]
+= \mathbb{E}_{q^{\phi}(z_{\le i},\, x^{z_{<i}})}\!\left[ \sum_{x^{z_i}} q\big(x^{z_i} \mid x^{z_{<i}}\big) \ln \frac{q(x^{z_i} \mid x^{z_{<i}})}{\prod_l q(x^l \mid x^{z_{<i}})} \right]
+= \mathbb{E}\Big[ D_{\mathrm{KL}}\Big(q(x^{z_i} \mid x^{z_{<i}}), \prod_l q(x^l \mid x^{z_{<i}})\Big) \Big].
+$$
+
+**Left term of (11) → model error.** Same two steps, plus one more marginalization (∗∗∗): the $l$-th log-ratio depends only on $x^l$, so summing $q(x^{z_i} \mid x^{z_{<i}})$ over the other coordinates of $z_i$ leaves the marginal $q(x^l \mid x^{z_{<i}})$:
+
+$$
+\mathbb{E}_{q^{\phi}}\!\left[ \sum_{l \in z_i} \ln \frac{q(x^l \mid x^{z_{<i}})}{p^\theta(x^l \mid x^{z_{<i}})} \right]
+= \mathbb{E}_{q^{\phi}(z_{\le i},\, x^{z_{<i}})}\!\left[ \sum_{l \in z_i} \sum_{x^l} q\big(x^l \mid x^{z_{<i}}\big) \ln \frac{q(x^l \mid x^{z_{<i}})}{p^\theta(x^l \mid x^{z_{<i}})} \right],
+$$
+
+which is the expected sum of per-token KLs. $\blacksquare$
+
+Pause on what this theorem buys. The two failure modes of parallel sampling — *my conditionals are wrong* and *these tokens aren't actually independent* — are not just intuitions; they are **orthogonal summands of an exact identity**. Model error is fixed by the checkpoint and the visited contexts; the sampler cannot reduce it, only route around its worst spots (that's what the error-proxy ordering attempts). Joint dependence error is entirely the sampler's creation: it vanishes for one-token-per-step sampling ($|z_i| = 1$ makes the joint equal the product, KL $= 0$) and is the *only* new error introduced by parallelism. A principled multi-token sampler must therefore (a) select low-model-error tokens and (b) budget the dependence term. EB-Sampler is (a) via the proxies, (b) via what comes next.
+
+### Step 3: bounding the dependence term by sum-minus-max of entropies
+
+**Proposition (Eq. 8 of the paper).** For any realized context $x^{z_{<i}}$, writing $H(q(x^l \mid x^{z_{<i}}))$ for the entropy of the true conditional of coordinate $l$,
+
+$$
+D_{\mathrm{KL}}\Big(q(x^{z_i} \mid x^{z_{<i}}),\, \prod_{l \in z_i} q(x^l \mid x^{z_{<i}})\Big)
+\;\le\; \sum_{l \in z_i} H\big(q(x^l \mid x^{z_{<i}})\big) - \max_{l \in z_i} H\big(q(x^l \mid x^{z_{<i}})\big).
+$$
+
+*Proof.* All entropies below are conditioned on the fixed realization $x^{z_{<i}}$; abbreviate the joint variable $X^{z_i}$ and its coordinates $X^l$. Expand the KL against the product of the joint's own marginals:
+
+$$
+D_{\mathrm{KL}}\Big(q(x^{z_i}),\, \prod_l q(x^l)\Big)
+= \sum_{x^{z_i}} q(x^{z_i}) \ln q(x^{z_i}) \;-\; \sum_{l \in z_i} \sum_{x^{z_i}} q(x^{z_i}) \ln q(x^l)
+= \sum_{l \in z_i} H(X^l) - H(X^{z_i}),
+$$
+
+where the cross term reduced coordinate-wise because $\sum_{x^{z_i}} q(x^{z_i}) \ln q(x^l) = \sum_{x^l} q(x^l) \ln q(x^l) = -H(X^l)$. This quantity is the (conditional) **total correlation** of the step's tokens. Now bound the joint entropy from below: for any $l_0 \in z_i$, $H(X^{z_i}) \ge H(X^{l_0})$ (a discrete joint carries at least as much entropy as any single coordinate, since $H(X^{z_i}) = H(X^{l_0}) + H(X^{z_i \setminus l_0} \mid X^{l_0})$ and conditional entropy is non-negative). Taking $l_0 = \arg\max_l H(X^l)$ gives $H(X^{z_i}) \ge \max_l H(X^l)$, and substituting yields the claim. $\blacksquare$
+
+Sanity checks that convinced me the bound is the *right* one and not merely *a* bound:
+
+- **Two tokens.** For $|z_i| = 2$ the total correlation is the mutual information $I(X^1; X^2)$ and sum-minus-max is $\min(H_1, H_2)$ — so the proposition specializes to the classical $I(X;Y) \le \min(H(X), H(Y))$, with equality iff one token is a deterministic function of the other. Tight, and achieved exactly in the "copied token" worst case.
+- **The free rider, again.** Any token with $H = 0$ changes neither the sum-minus-max (adds 0 to the sum) nor the true total correlation (a deterministic coordinate is independent of everything). The budget statistic treats forced tokens as exactly free *because they are*.
+- **Why not just the sum?** $\sum_l H_l$ alone also upper-bounds total correlation, but it charges you for unmasking even a single uncertain token — which introduces *zero* dependence error. Subtracting the max is what makes the bound (and the sampler) correctly refuse to penalize the one genuinely-being-decided token per step. The $-\max$ in the algorithm is the $H(X^{z_i}) \ge \max_l H_l$ step of the proof, no more and no less.
+
+### Step 4: the plug-in step — where exactness ends
+
+The bound above is in terms of entropies of the **true** conditionals $q$, which we don't have. The paper's final move: assume $\phi$ selects only tokens where model error is negligible, $p^\theta(x^l \mid x^{z_{<i}}) \approx q(x^l \mid x^{z_{<i}})$ for all $l \in z_i$ — this is precisely what sorting by the error proxy is trying to arrange. Then (i) the model-error summand of the theorem is $\approx 0$, and (ii) the entropies in the proposition can be evaluated under $p^\theta$ instead of $q$, giving the computable criterion (EB). The per-step error contribution is then $\lesssim \gamma$.
+
+Being precise about what's rigorous and what isn't — the part I most wanted to write down cleanly:
+
+1. **Exact:** the decomposition theorem (an identity) and the entropy bound (an inequality in $q$-quantities). No approximation anywhere.
+2. **Heuristic, empirically supported:** confidence/entropy/margin as proxies for local model error (Fact 1's Figure 2 is the evidence; there is no bound connecting proxy rank to KL).
+3. **Approximation, uncontrolled but controllable in principle:** swapping $H(q(\cdot))$ for $H(p^\theta(\cdot))$. Entropy is continuous in total variation (on a finite alphabet, $|H(p) - H(q)| \le \delta \ln(K-1) + h_b(\delta)$ for $\|p-q\|_{TV} = \delta$, by Fannes–Audenaert), and TV is controlled by the local model-error KL via Pinsker — so *if* the proxy really does pick low-KL tokens, the entropy swap is quantitatively safe. The paper leaves this chain implicit; it's the one place where "approximately bounds" is doing unacknowledged work, and I'd have liked a corollary stating it.
+
+### Coda: when is the ELBO bound an equality?
+
+Appendix A.1 closes a loop most sampling papers leave open: when does minimizing the tractable joint KL actually minimize the marginal KL we care about? Equality in (10a) holds iff $q^{\phi}(z \mid x) = p^{\phi}(z \mid x)$. Computing both posteriors from the lemma and (5):
+
+$$
+q^{\phi}(z \mid x) = \prod_{i=1}^{d} \phi\big(z_i \mid x^{z_{<i}}, z_{<i}\big),
+\qquad
+p^{\phi}(z \mid x) = \frac{\prod_{i=1}^{d} \prod_{l \in z_i} p^\theta(x^l \mid x^{z_{<i}})}{p^{\phi}(x)} \, q^{\phi}(z \mid x).
+$$
+
+The prefactor is the order-dependence of the *learned* conditionals: for the true $q$ the product over any schedule is $q(x)$ (chain rule), but for a learned $p^\theta$ different schedules compose to different joints — so the prefactor is generically $\neq 1$ and the bound is strict, *even for one-token-per-step sampling*. The exception: **deterministic $\phi$** (which covers Top-$k$ with deterministic tie-breaking, and EB-Sampler). Then $z = z_\phi(x)$ is a function of the sample, both posteriors are the same point mass, and
+
+$$
+D_{\mathrm{KL}}\big(q(x), p^{\phi}(x)\big) = D_{\mathrm{KL}}\big(q^{\phi}(x,z), p^{\phi}(x,z)\big)
+\quad\Longleftrightarrow\quad
+\mathbb{E}_q\big[\ln p^{\phi}(x)\big] = \mathbb{E}_{q^{\phi}}\big[\ln p^{\phi}(x, z_\phi(x))\big].
+$$
+
+So for the samplers people actually run, the error decomposition is not a loose surrogate — it *is* the likelihood objective, exactly. I find this a quietly important paragraph: it says the design target "minimize model error routing + dependence budget" is the true target, not an ELBO-shaped shadow of it.
+
+## Experiments: the honest 2–3×
+
+**Code and math (LLaDa 8B, Dream 7B; HumanEval, MBPP, GSM8K, MATH).** Across all eight model×benchmark pairs and both proxies, EB-Sampler sits on or above the Top-$k$ Pareto frontier of accuracy vs. NFE, with 2–4× fewer function evaluations than Top-1 at matched accuracy. The comparison is apples-to-apples: same checkpoints, same zero-temperature setting, the only change is the four lines.
+
+**The measurement methodology is a contribution in itself.** MDM evaluation conventionally generates all `max_gen_len` tokens (512 for MBPP) even when the answer needs ~50 — so naive NFE counts reward samplers for quickly generating tokens that get thrown away. The authors add a `generate_until` stopping logic (answer-complete when the stop phrase appears *and* everything before it is unmasked), and then notice a further bias: at $\gamma$ small the model happily continues unmasking *past* the stop phrase. Their Table 1 on MBPP with Dream 7B is the paper in microcosm: EB at $\gamma = 0.1$ reads as a **6.0×** speedup against full-length generation, **4.0×** under `generate_until`, and **3.05×** under `generate_until` + [semi-AR block generation](../block-diffusion-bd3lm/) — and the authors explicitly *decline to claim the 6×*, calling 2–3× the honest estimate (≈2.4 tokens per forward pass at equal pass@1). A results section that argues its own headline number *down* earns trust for everything else. It also surfaces a real open problem: MDMs burn compute on tokens nobody will read, and no current sampler fully avoids it.
+
+**Logic puzzles (6M-parameter DiT, 10×10 DFS mazes and 9×9 Sudoku).** The regime where the forced-cascade intuition is most literal. All error proxies perform near-identically; the difference is the *shape* of the degradation curve. Top-$k$ decays steadily as $k$ grows; EB-Sampler holds near-full accuracy down to ~10–15 NFE on Sudoku (89-token sequences — roughly 6–9 tokens per pass) and to under ~5 NFE on mazes before a sharp cliff. The cliff is exactly what the theory predicts: dependence in a constraint-satisfaction problem is not smoothly distributed — either your budget respects the constraint graph's forced structure or it starts guessing coupled cells independently, and there is no graceful middle.
+
+## My take
+
+The headline number is modest as 2025 acceleration papers go — speculative decoding bought comparable factors for ARMs years earlier — but I think this is the right paper to *study* in the MDM-efficiency line, for two reasons.
+
+First, it's the cleanest instance I know of a pattern worth internalizing: **an exact error decomposition, then one term attacked per mechanism.** The identity "total KL = model error + joint dependence error" does all the conceptual work. Once you have it, the algorithm designs itself: proxies route around the term you can't reduce; the entropy budget caps the term you create. Even the algorithm's oddest-looking detail — subtracting the max entropy — turns out to be a single inequality in the proof ($H_{\text{joint}} \ge \max_l H_l$) surfacing in the code. Compare Top-$k$, which in this framing is EB-Sampler with the budget replaced by "cardinality $= k$" — a constraint on a quantity the error decomposition never mentions. Of course it traces a worse Pareto curve; it's rationing the wrong resource.
+
+Second, the family formalism is more valuable than the sampler. Equations (5)–(6) give a clean design space — measurable unmasking policies $\phi$ over ordered partitions — with a correctness lemma (any $\phi$ is exact at zero model error), a shared objective (the decomposition), and an equality result for the deterministic members. LLaDa's semi-AR sampling, all the Top-$k$ variants, and EB are points in this space; the paper's own suggested future work (learn $\phi$ by optimizing the KL bound; extend to remasking) reads as a research agenda for the space rather than an add-on. My guess is the framework gets cited longer than the specific budget rule.
+
+The honest gaps, both acknowledged to differing degrees: the proxy step (rank by confidence/entropy/margin ⇒ low model error) is where the whole guarantee chain passes through an empirical observation, and a token that is confidently *wrong* — low entropy, high KL — sails under the budget at zero charge; the bound is only as good as the model's calibration, and the paper doesn't probe miscalibration at all. And the framework deliberately excludes remasking, so an early parallel mistake is permanent — the predictor-corrector line (e.g. ReMDM) is solving the complementary problem, and the natural combination (EB for width, remasking for repair) is unexplored. Neither gap undermines the paper; both are exactly the kind of open ends a good formalism is supposed to expose.
+
+## Related
+
+- **The paper:** Ben-Hamu et al. *Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking.* 2025 — [arXiv:2505.24857](https://arxiv.org/abs/2505.24857)
+- **The models it accelerates:** Nie et al. *LLaDA: Large Language Diffusion Models* — [arXiv:2502.09992](https://arxiv.org/abs/2502.09992); Ye et al. *Dream 7B* — [blog](https://hkunlp.github.io/blog/2025/dream)
+- **Why MDMs secretly model clean-data conditionals (the fact the whole family construction rests on):** Ou et al. — [arXiv:2406.03736](https://arxiv.org/abs/2406.03736)
+- **The semi-AR block scheme used in the NFE-bias analysis:** Arriola et al. *Block Diffusion* (BD3-LM), ICLR 2025 — [my review](../block-diffusion-bd3lm/)
+- **The complementary error-correction line (remasking, excluded here by design):** Wang et al. *ReMDM* — [arXiv:2503.00307](https://arxiv.org/abs/2503.00307)
+- **Non-adaptive counterpart (globally optimized fixed schedule vs. EB's per-step adaptivity):** Park et al. *Jump Your Steps* — [CoRR 2024](https://arxiv.org/abs/2410.07761)
