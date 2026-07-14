@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-07-14">
+<meta name="description" content="EB-Sampler asks: if a half-finished sequence already forces the values of several masked tokens, why spend one forward pass per token? A close read of the paper’s KL error decomposition — total error splits exactly into model error plus joint dependence error, the latter bounded by a sum-minus-max of entropies — worked through line by line, since the four-line algorithm is the theorem wearing a PyTorch costume.">
+
+<title>[Paper Review] Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking – Jiwoo Shin</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-85329ba1582bd894883eda7c9f3de3b0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="[Paper Review] Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking – Jiwoo Shin">
+<meta property="og:description" content="EB-Sampler asks: if a half-finished sequence already forces the values of several masked tokens, why spend one forward pass per token? A close read of the paper’s KL error decomposition — total error splits exactly into model error plus joint dependence error, the latter bounded by a sum-minus-max of entropies — worked through line by line, since the four-line algorithm is the theorem wearing a PyTorch costume.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/eb-sampler-entropy-bounded-unmasking/cover.png">
+<meta property="og:site_name" content="Jiwoo Shin">
+<meta property="og:image:height" content="460">
+<meta property="og:image:width" content="1460">
+<meta name="twitter:title" content="[Paper Review] Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking – Jiwoo Shin">
+<meta name="twitter:description" content="EB-Sampler asks: if a half-finished sequence already forces the values of several masked tokens, why spend one forward pass per token? A close read of the paper’s KL error decomposition — total error splits exactly into model error plus joint dependence error, the latter bounded by a sum-minus-max of entropies — worked through line by line, since the four-line algorithm is the theorem wearing a PyTorch costume.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/eb-sampler-entropy-bounded-unmasking/cover.png">
+<meta name="twitter:image-height" content="460">
+<meta name="twitter:image-width" content="1460">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const queryPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    const darkModeDefault = queryPrefersDark.matches;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    queryPrefersDark.addEventListener("change", e => {
+      if(window.localStorage.getItem("quarto-color-scheme") !== null)
+        return;
+      const alternate = e.matches
+      toggleColorMode(alternate);
+      localAlternateSentinel = e.matches ? 'alternate' : 'default'; // this is used alongside local storage!
+      toggleGiscusIfUsed(alternate, darkModeDefault);
+    });
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Notes to Self</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="https://jiwooshin-kr.github.io/"> 
+<span class="menu-text">About Me</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">[Paper Review] Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking</h1>
+                  <div>
+        <div class="description">
+          EB-Sampler asks: if a half-finished sequence already <em>forces</em> the values of several masked tokens, why spend one forward pass per token? A close read of the paper’s KL error decomposition — total error splits exactly into model error plus joint dependence error, the latter bounded by a sum-minus-max of entropies — worked through line by line, since the four-line algorithm is the theorem wearing a PyTorch costume.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Paper-Review</div>
+                <div class="quarto-category">Diffusion</div>
+                <div class="quarto-category">LLM</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Jiwoo Shin </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 14, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#setup-what-an-mdm-actually-learns" id="toc-setup-what-an-mdm-actually-learns" class="nav-link" data-scroll-target="#setup-what-an-mdm-actually-learns">Setup: what an MDM actually learns</a></li>
+  <li><a href="#the-eb-sampler-in-one-equation" id="toc-the-eb-sampler-in-one-equation" class="nav-link" data-scroll-target="#the-eb-sampler-in-one-equation">The EB-Sampler in one equation</a></li>
+  <li><a href="#the-math-adaptive-unmasking-samplers-with-proofs" id="toc-the-math-adaptive-unmasking-samplers-with-proofs" class="nav-link" data-scroll-target="#the-math-adaptive-unmasking-samplers-with-proofs">The math: adaptive unmasking samplers, with proofs</a>
+  <ul class="collapse">
+  <li><a href="#the-object-ordered-partitions-and-the-sampler-family" id="toc-the-object-ordered-partitions-and-the-sampler-family" class="nav-link" data-scroll-target="#the-object-ordered-partitions-and-the-sampler-family">The object: ordered partitions and the sampler family</a></li>
+  <li><a href="#step-1-the-elbo-style-bound" id="toc-step-1-the-elbo-style-bound" class="nav-link" data-scroll-target="#step-1-the-elbo-style-bound">Step 1: the ELBO-style bound</a></li>
+  <li><a href="#step-2-the-exact-error-decomposition" id="toc-step-2-the-exact-error-decomposition" class="nav-link" data-scroll-target="#step-2-the-exact-error-decomposition">Step 2: the exact error decomposition</a></li>
+  <li><a href="#step-3-bounding-the-dependence-term-by-sum-minus-max-of-entropies" id="toc-step-3-bounding-the-dependence-term-by-sum-minus-max-of-entropies" class="nav-link" data-scroll-target="#step-3-bounding-the-dependence-term-by-sum-minus-max-of-entropies">Step 3: bounding the dependence term by sum-minus-max of entropies</a></li>
+  <li><a href="#step-4-the-plug-in-step-where-exactness-ends" id="toc-step-4-the-plug-in-step-where-exactness-ends" class="nav-link" data-scroll-target="#step-4-the-plug-in-step-where-exactness-ends">Step 4: the plug-in step — where exactness ends</a></li>
+  <li><a href="#coda-when-is-the-elbo-bound-an-equality" id="toc-coda-when-is-the-elbo-bound-an-equality" class="nav-link" data-scroll-target="#coda-when-is-the-elbo-bound-an-equality">Coda: when is the ELBO bound an equality?</a></li>
+  </ul></li>
+  <li><a href="#experiments-the-honest-23" id="toc-experiments-the-honest-23" class="nav-link" data-scroll-target="#experiments-the-honest-23">Experiments: the honest 2–3×</a></li>
+  <li><a href="#my-take" id="toc-my-take" class="nav-link" data-scroll-target="#my-take">My take</a></li>
+  <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Heli Ben-Hamu, Itai Gat, Daniel Severo, Niklas Nolte, Brian Karrer (FAIR at Meta). <em>Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking.</em> 2025. <a href="https://arxiv.org/abs/2505.24857">arXiv:2505.24857</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Masked diffusion models (MDMs) like LLaDa and Dream match similarly sized autoregressive models on code and math — but only when sampled <strong>one token per forward pass</strong>, which forfeits the entire parallelism argument for diffusion. Unmasking a fixed <span class="math inline">\(k &gt; 1\)</span> tokens per step (Top-<span class="math inline">\(k\)</span>) degrades quality fast, because tokens sampled independently in the same step may in truth be strongly dependent. This paper’s observation is that the number of tokens you can <em>safely</em> unmask together is not a constant — it’s a property of the current state, and the model already tells you what it is: when several masked tokens are predicted with (near-)zero entropy, they are predicted to be (near-)deterministic given the context, hence (near-)independent of each other, hence free to unmask in parallel.</p>
+<p><strong>EB-Sampler</strong> turns this into a four-line change to existing samplers: sort masked positions by an error proxy (confidence/entropy/margin — exactly what LLaDa and Dream already use), then unmask the longest prefix whose predicted entropies satisfy <span class="math inline">\(\sum_l H_l - \max_l H_l \le \gamma\)</span>. The specific <em>sum-minus-max</em> form is not a heuristic: the paper proves total sampling error decomposes into <strong>model error</strong> plus <strong>joint dependence error</strong>, and sum-minus-max of entropies is a rigorous upper bound on the latter. The result is 2–3× fewer function evaluations on HumanEval/MBPP/GSM8K/MATH at equal accuracy, with no training, and near-lossless 5–8× step reductions on maze and Sudoku solvers. Since I want to actually <em>learn</em> the math in this one, the middle section works through the error decomposition and the entropy bound at full rigor — every marginalization step included.</p>
+<p>The metaphor for this paper is the one its own Sudoku experiment hands you. A cautious solver re-scans the whole grid after penciling in every single digit. A good solver knows that one deduction often forces a <em>cascade</em> of cells — and fills in the entire forced cascade before bothering to re-scan. Re-scanning is the expensive forward pass; the cascade is the set of low-entropy tokens; and <span class="math inline">\(\gamma\)</span> is how much non-forcedness you’re willing to tolerate per pass before you insist on looking at the board again.</p>
+</section>
+<section id="setup-what-an-mdm-actually-learns" class="level2">
+<h2 class="anchored" data-anchor-id="setup-what-an-mdm-actually-learns">Setup: what an MDM actually learns</h2>
+<p>Sequences live in <span class="math inline">\(\mathcal{S} = \mathcal{T}^d\)</span> with vocabulary <span class="math inline">\(\mathcal{T} = [K]\)</span>, index set <span class="math inline">\(I = [d]\)</span>, and an extra mask token <span class="math inline">\(m\)</span>. The key fact (Ou et al., 2025; Zheng et al., 2024) is that masked diffusion training — despite the diffusion framing — provably learns the <strong>clean-data conditionals</strong>: for every set of unmasked indices <span class="math inline">\(\bar{M} \subseteq I\)</span> and every masked position <span class="math inline">\(l\)</span>, the network outputs <span class="math inline">\(p^\theta(x^l \mid x^{\bar{M}})\)</span>, ideally equal to the true conditional <span class="math inline">\(q(x^l \mid x^{\bar{M}})\)</span> of the data distribution <span class="math inline">\(q\)</span>. One forward pass with full attention produces these factorized conditionals <em>for all masked positions at once</em> — that’s the resource the whole paper is about spending wisely.</p>
+<p>The baseline sampler unmasks one position at a time: pick an index, sample from its conditional, repeat <span class="math inline">\(d\)</span> times. Two facts about this procedure set up the problem.</p>
+<p><strong>Fact 1: order doesn’t matter for a perfect model, but no model is perfect.</strong> For the optimal predictor, the chain rule guarantees order-invariance: for any two unmasking permutations <span class="math inline">\(\sigma, \sigma'\)</span>,</p>
+<p><span class="math display">\[
+p^\theta_\sigma(x) = p^\theta_{\sigma'}(x), \qquad p^\theta_\sigma(x) = \prod_{l=1}^{d} p^\theta\!\left(x^{\sigma(l)} \,\middle|\, x^{\cup_{j&lt;l}\sigma(j)}\right).
+\]</span></p>
+<p>But a trained <span class="math inline">\(p^\theta\)</span> has <strong>local model error</strong> <span class="math inline">\(D_{\mathrm{KL}}\!\big(q(x^l \mid x^{\bar{M}}),\, p^\theta(x^l \mid x^{\bar{M}})\big) &gt; 0\)</span>, unevenly distributed across contexts and positions — so the total error of the sampled distribution <em>does</em> depend on the order. Empirically, model-chosen orders crush random ones: LLaDa 8B jumps from ~20% to ~40% on MBPP just by unmasking in a smart order. The orders that work are greedy on a per-token <strong>error proxy</strong>:</p>
+<p><span class="math display">\[
+\begin{aligned}
+\text{Confidence:}\quad &amp; l = \arg\max_{l' \in M} \big[\max_{x^{l'}} p^\theta(x^{l'} \mid x^{\bar{M}})\big] \\
+\text{Entropy:}\quad &amp; l = \arg\min_{l' \in M} \big[H(X^{l'} \mid X^{\bar{M}} = x^{\bar{M}})\big] \\
+\text{Margin:}\quad &amp; l = \arg\max_{l' \in M} \big[p^\theta(X^{l'}\!=y_1 \mid x^{\bar{M}}) - p^\theta(X^{l'}\!=y_2 \mid x^{\bar{M}})\big]
+\end{aligned}
+\]</span></p>
+<p>with <span class="math inline">\((y_1, y_2)\)</span> the top-2 predictions. None of these is a theorem — they’re empirical proxies for “where is my local model error small?” — but Figure 2 of the paper shows all three work and are nearly interchangeable.</p>
+<p><strong>Fact 2: fixed-<span class="math inline">\(k\)</span> parallel unmasking buys speed with a hidden currency.</strong> Top-<span class="math inline">\(k\)</span> samplers take the <span class="math inline">\(k\)</span> best positions under the proxy and sample them <em>independently</em> from their factorized conditionals. If those tokens are actually dependent under <span class="math inline">\(q\)</span> given the context, independent sampling is simply drawing from the wrong joint — the paper names this <strong>joint dependence error</strong>, and Figure 3 shows accuracy on MBPP collapsing as <span class="math inline">\(k\)</span> grows from 1 to 16. The failure isn’t that the model got worse; it’s that a <em>fixed</em> <span class="math inline">\(k\)</span> ignores that dependence varies wildly from state to state. Sometimes the grid forces twelve cells; sometimes it forces none.</p>
+</section>
+<section id="the-eb-sampler-in-one-equation" class="level2">
+<h2 class="anchored" data-anchor-id="the-eb-sampler-in-one-equation">The EB-Sampler in one equation</h2>
+<p>At each step, sort the masked positions ascending by error proxy (same as Top-<span class="math inline">\(k\)</span>), then choose the <strong>largest prefix</strong> <span class="math inline">\(U\)</span> of that order satisfying the entropy budget</p>
+<p><span class="math display">\[
+\sum_{l \in U} H\big(p^\theta(x^l \mid x^{\bar{M}})\big) \;-\; \max_{l \in U} H\big(p^\theta(x^l \mid x^{\bar{M}})\big) \;\le\; \gamma,
+\tag{EB}
+\]</span></p>
+<p>and sample every token in <span class="math inline">\(U\)</span> independently from its conditional. In PyTorch this is literally four added lines — compute per-token entropies in sorted order, take <code>cumsum</code> and <code>cummax</code>, and set <span class="math inline">\(k = \#\{\text{prefixes with } \texttt{cumsum} - \texttt{cummax} \le \gamma\}\)</span>.</p>
+<p>Three structural remarks that repay a moment of care:</p>
+<ul>
+<li><strong>The prefix rule is well-posed because the budget statistic is monotone.</strong> Let <span class="math inline">\(g(U) = \sum_{l\in U} H_l - \max_{l \in U} H_l\)</span> and extend the prefix by a token with entropy <span class="math inline">\(h\)</span>, with current sum <span class="math inline">\(S\)</span> and max <span class="math inline">\(M\)</span>. If <span class="math inline">\(h \le M\)</span> the statistic increases by <span class="math inline">\(h \ge 0\)</span>; if <span class="math inline">\(h &gt; M\)</span> it becomes <span class="math inline">\(S + h - h = S\)</span>, an increase of <span class="math inline">\(M \ge 0\)</span>. Either way <span class="math inline">\(g\)</span> is non-decreasing along the sorted order, so “the largest prefix under budget” is exactly what the single vectorized comparison <code>cumsum − cummax ≤ γ</code> computes — no search needed.</li>
+<li><strong>The <span class="math inline">\(-\max\)</span> term is the license to always make progress.</strong> For a singleton, <span class="math inline">\(g(\{l\}) = 0 \le \gamma\)</span> regardless of how uncertain the token is — so the sampler never stalls, and at <span class="math inline">\(\gamma = 0\)</span> it degenerates to (essentially) the one-token-per-step greedy sampler, except that any <em>exactly deterministic</em> tokens (<span class="math inline">\(H = 0\)</span>) still ride along for free. That free-rider clause is the paper’s opening observation formalized: tokens whose values are already forced by the visible context cost nothing to unmask, in the precise sense that they contribute nothing to the budget.</li>
+<li><strong><span class="math inline">\(\gamma\)</span> interpolates the whole spectrum</strong>: <span class="math inline">\(\gamma = 0\)</span> is one-real-token-per-step; <span class="math inline">\(\gamma = \infty\)</span> unmasks everything in a single evaluation. In between, the number of tokens per step is <em>adaptive</em>: many when the state is predicted simple, few when it’s predicted contentious. Compute concentrates exactly where the model claims the sequence is still undecided.</li>
+</ul>
+<p>The obvious question is why <em>this</em> statistic — why sum-minus-max of entropies rather than, say, sum, or max, or the product of confidences. That’s what the theory section answers, and it’s the part of the paper worth studying closely.</p>
+</section>
+<section id="the-math-adaptive-unmasking-samplers-with-proofs" class="level2">
+<h2 class="anchored" data-anchor-id="the-math-adaptive-unmasking-samplers-with-proofs">The math: adaptive unmasking samplers, with proofs</h2>
+<p>This section is Section 5 + Appendix A.1 of the paper, reconstructed with every step spelled out.</p>
+<section id="the-object-ordered-partitions-and-the-sampler-family" class="level3">
+<h3 class="anchored" data-anchor-id="the-object-ordered-partitions-and-the-sampler-family">The object: ordered partitions and the sampler family</h3>
+<p>A multi-token unmasking schedule is encoded as an <strong>ordered partition</strong> <span class="math inline">\(z = (z_1, \dots, z_d)\)</span> of the index set: <span class="math inline">\(\bigcup_i z_i = I\)</span>, <span class="math inline">\(z_i \cap z_j = \emptyset\)</span> for <span class="math inline">\(i \neq j\)</span>, where <span class="math inline">\(z_i \subseteq I\)</span> is the set of positions unmasked at step <span class="math inline">\(i\)</span> (padding with <span class="math inline">\(z_i = \emptyset\)</span> allowed, so every schedule fits in exactly <span class="math inline">\(d\)</span> slots). Write <span class="math inline">\(z_{&lt;i} = (z_1, \dots, z_{i-1})\)</span> and, for an ordered sub-partition <span class="math inline">\(s\)</span>, let <span class="math inline">\(x^s\)</span> denote the tokens at indices <span class="math inline">\(I_s = \bigcup_j s_j\)</span>.</p>
+<p>A <strong>sampler</strong> is a conditional distribution <span class="math inline">\(\phi(z_i \mid x^{z_{&lt;i}}, z_{&lt;i})\)</span>: given everything unmasked so far (both the <em>values</em> <span class="math inline">\(x^{z_{&lt;i}}\)</span> and the <em>history of choices</em> <span class="math inline">\(z_{&lt;i}\)</span>), it picks which set of positions to unmask next. WLOG <span class="math inline">\(\phi\)</span> picks <span class="math inline">\(z_i = \emptyset\)</span> only when everything is already unmasked. Running <span class="math inline">\(\phi\)</span> with the learned conditionals defines a joint distribution over (sequence, schedule):</p>
+<p><span class="math display">\[
+p^{\phi}(x, z) \;=\; \prod_{i=1}^{d} \Bigg( \prod_{l \in z_i} p^\theta\big(x^l \mid x^{z_{&lt;i}}\big) \Bigg)\, \phi\big(z_i \mid x^{z_{&lt;i}}, z_{&lt;i}\big),
+\tag{5}
+\]</span></p>
+<p>— the inner product over <span class="math inline">\(l \in z_i\)</span> is precisely the “sample this step’s tokens independently” operation. The idealized reference process replaces the independent learned conditionals with the <em>true joint</em> conditional:</p>
+<p><span class="math display">\[
+q^{\phi}(x, z) \;=\; \prod_{i=1}^{d} q\big(x^{z_i} \mid x^{z_{&lt;i}}\big)\, \phi\big(z_i \mid x^{z_{&lt;i}}, z_{&lt;i}\big).
+\tag{6}
+\]</span></p>
+<p><strong>Lemma (schedule-invariance of <span class="math inline">\(q^\phi\)</span>).</strong> <span class="math inline">\(\displaystyle\sum_z q^{\phi}(x, z) = q(x)\)</span> for <em>every</em> <span class="math inline">\(\phi\)</span>.</p>
+<p><em>Proof.</em> For any fixed partition <span class="math inline">\(z\)</span>, the chain rule gives <span class="math inline">\(\prod_i q(x^{z_i} \mid x^{z_{&lt;i}}) = q(x)\)</span> — the true conditionals compose to the true joint no matter how you group and order the coordinates. Hence <span class="math inline">\(q^{\phi}(x, z) = q(x) \prod_i \phi(z_i \mid x^{z_{&lt;i}}, z_{&lt;i})\)</span>, and summing the product of normalized conditionals <span class="math inline">\(\phi\)</span> over all <span class="math inline">\(z\)</span> (telescoping step by step, since each factor sums to 1 given its past) yields <span class="math inline">\(q(x)\)</span>. <span class="math inline">\(\blacksquare\)</span></p>
+<p>This lemma is the family’s correctness guarantee and the justification for using a <em>pretrained</em> MDM with <em>any</em> new sampler: if <span class="math inline">\(p^\theta = q\)</span> exactly, then by the same argument <span class="math inline">\(\sum_z p^{\phi}(x,z) = q(x)\)</span> for every <span class="math inline">\(\phi\)</span> — the zero-model-error optimum is shared across the entire family, so choosing <span class="math inline">\(\phi\)</span> is purely a question of how errors compound, not of what the target is. Note also how expressive the family is: Top-<span class="math inline">\(k\)</span> with any proxy, random-order unmasking, LLaDa’s semi-autoregressive block sampling, and EB-Sampler are all particular (deterministic) choices of <span class="math inline">\(\phi\)</span>.</p>
+</section>
+<section id="step-1-the-elbo-style-bound" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-the-elbo-style-bound">Step 1: the ELBO-style bound</h3>
+<p>We care about the mismatch between the data distribution and what the sampler actually produces, <span class="math inline">\(p^{\phi}(x) = \sum_z p^{\phi}(x,z)\)</span>. The first move is standard but worth doing precisely. By the chain rule for KL divergence applied to the joint,</p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}\big(q^{\phi}(x,z),\, p^{\phi}(x,z)\big)
+= D_{\mathrm{KL}}\big(q^{\phi}(x),\, p^{\phi}(x)\big)
++ \mathbb{E}_{q(x)}\Big[ D_{\mathrm{KL}}\big(q^{\phi}(z \mid x),\, p^{\phi}(z \mid x)\big) \Big],
+\]</span></p>
+<p>and since the lemma gives <span class="math inline">\(q^{\phi}(x) = q(x)\)</span> and the second term is non-negative,</p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}\big(q(x),\, p^{\phi}(x)\big) \;\le\; D_{\mathrm{KL}}\big(q^{\phi}(x,z),\, p^{\phi}(x,z)\big).
+\tag{10a}
+\]</span></p>
+<p>This is the same maneuver that produces the ELBO in a VAE — bound an intractable marginal divergence by a tractable joint one. The joint divergence now factorizes beautifully: plugging (5) and (6) into the log-ratio, <strong>the <span class="math inline">\(\phi\)</span> factors cancel</strong> (they appear identically in both joints), leaving</p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}\big(q^{\phi}(x,z),\, p^{\phi}(x,z)\big)
+= \sum_{i=1}^{d} \mathbb{E}_{q^{\phi}}\Bigg[ \ln q\big(x^{z_i} \mid x^{z_{&lt;i}}\big) - \sum_{l \in z_i} \ln p^\theta\big(x^l \mid x^{z_{&lt;i}}\big) \Bigg].
+\tag{10b}
+\]</span></p>
+<p>Each summand compares the <em>true joint</em> conditional of step <span class="math inline">\(i\)</span>’s tokens against the <em>product of learned marginals</em> actually sampled — the two ways one step can go wrong, still entangled.</p>
+</section>
+<section id="step-2-the-exact-error-decomposition" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-the-exact-error-decomposition">Step 2: the exact error decomposition</h3>
+<p><strong>Theorem (error decomposition, Eq. 7 of the paper).</strong></p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}\big(q^{\phi}, p^{\phi}\big)
+= \sum_{i=1}^{d} \mathbb{E}_{q^{\phi}}\Bigg[
+\underbrace{\sum_{l \in z_i} D_{\mathrm{KL}}\Big(q(x^l \mid x^{z_{&lt;i}}),\, p^\theta(x^l \mid x^{z_{&lt;i}})\Big)}_{\textbf{model error}}
+\;+\;
+\underbrace{D_{\mathrm{KL}}\Big(q(x^{z_i} \mid x^{z_{&lt;i}}),\, \textstyle\prod_{l \in z_i} q(x^l \mid x^{z_{&lt;i}})\Big)}_{\textbf{joint dependence error}}
+\Bigg].
+\]</span></p>
+<p><em>Proof.</em> Add and subtract <span class="math inline">\(\sum_{l \in z_i} \ln q(x^l \mid x^{z_{&lt;i}})\)</span> inside each summand of (10b):</p>
+<p><span class="math display">\[
+\ln q\big(x^{z_i} \mid x^{z_{&lt;i}}\big) - \sum_{l \in z_i} \ln p^\theta\big(x^l \mid x^{z_{&lt;i}}\big)
+= \sum_{l \in z_i} \ln \frac{q(x^l \mid x^{z_{&lt;i}})}{p^\theta(x^l \mid x^{z_{&lt;i}})}
++ \ln \frac{q(x^{z_i} \mid x^{z_{&lt;i}})}{\prod_{l \in z_i} q(x^l \mid x^{z_{&lt;i}})}.
+\tag{11}
+\]</span></p>
+<p>It remains to show each term’s expectation under <span class="math inline">\(q^{\phi}\)</span> is the corresponding KL. Both reductions use the same two facts, so let me state them once:</p>
+<ul>
+<li><strong>(∗) Irrelevant-coordinate marginalization.</strong> The <span class="math inline">\(i\)</span>-th summand depends only on <span class="math inline">\((z_{\le i}, x^{z_{\le i}})\)</span>, so the expectation over the full <span class="math inline">\(q^{\phi}(x, z)\)</span> collapses to one over <span class="math inline">\(q^{\phi}(z_{\le i}, x^{z_{\le i}})\)</span> — the future of the trajectory integrates out.</li>
+<li><strong>(∗∗) The reference process samples true conditionals.</strong> Under <span class="math inline">\(q^{\phi}\)</span>, conditioned on the visible prefix and the choice history, the newly revealed tokens are distributed as the data conditional: <span class="math display">\[
+q^{\phi}\big(x^{z_i} \mid x^{z_{&lt;i}}, z_{\le i}\big) = q\big(x^{z_i} \mid x^{z_{&lt;i}}\big).
+\]</span> This is by construction in (6) — and it is <em>not</em> trivial: it holds because <span class="math inline">\(\phi\)</span> selects <span class="math inline">\(z_i\)</span> using only <span class="math inline">\((x^{z_{&lt;i}}, z_{&lt;i})\)</span>, never peeking at masked values, so conditioning on the choice <span class="math inline">\(z_i\)</span> adds no information about <span class="math inline">\(x^{z_i}\)</span> beyond the visible tokens. This measurability restriction on <span class="math inline">\(\phi\)</span> is where the family definition earns its keep.</li>
+</ul>
+<p><strong>Right term of (11) → joint dependence error.</strong> By (∗), then splitting the expectation over <span class="math inline">\(x^{z_i}\)</span> via (∗∗):</p>
+<p><span class="math display">\[
+\mathbb{E}_{q^{\phi}}\!\left[ \ln \frac{q(x^{z_i} \mid x^{z_{&lt;i}})}{\prod_l q(x^l \mid x^{z_{&lt;i}})} \right]
+= \mathbb{E}_{q^{\phi}(z_{\le i},\, x^{z_{&lt;i}})}\!\left[ \sum_{x^{z_i}} q\big(x^{z_i} \mid x^{z_{&lt;i}}\big) \ln \frac{q(x^{z_i} \mid x^{z_{&lt;i}})}{\prod_l q(x^l \mid x^{z_{&lt;i}})} \right]
+= \mathbb{E}\Big[ D_{\mathrm{KL}}\Big(q(x^{z_i} \mid x^{z_{&lt;i}}), \prod_l q(x^l \mid x^{z_{&lt;i}})\Big) \Big].
+\]</span></p>
+<p><strong>Left term of (11) → model error.</strong> Same two steps, plus one more marginalization (∗∗∗): the <span class="math inline">\(l\)</span>-th log-ratio depends only on <span class="math inline">\(x^l\)</span>, so summing <span class="math inline">\(q(x^{z_i} \mid x^{z_{&lt;i}})\)</span> over the other coordinates of <span class="math inline">\(z_i\)</span> leaves the marginal <span class="math inline">\(q(x^l \mid x^{z_{&lt;i}})\)</span>:</p>
+<p><span class="math display">\[
+\mathbb{E}_{q^{\phi}}\!\left[ \sum_{l \in z_i} \ln \frac{q(x^l \mid x^{z_{&lt;i}})}{p^\theta(x^l \mid x^{z_{&lt;i}})} \right]
+= \mathbb{E}_{q^{\phi}(z_{\le i},\, x^{z_{&lt;i}})}\!\left[ \sum_{l \in z_i} \sum_{x^l} q\big(x^l \mid x^{z_{&lt;i}}\big) \ln \frac{q(x^l \mid x^{z_{&lt;i}})}{p^\theta(x^l \mid x^{z_{&lt;i}})} \right],
+\]</span></p>
+<p>which is the expected sum of per-token KLs. <span class="math inline">\(\blacksquare\)</span></p>
+<p>Pause on what this theorem buys. The two failure modes of parallel sampling — <em>my conditionals are wrong</em> and <em>these tokens aren’t actually independent</em> — are not just intuitions; they are <strong>orthogonal summands of an exact identity</strong>. Model error is fixed by the checkpoint and the visited contexts; the sampler cannot reduce it, only route around its worst spots (that’s what the error-proxy ordering attempts). Joint dependence error is entirely the sampler’s creation: it vanishes for one-token-per-step sampling (<span class="math inline">\(|z_i| = 1\)</span> makes the joint equal the product, KL <span class="math inline">\(= 0\)</span>) and is the <em>only</em> new error introduced by parallelism. A principled multi-token sampler must therefore (a) select low-model-error tokens and (b) budget the dependence term. EB-Sampler is (a) via the proxies, (b) via what comes next.</p>
+</section>
+<section id="step-3-bounding-the-dependence-term-by-sum-minus-max-of-entropies" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-bounding-the-dependence-term-by-sum-minus-max-of-entropies">Step 3: bounding the dependence term by sum-minus-max of entropies</h3>
+<p><strong>Proposition (Eq. 8 of the paper).</strong> For any realized context <span class="math inline">\(x^{z_{&lt;i}}\)</span>, writing <span class="math inline">\(H(q(x^l \mid x^{z_{&lt;i}}))\)</span> for the entropy of the true conditional of coordinate <span class="math inline">\(l\)</span>,</p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}\Big(q(x^{z_i} \mid x^{z_{&lt;i}}),\, \prod_{l \in z_i} q(x^l \mid x^{z_{&lt;i}})\Big)
+\;\le\; \sum_{l \in z_i} H\big(q(x^l \mid x^{z_{&lt;i}})\big) - \max_{l \in z_i} H\big(q(x^l \mid x^{z_{&lt;i}})\big).
+\]</span></p>
+<p><em>Proof.</em> All entropies below are conditioned on the fixed realization <span class="math inline">\(x^{z_{&lt;i}}\)</span>; abbreviate the joint variable <span class="math inline">\(X^{z_i}\)</span> and its coordinates <span class="math inline">\(X^l\)</span>. Expand the KL against the product of the joint’s own marginals:</p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}\Big(q(x^{z_i}),\, \prod_l q(x^l)\Big)
+= \sum_{x^{z_i}} q(x^{z_i}) \ln q(x^{z_i}) \;-\; \sum_{l \in z_i} \sum_{x^{z_i}} q(x^{z_i}) \ln q(x^l)
+= \sum_{l \in z_i} H(X^l) - H(X^{z_i}),
+\]</span></p>
+<p>where the cross term reduced coordinate-wise because <span class="math inline">\(\sum_{x^{z_i}} q(x^{z_i}) \ln q(x^l) = \sum_{x^l} q(x^l) \ln q(x^l) = -H(X^l)\)</span>. This quantity is the (conditional) <strong>total correlation</strong> of the step’s tokens. Now bound the joint entropy from below: for any <span class="math inline">\(l_0 \in z_i\)</span>, <span class="math inline">\(H(X^{z_i}) \ge H(X^{l_0})\)</span> (a discrete joint carries at least as much entropy as any single coordinate, since <span class="math inline">\(H(X^{z_i}) = H(X^{l_0}) + H(X^{z_i \setminus l_0} \mid X^{l_0})\)</span> and conditional entropy is non-negative). Taking <span class="math inline">\(l_0 = \arg\max_l H(X^l)\)</span> gives <span class="math inline">\(H(X^{z_i}) \ge \max_l H(X^l)\)</span>, and substituting yields the claim. <span class="math inline">\(\blacksquare\)</span></p>
+<p>Sanity checks that convinced me the bound is the <em>right</em> one and not merely <em>a</em> bound:</p>
+<ul>
+<li><strong>Two tokens.</strong> For <span class="math inline">\(|z_i| = 2\)</span> the total correlation is the mutual information <span class="math inline">\(I(X^1; X^2)\)</span> and sum-minus-max is <span class="math inline">\(\min(H_1, H_2)\)</span> — so the proposition specializes to the classical <span class="math inline">\(I(X;Y) \le \min(H(X), H(Y))\)</span>, with equality iff one token is a deterministic function of the other. Tight, and achieved exactly in the “copied token” worst case.</li>
+<li><strong>The free rider, again.</strong> Any token with <span class="math inline">\(H = 0\)</span> changes neither the sum-minus-max (adds 0 to the sum) nor the true total correlation (a deterministic coordinate is independent of everything). The budget statistic treats forced tokens as exactly free <em>because they are</em>.</li>
+<li><strong>Why not just the sum?</strong> <span class="math inline">\(\sum_l H_l\)</span> alone also upper-bounds total correlation, but it charges you for unmasking even a single uncertain token — which introduces <em>zero</em> dependence error. Subtracting the max is what makes the bound (and the sampler) correctly refuse to penalize the one genuinely-being-decided token per step. The <span class="math inline">\(-\max\)</span> in the algorithm is the <span class="math inline">\(H(X^{z_i}) \ge \max_l H_l\)</span> step of the proof, no more and no less.</li>
+</ul>
+</section>
+<section id="step-4-the-plug-in-step-where-exactness-ends" class="level3">
+<h3 class="anchored" data-anchor-id="step-4-the-plug-in-step-where-exactness-ends">Step 4: the plug-in step — where exactness ends</h3>
+<p>The bound above is in terms of entropies of the <strong>true</strong> conditionals <span class="math inline">\(q\)</span>, which we don’t have. The paper’s final move: assume <span class="math inline">\(\phi\)</span> selects only tokens where model error is negligible, <span class="math inline">\(p^\theta(x^l \mid x^{z_{&lt;i}}) \approx q(x^l \mid x^{z_{&lt;i}})\)</span> for all <span class="math inline">\(l \in z_i\)</span> — this is precisely what sorting by the error proxy is trying to arrange. Then (i) the model-error summand of the theorem is <span class="math inline">\(\approx 0\)</span>, and (ii) the entropies in the proposition can be evaluated under <span class="math inline">\(p^\theta\)</span> instead of <span class="math inline">\(q\)</span>, giving the computable criterion (EB). The per-step error contribution is then <span class="math inline">\(\lesssim \gamma\)</span>.</p>
+<p>Being precise about what’s rigorous and what isn’t — the part I most wanted to write down cleanly:</p>
+<ol type="1">
+<li><strong>Exact:</strong> the decomposition theorem (an identity) and the entropy bound (an inequality in <span class="math inline">\(q\)</span>-quantities). No approximation anywhere.</li>
+<li><strong>Heuristic, empirically supported:</strong> confidence/entropy/margin as proxies for local model error (Fact 1’s Figure 2 is the evidence; there is no bound connecting proxy rank to KL).</li>
+<li><strong>Approximation, uncontrolled but controllable in principle:</strong> swapping <span class="math inline">\(H(q(\cdot))\)</span> for <span class="math inline">\(H(p^\theta(\cdot))\)</span>. Entropy is continuous in total variation (on a finite alphabet, <span class="math inline">\(|H(p) - H(q)| \le \delta \ln(K-1) + h_b(\delta)\)</span> for <span class="math inline">\(\|p-q\|_{TV} = \delta\)</span>, by Fannes–Audenaert), and TV is controlled by the local model-error KL via Pinsker — so <em>if</em> the proxy really does pick low-KL tokens, the entropy swap is quantitatively safe. The paper leaves this chain implicit; it’s the one place where “approximately bounds” is doing unacknowledged work, and I’d have liked a corollary stating it.</li>
+</ol>
+</section>
+<section id="coda-when-is-the-elbo-bound-an-equality" class="level3">
+<h3 class="anchored" data-anchor-id="coda-when-is-the-elbo-bound-an-equality">Coda: when is the ELBO bound an equality?</h3>
+<p>Appendix A.1 closes a loop most sampling papers leave open: when does minimizing the tractable joint KL actually minimize the marginal KL we care about? Equality in (10a) holds iff <span class="math inline">\(q^{\phi}(z \mid x) = p^{\phi}(z \mid x)\)</span>. Computing both posteriors from the lemma and (5):</p>
+<p><span class="math display">\[
+q^{\phi}(z \mid x) = \prod_{i=1}^{d} \phi\big(z_i \mid x^{z_{&lt;i}}, z_{&lt;i}\big),
+\qquad
+p^{\phi}(z \mid x) = \frac{\prod_{i=1}^{d} \prod_{l \in z_i} p^\theta(x^l \mid x^{z_{&lt;i}})}{p^{\phi}(x)} \, q^{\phi}(z \mid x).
+\]</span></p>
+<p>The prefactor is the order-dependence of the <em>learned</em> conditionals: for the true <span class="math inline">\(q\)</span> the product over any schedule is <span class="math inline">\(q(x)\)</span> (chain rule), but for a learned <span class="math inline">\(p^\theta\)</span> different schedules compose to different joints — so the prefactor is generically <span class="math inline">\(\neq 1\)</span> and the bound is strict, <em>even for one-token-per-step sampling</em>. The exception: <strong>deterministic <span class="math inline">\(\phi\)</span></strong> (which covers Top-<span class="math inline">\(k\)</span> with deterministic tie-breaking, and EB-Sampler). Then <span class="math inline">\(z = z_\phi(x)\)</span> is a function of the sample, both posteriors are the same point mass, and</p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}\big(q(x), p^{\phi}(x)\big) = D_{\mathrm{KL}}\big(q^{\phi}(x,z), p^{\phi}(x,z)\big)
+\quad\Longleftrightarrow\quad
+\mathbb{E}_q\big[\ln p^{\phi}(x)\big] = \mathbb{E}_{q^{\phi}}\big[\ln p^{\phi}(x, z_\phi(x))\big].
+\]</span></p>
+<p>So for the samplers people actually run, the error decomposition is not a loose surrogate — it <em>is</em> the likelihood objective, exactly. I find this a quietly important paragraph: it says the design target “minimize model error routing + dependence budget” is the true target, not an ELBO-shaped shadow of it.</p>
+</section>
+</section>
+<section id="experiments-the-honest-23" class="level2">
+<h2 class="anchored" data-anchor-id="experiments-the-honest-23">Experiments: the honest 2–3×</h2>
+<p><strong>Code and math (LLaDa 8B, Dream 7B; HumanEval, MBPP, GSM8K, MATH).</strong> Across all eight model×benchmark pairs and both proxies, EB-Sampler sits on or above the Top-<span class="math inline">\(k\)</span> Pareto frontier of accuracy vs.&nbsp;NFE, with 2–4× fewer function evaluations than Top-1 at matched accuracy. The comparison is apples-to-apples: same checkpoints, same zero-temperature setting, the only change is the four lines.</p>
+<p><strong>The measurement methodology is a contribution in itself.</strong> MDM evaluation conventionally generates all <code>max_gen_len</code> tokens (512 for MBPP) even when the answer needs ~50 — so naive NFE counts reward samplers for quickly generating tokens that get thrown away. The authors add a <code>generate_until</code> stopping logic (answer-complete when the stop phrase appears <em>and</em> everything before it is unmasked), and then notice a further bias: at <span class="math inline">\(\gamma\)</span> small the model happily continues unmasking <em>past</em> the stop phrase. Their Table 1 on MBPP with Dream 7B is the paper in microcosm: EB at <span class="math inline">\(\gamma = 0.1\)</span> reads as a <strong>6.0×</strong> speedup against full-length generation, <strong>4.0×</strong> under <code>generate_until</code>, and <strong>3.05×</strong> under <code>generate_until</code> + <a href="../block-diffusion-bd3lm/">semi-AR block generation</a> — and the authors explicitly <em>decline to claim the 6×</em>, calling 2–3× the honest estimate (≈2.4 tokens per forward pass at equal pass@1). A results section that argues its own headline number <em>down</em> earns trust for everything else. It also surfaces a real open problem: MDMs burn compute on tokens nobody will read, and no current sampler fully avoids it.</p>
+<p><strong>Logic puzzles (6M-parameter DiT, 10×10 DFS mazes and 9×9 Sudoku).</strong> The regime where the forced-cascade intuition is most literal. All error proxies perform near-identically; the difference is the <em>shape</em> of the degradation curve. Top-<span class="math inline">\(k\)</span> decays steadily as <span class="math inline">\(k\)</span> grows; EB-Sampler holds near-full accuracy down to ~10–15 NFE on Sudoku (89-token sequences — roughly 6–9 tokens per pass) and to under ~5 NFE on mazes before a sharp cliff. The cliff is exactly what the theory predicts: dependence in a constraint-satisfaction problem is not smoothly distributed — either your budget respects the constraint graph’s forced structure or it starts guessing coupled cells independently, and there is no graceful middle.</p>
+</section>
+<section id="my-take" class="level2">
+<h2 class="anchored" data-anchor-id="my-take">My take</h2>
+<p>The headline number is modest as 2025 acceleration papers go — speculative decoding bought comparable factors for ARMs years earlier — but I think this is the right paper to <em>study</em> in the MDM-efficiency line, for two reasons.</p>
+<p>First, it’s the cleanest instance I know of a pattern worth internalizing: <strong>an exact error decomposition, then one term attacked per mechanism.</strong> The identity “total KL = model error + joint dependence error” does all the conceptual work. Once you have it, the algorithm designs itself: proxies route around the term you can’t reduce; the entropy budget caps the term you create. Even the algorithm’s oddest-looking detail — subtracting the max entropy — turns out to be a single inequality in the proof (<span class="math inline">\(H_{\text{joint}} \ge \max_l H_l\)</span>) surfacing in the code. Compare Top-<span class="math inline">\(k\)</span>, which in this framing is EB-Sampler with the budget replaced by “cardinality <span class="math inline">\(= k\)</span>” — a constraint on a quantity the error decomposition never mentions. Of course it traces a worse Pareto curve; it’s rationing the wrong resource.</p>
+<p>Second, the family formalism is more valuable than the sampler. Equations (5)–(6) give a clean design space — measurable unmasking policies <span class="math inline">\(\phi\)</span> over ordered partitions — with a correctness lemma (any <span class="math inline">\(\phi\)</span> is exact at zero model error), a shared objective (the decomposition), and an equality result for the deterministic members. LLaDa’s semi-AR sampling, all the Top-<span class="math inline">\(k\)</span> variants, and EB are points in this space; the paper’s own suggested future work (learn <span class="math inline">\(\phi\)</span> by optimizing the KL bound; extend to remasking) reads as a research agenda for the space rather than an add-on. My guess is the framework gets cited longer than the specific budget rule.</p>
+<p>The honest gaps, both acknowledged to differing degrees: the proxy step (rank by confidence/entropy/margin ⇒ low model error) is where the whole guarantee chain passes through an empirical observation, and a token that is confidently <em>wrong</em> — low entropy, high KL — sails under the budget at zero charge; the bound is only as good as the model’s calibration, and the paper doesn’t probe miscalibration at all. And the framework deliberately excludes remasking, so an early parallel mistake is permanent — the predictor-corrector line (e.g.&nbsp;ReMDM) is solving the complementary problem, and the natural combination (EB for width, remasking for repair) is unexplored. Neither gap undermines the paper; both are exactly the kind of open ends a good formalism is supposed to expose.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
+<ul>
+<li><strong>The paper:</strong> Ben-Hamu et al.&nbsp;<em>Accelerated Sampling from Masked Diffusion Models via Entropy Bounded Unmasking.</em> 2025 — <a href="https://arxiv.org/abs/2505.24857">arXiv:2505.24857</a></li>
+<li><strong>The models it accelerates:</strong> Nie et al.&nbsp;<em>LLaDA: Large Language Diffusion Models</em> — <a href="https://arxiv.org/abs/2502.09992">arXiv:2502.09992</a>; Ye et al.&nbsp;<em>Dream 7B</em> — <a href="https://hkunlp.github.io/blog/2025/dream">blog</a></li>
+<li><strong>Why MDMs secretly model clean-data conditionals (the fact the whole family construction rests on):</strong> Ou et al.&nbsp;— <a href="https://arxiv.org/abs/2406.03736">arXiv:2406.03736</a></li>
+<li><strong>The semi-AR block scheme used in the NFE-bias analysis:</strong> Arriola et al.&nbsp;<em>Block Diffusion</em> (BD3-LM), ICLR 2025 — <a href="../block-diffusion-bd3lm/">my review</a></li>
+<li><strong>The complementary error-correction line (remasking, excluded here by design):</strong> Wang et al.&nbsp;<em>ReMDM</em> — <a href="https://arxiv.org/abs/2503.00307">arXiv:2503.00307</a></li>
+<li><strong>Non-adaptive counterpart (globally optimized fixed schedule vs.&nbsp;EB’s per-step adaptivity):</strong> Park et al.&nbsp;<em>Jump Your Steps</em> — <a href="https://arxiv.org/abs/2410.07761">CoRR 2024</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+/* GoatCounter: visitor tracking + footer counter (Total / Today / Yesterday).
+   Setup: sign up at goatcounter.com, then put your site code below.
+   Also enable "Allow adding visitor counts on your website" in
+   GoatCounter Settings so the counter API is publicly readable. */
+(function () {
+  var GC_CODE = "jiwooshin";
+  if (GC_CODE.indexOf("GOATCOUNTER") === 0) return; // not configured yet
+  var site = "https://" + GC_CODE + ".goatcounter.com";
+
+  // tracking snippet
+  var s = document.createElement("script");
+  s.async = true;
+  s.src = "https://gc.zgo.at/count.js";
+  s.setAttribute("data-goatcounter", site + "/count");
+  document.head.appendChild(s);
+
+  // footer counter: runs after the DOM is ready (this script is injected
+  // before the footer markup exists)
+  var run = function () {
+    var footer = document.querySelector(".nav-footer");
+    if (!footer) return;
+    var slot = footer.querySelector(".nav-footer-right");
+    if (!slot) {
+      slot = document.createElement("div");
+      slot.className = "nav-footer-right";
+      footer.appendChild(slot);
+    }
+    var el = document.createElement("span");
+    el.className = "visitor-stats";
+    slot.appendChild(el);
+    var d2s = function (d) {
+      var p = function (n) { return String(n).padStart(2, "0"); };
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    };
+    var now = new Date();
+    var today = d2s(now);
+    var yest = d2s(new Date(now.getTime() - 864e5));
+    // GoatCounter caches counter responses for hours, and only recognized
+    // params (start/end) form the cache key. Rotating an ancient start date
+    // by hour gives fresh numbers (max ~1h stale) while sharing the cache
+    // within each hour. Note: "end" excludes that day, hence the subtraction.
+    var ancient = "2020-01-" + String(now.getHours() + 1).padStart(2, "0");
+    var get = function (qs) {
+      return fetch(site + "/counter/TOTAL.json" + qs)
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j) return null;
+          // unique visitors (sessions), not raw pageviews
+          var n = j.count_unique != null ? j.count_unique : j.count;
+          return parseInt(String(n).replace(/[^0-9]/g, ""), 10);
+        })
+        .catch(function () { return null; });
+    };
+    Promise.all([
+      get("?start=" + ancient),                      // all-time
+      get("?start=" + ancient + "&end=" + today),    // before today
+      get("?start=" + ancient + "&end=" + yest),     // before yesterday
+    ]).then(function (v) {
+      var total = v[0], beforeToday = v[1], beforeYest = v[2];
+      if (total == null || isNaN(total)) return;
+      var fmt = function (n) { return n == null || isNaN(n) || n < 0 ? "0" : String(n); };
+      var todayN = beforeToday == null ? null : total - beforeToday;
+      var yestN = beforeToday == null || beforeYest == null ? null : beforeToday - beforeYest;
+      el.textContent =
+        "Total " + total + " · Today " + fmt(todayN) + " · Yesterday " + fmt(yestN);
+    });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
+</script>
+<script>
+/* Prev/next + related posts, built from the home listing.
+   Runs on every post page; new posts are picked up automatically. */
+(async () => {
+  const offsetMeta = document.querySelector('meta[name="quarto:offset"]');
+  if (!offsetMeta) return;
+  const indexUrl = new URL(offsetMeta.content + "index.html", window.location.href);
+
+  let doc;
+  try {
+    const res = await fetch(indexUrl.href);
+    if (!res.ok) return;
+    doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  } catch (e) {
+    return;
+  }
+
+  const norm = (p) => p.replace(/index\.html$/, "");
+  const here = norm(window.location.pathname);
+
+  // listing is already sorted date-desc
+  const items = [...doc.querySelectorAll(".quarto-listing-default .quarto-post")]
+    .map((el) => {
+      const a = el.querySelector(".listing-title a");
+      if (!a) return null;
+      const url = new URL(a.getAttribute("href"), indexUrl);
+      let cats = [];
+      try {
+        cats = decodeURIComponent(atob(el.dataset.categories || "")).split(",").filter(Boolean);
+      } catch (e) {}
+      const img = el.querySelector(".thumbnail-image");
+      const dateEl = el.querySelector(".listing-date");
+      return {
+        href: url.href,
+        path: norm(url.pathname),
+        title: a.textContent.trim(),
+        date: dateEl ? dateEl.textContent.trim() : "",
+        image: img ? new URL(img.getAttribute("src"), indexUrl).href : null,
+        cats: cats,
+      };
+    })
+    .filter(Boolean);
+
+  const idx = items.findIndex((it) => it.path === here);
+  if (idx === -1 || items.length < 2) return;
+  const current = items[idx];
+  const newer = idx > 0 ? items[idx - 1] : null;
+  const older = idx < items.length - 1 ? items[idx + 1] : null;
+
+  // related: most shared categories first; ties keep date order
+  const related = items
+    .filter((_, i) => i !== idx)
+    .map((it) => ({ it, s: it.cats.filter((c) => current.cats.includes(c)).length }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 3)
+    .map((x) => x.it);
+
+  const esc = (s) =>
+    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const navItem = (post, cls, label) =>
+    post
+      ? `<a class="post-nav-item ${cls}" href="${post.href}">
+           <span class="post-nav-label">${label}</span>
+           <span class="post-nav-title">${esc(post.title)}</span>
+         </a>`
+      : `<span></span>`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "post-footer-nav";
+  wrap.innerHTML = `
+    <nav class="post-nav">
+      ${navItem(older, "post-nav-prev", "&larr; Older")}
+      ${navItem(newer, "post-nav-next", "Newer &rarr;")}
+    </nav>
+    ${
+      related.length
+        ? `<section class="related-posts">
+             <div class="related-posts-title">Related posts</div>
+             <div class="related-posts-grid">
+               ${related
+                 .map(
+                   (r) => `
+                 <a class="related-card" href="${r.href}">
+                   ${r.image ? `<img class="related-card-image" src="${r.image}" alt="">` : ""}
+                   <span class="related-card-title">${esc(r.title)}</span>
+                   <span class="related-card-date">${esc(r.date)}</span>
+                 </a>`
+                 )
+                 .join("")}
+             </div>
+           </section>`
+        : ""
+    }
+  `;
+
+  const main = document.getElementById("quarto-document-content");
+  if (main) main.appendChild(wrap);
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/jiwooshin-kr\.github\.io\/blog\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      if (authorPrefersDark) {
+          [baseTheme, altTheme] = [altTheme, baseTheme];
+      }
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "jiwooshin-kr/blog";
+    script.dataset.repoId = "R_kgDOTPVNpg";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDOTPVNps4DAq0B";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© 2026 Jiwoo Shin</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
