@@ -9,7 +9,7 @@ image: "fig2-teaser.png"
 
 > **Paper:** Michael Janner\*, Yilun Du\*, Joshua B. Tenenbaum, Sergey Levine. *Planning with Diffusion for Flexible Behavior Synthesis.* ICML 2022. [arXiv:2205.09991](https://arxiv.org/abs/2205.09991) · [PMLR](https://proceedings.mlr.press/v162/janner22a.html) · [Project page](https://diffusion-planning.github.io/) · [Code](https://github.com/jannerm/diffuser)
 
-![Figure 2 of the paper. Diffuser denoises a two-dimensional array of state-action pairs — one column per planning timestep — all at once. Each denoising step has only a local receptive field over time, so a single step enforces local consistency; stacking many steps produces globally coherent plans. An optional guide $\mathcal{J}$ biases samples toward high return. (Janner et al., 2022)](fig2-teaser.png){#fig-teaser fig-alt="Diagram of Diffuser denoising a two-dimensional array of states and actions across the planning horizon, with a local receptive field highlighted and a guide function J injected into the denoising process"}
+![](fig4-inpainting.png){width="816"}
 
 ## TL;DR
 
@@ -17,7 +17,7 @@ Model-based RL usually means: learn a one-step dynamics model, then hand it to a
 
 Two conditioning mechanisms make the samples useful for control, both borrowed from image diffusion: rewards enter as [classifier-guided sampling](https://arxiv.org/abs/2105.05233) (gradients of a learned return model nudge the denoising mean), and constraints — most importantly **the initial and final states of the trajectory** — enter as **inpainting**: the constrained entries of the array are simply overwritten with their fixed values after every denoising step, exactly like known pixels in image inpainting. That second mechanism is the answer to a question I had when reading: *can you fix where a generated trajectory starts and ends?* Here it is not a trick bolted on afterwards — it is how every plan is conditioned on the current state, and how goal-reaching is solved with zero reward signal. On the sparse-reward Maze2D benchmark, this start/goal inpainting alone scores **119.5** average (vs 47.0 for the best model-free baseline), and the same trained model transfers to randomized goals *without any retraining* — you just clamp a different terminal state.
 
-## Why this problem matters
+## Why this problem matter\$\$
 
 Trajectory optimization is the cleanest story in control: write down the objective, let the optimizer find the actions. But it needs ground-truth dynamics $s_{t+1} = f(s_t, a_t)$. The learning-based workaround — approximate $f$ with a neural network, plug it into the optimizer — fails in a characteristic way: powerful optimizers treat model error as opportunity, steering into regions where the learned model hallucinates high reward. So practical model-based RL retreated to weak gradient-free planners, or abandoned planning for value functions.
 
@@ -27,13 +27,11 @@ Diffuser's proposal: if the planner is going to be tightly coupled to the model 
 
 **Trajectories as arrays.** Diffuser represents a plan as a two-dimensional array — one column per planning timestep, states stacked on actions:
 
-$$
-\tau \;=\;
+$$\tau \;=\;
 \begin{bmatrix}
 s_0 & s_1 & \cdots & s_T \\
 a_0 & a_1 & \cdots & a_T
-\end{bmatrix}
-$$
+\end{bmatrix}$$
 
 The model learns $p_\theta(\tau)$ with a standard diffusion setup ([Sohl-Dickstein et al., 2015](https://arxiv.org/abs/1503.03585); [Ho et al., 2020](https://arxiv.org/abs/2006.11239)): a forward process corrupts trajectories with Gaussian noise over diffusion steps $i = 1,\dots,N$, and a learned reverse process $p_\theta(\tau^{i-1} \mid \tau^i)$ denoises them back. Training is the usual simplified $\epsilon$-prediction objective $\mathcal{L}(\theta) = \mathbb{E}_{i,\epsilon,\tau^0}\big[\lVert \epsilon - \epsilon_\theta(\tau^i, i)\rVert^2\big]$ with a [cosine noise schedule](https://arxiv.org/abs/2102.09672). Notation to keep straight: superscripts are *diffusion* time (noise level), subscripts are *planning* time.
 
@@ -47,26 +45,22 @@ The model learns $p_\theta(\tau)$ with a standard diffusion setup ([Sohl-Dickste
 
 Sampling from $p_\theta(\tau)$ gives *plausible* trajectories from anywhere to anywhere. Planning needs trajectories that satisfy conditions. Diffuser frames all conditioning as sampling from a perturbed distribution
 
-$$
-\tilde{p}_\theta(\tau) \;\propto\; p_\theta(\tau)\, h(\tau),
-$$
+$$\tilde{p}_\theta(\tau) \;\propto\; p_\theta(\tau)\, h(\tau),$$
 
 where $h(\tau)$ carries everything task-specific — and because the dynamics knowledge lives entirely in $p_\theta$, one trained model serves every task in the environment.
 
 The case I want to dwell on — and the reason I picked up this paper — is **hard state constraints: fixing where the trajectory begins and ends.** Section 3.3 observes that with the 2D-array trajectory representation, this is *literally* the inpainting problem from image diffusion: constrained states play the role of observed pixels, and the model must fill in everything else consistently. The perturbation function is a Dirac delta on the constrained entries — for a constraint $c_t$ at planning time $t$:
 
-$$
-h(\tau) \;=\; \delta_{c_t}(s_0, a_0, \dots, s_T, a_T) \;=\;
+$$h(\tau) \;=\; \delta_{c_t}(s_0, a_0, \dots, s_T, a_T) \;=\;
 \begin{cases}
 +\infty & \text{if } c_t = s_t \\
 0 & \text{otherwise}
-\end{cases}
-$$
+\end{cases}$$
 
 The implementation is disarmingly simple. At every denoising step $i \in \{N, \dots, 1\}$:
 
-1. sample $\tau^{i-1} \sim p_\theta(\tau^{i-1} \mid \tau^i)$ as usual;
-2. **overwrite the constrained entries with their fixed values** — for start/goal conditioning, $\tau_{s_0} \leftarrow s_{\text{current}}$ and $\tau_{s_T} \leftarrow s_{\text{goal}}$.
+1.  sample $\tau^{i-1} \sim p_\theta(\tau^{i-1} \mid \tau^i)$ as usual;
+2.  **overwrite the constrained entries with their fixed values** — for start/goal conditioning, $\tau_{s_0} \leftarrow s_{\text{current}}$ and $\tau_{s_T} \leftarrow s_{\text{goal}}$.
 
 Because the clamp is re-imposed after *every* step, the denoiser is repeatedly forced to reconcile the free middle of the trajectory with both fixed endpoints. The anti-causal, bidirectional receptive field is what lets the goal at $t{=}T$ shape the actions at $t{=}0$ — over the denoising iterations, boundary information diffuses inward through planning time until the inpainted middle is a dynamically consistent path connecting the two. Figure 4 makes this visual and is, for me, the most striking figure of the paper: red point-clouds of noise crystallize into a single path pinned at ⦿ and ★.
 
@@ -82,35 +76,33 @@ Three things worth underlining about this mechanism:
 
 For reward maximization, Diffuser ports [classifier-guided sampling](https://arxiv.org/abs/2105.05233) through the [control-as-inference](https://arxiv.org/abs/1805.00909) lens. Let $\mathcal{O}_t$ be the optimality variable with $p(\mathcal{O}_t = 1) = \exp(r(s_t, a_t))$; setting $h(\tau) = p(\mathcal{O}_{1:T} \mid \tau)$ turns RL into conditional sampling. When the guidance term is smooth, the guided reverse step is Gaussian with a shifted mean:
 
-$$
-p_\theta(\tau^{i-1} \mid \tau^i, \mathcal{O}_{1:T}) \;\approx\; \mathcal{N}\!\big(\tau^{i-1};\; \mu + \alpha\Sigma\,\nabla\mathcal{J}(\mu),\; \Sigma^i\big)
-$$
+$$p_\theta(\tau^{i-1} \mid \tau^i, \mathcal{O}_{1:T}) \;\approx\; \mathcal{N}\!\big(\tau^{i-1};\; \mu + \alpha\Sigma\,\nabla\mathcal{J}(\mu),\; \Sigma^i\big)$$
 
 where $\mathcal{J}_\phi$ is a separately trained return predictor on noisy trajectories, standing in for the image-domain classifier. Guidance and inpainting compose in the same loop — shift the mean by $\alpha\Sigma\nabla\mathcal{J}$, sample, clamp $\tau_{s_0}$, repeat — and multiple guides can be *added* (task compositionality, Figure 3d: a reward function never seen during training steers the same model at test time). Execution is receding-horizon: plan, execute the first action, observe, replan.
 
 ## Experiments
 
-**Long-horizon sparse reward (Maze2D / Multi2D).** Reward is 1 only at the goal, hundreds of steps away — a credit-assignment nightmare for model-free RL. Diffuser plans by pure start/goal inpainting (no reward guidance at all) and scores 113.9–123.0 across maze sizes (>100 = better than the reference expert), vs 47.0 average for [IQL](https://arxiv.org/abs/2110.06169) and worse for [CQL](https://arxiv.org/abs/2006.04779) and [MPPI](https://arxiv.org/abs/1509.01149) — the latter *with ground-truth dynamics*, which neatly isolates planning difficulty from model error. In the multi-goal variant, IQL (with hindsight relabeling) drops to 16.9 while Diffuser holds at 129.4, unchanged, because retargeting is just a different clamp.
+**Long-horizon sparse reward (Maze2D / Multi2D).** Reward is 1 only at the goal, hundreds of steps away — a credit-assignment nightmare for model-free RL. Diffuser plans by pure start/goal inpainting (no reward guidance at all) and scores 113.9–123.0 across maze sizes (\>100 = better than the reference expert), vs 47.0 average for [IQL](https://arxiv.org/abs/2110.06169) and worse for [CQL](https://arxiv.org/abs/2006.04779) and [MPPI](https://arxiv.org/abs/1509.01149) — the latter *with ground-truth dynamics*, which neatly isolates planning difficulty from model error. In the multi-goal variant, IQL (with hindsight relabeling) drops to 16.9 while Diffuser holds at 129.4, unchanged, because retargeting is just a different clamp.
 
 **Test-time flexibility (block stacking).** One model trained on [PDDLStream](https://arxiv.org/abs/1802.08705) demonstrations handles three tasks by swapping $h(\tau)$: unconditional stacking (no perturbation), conditional stacking and rearrangement (a final-state-matching guide composed with an end-effector contact constraint). Diffuser averages 54.4 where goal-conditioned [BCQ](https://arxiv.org/abs/1812.02900) and CQL score 0.0 — the conditional settings simply break the model-free baselines.
 
 **Offline locomotion (D4RL).** On the [D4RL](https://arxiv.org/abs/2004.07219) MuJoCo suite with reward guidance, Diffuser averages 77.5 — on par with the best purpose-built single-task methods (CQL 77.6, IQL 77.0, [Trajectory Transformer](https://arxiv.org/abs/2106.02039) 78.9, beating [Decision Transformer](https://arxiv.org/abs/2106.01345) 74.7). A telling ablation: using Diffuser merely as a *dynamics model* inside MPPI performs no better than random — the value is in the coupled model-planner, not in prediction accuracy.
 
-**Speed, the honest caveat.** Iterative denoising per plan is slow. Warm-starting helps a lot: re-noise the previous timestep's plan a few steps and re-denoise, cutting the budget ~10× with only a modest score drop (Figure 7). Still, this is 2022-era diffusion sampling — slow relative to a policy forward pass.
+**Speed, the honest caveat.** Iterative denoising per plan is slow. Warm-starting helps a lot: re-noise the previous timestep's plan a few steps and re-denoise, cutting the budget \~10× with only a modest score drop (Figure 7). Still, this is 2022-era diffusion sampling — slow relative to a policy forward pass.
 
 ## Strengths
 
-1. **A genuinely new abstraction for planning.** "Sampling = planning" is not a slogan here — the planner *is* the sampler plus a perturbation function. This eliminates the model-exploitation failure mode by construction: there is no outer-loop optimizer to adversarially probe the model.
-2. **Conditioning by inpainting is elegant and exactly right for goal-reaching.** Hard endpoint constraints, zero retraining, task retargeting by changing one clamped value, and it *is* the Maze2D result — the paper's biggest margin comes from its simplest mechanism.
-3. **The anti-causality argument.** The observation that control is anti-causal while autoregressive models are causal is a crisp, transferable insight that justifies the whole non-autoregressive design — and predicts exactly which problems (goal-conditioned, sparse-reward, long-horizon) diffusion planners should win.
-4. **Compositionality demonstrated, not just claimed.** Trajectory stitching (3b), variable horizons (3c), unseen rewards (3d), and constraint composition in block stacking are each backed by an experiment.
+1.  **A genuinely new abstraction for planning.** "Sampling = planning" is not a slogan here — the planner *is* the sampler plus a perturbation function. This eliminates the model-exploitation failure mode by construction: there is no outer-loop optimizer to adversarially probe the model.
+2.  **Conditioning by inpainting is elegant and exactly right for goal-reaching.** Hard endpoint constraints, zero retraining, task retargeting by changing one clamped value, and it *is* the Maze2D result — the paper's biggest margin comes from its simplest mechanism.
+3.  **The anti-causality argument.** The observation that control is anti-causal while autoregressive models are causal is a crisp, transferable insight that justifies the whole non-autoregressive design — and predicts exactly which problems (goal-conditioned, sparse-reward, long-horizon) diffusion planners should win.
+4.  **Compositionality demonstrated, not just claimed.** Trajectory stitching (3b), variable horizons (3c), unseen rewards (3d), and constraint composition in block stacking are each backed by an experiment.
 
 ## Weaknesses / open questions
 
-1. **Feasibility of inpainted plans is distributional, not guaranteed.** Clamping makes the endpoints appear; nothing certifies the middle respects dynamics or obstacles when conditions leave the data manifold. Plans are also executed open-loop in Maze2D — fine there, fragile in general.
-2. **Reward guidance is the weaker of the two mechanisms.** On D4RL, Diffuser only matches model-free baselines, and $\mathcal{J}_\phi$ must be trained per reward on *noisy* trajectories — a somewhat awkward object. Later work (classifier-free variants like [Decision Diffuser](https://arxiv.org/abs/2211.15657)) largely replaced it.
-3. **Sampling cost.** Even warm-started, denoising-per-decision is orders of magnitude more expensive than a policy. The paper is upfront about this; it remains the main deployment barrier for this family.
-4. **Low-dimensional states only.** Everything here is proprioceptive/planar state; image-based control is untouched (and the temporal-U-Net-over-state-vectors design doesn't obviously transfer).
+1.  **Feasibility of inpainted plans is distributional, not guaranteed.** Clamping makes the endpoints appear; nothing certifies the middle respects dynamics or obstacles when conditions leave the data manifold. Plans are also executed open-loop in Maze2D — fine there, fragile in general.
+2.  **Reward guidance is the weaker of the two mechanisms.** On D4RL, Diffuser only matches model-free baselines, and $\mathcal{J}_\phi$ must be trained per reward on *noisy* trajectories — a somewhat awkward object. Later work (classifier-free variants like [Decision Diffuser](https://arxiv.org/abs/2211.15657)) largely replaced it.
+3.  **Sampling cost.** Even warm-started, denoising-per-decision is orders of magnitude more expensive than a policy. The paper is upfront about this; it remains the main deployment barrier for this family.
+4.  **Low-dimensional states only.** Everything here is proprioceptive/planar state; image-based control is untouched (and the temporal-U-Net-over-state-vectors design doesn't obviously transfer).
 
 ## My take
 
