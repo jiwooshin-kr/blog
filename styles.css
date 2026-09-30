@@ -733,6 +733,68 @@ body:has(.quarto-title-banner) #quarto-content > .giscus {
   font-size: 0.8rem;
 }
 
+/* ---- external link preview card ---- */
+
+.link-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: inherit;
+  display: flex;
+  margin: 1.1rem 0;
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.link-card:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.link-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.9rem 1.05rem;
+}
+
+.link-card-site {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.link-card-title {
+  color: var(--ink);
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.link-card:hover .link-card-title {
+  color: var(--accent);
+}
+
+.link-card-desc {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--ink-2);
+  display: -webkit-box;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  overflow: hidden;
+}
+
+.link-card-image {
+  align-self: stretch;
+  border-left: 1px solid var(--line);
+  flex: 0 0 9.5rem;
+  object-fit: cover;
+  width: 9.5rem;
+}
+
 /* ---- article body ---- */
 
 #quarto-document-content {
@@ -961,5 +1023,17 @@ body .nav-footer {
 
   .related-posts-grid {
     grid-template-columns: 1fr;
+  }
+
+  .link-card {
+    flex-direction: column-reverse;
+  }
+
+  .link-card-image {
+    border-bottom: 1px solid var(--line);
+    border-left: 0;
+    flex: none;
+    height: 8rem;
+    width: 100%;
   }
 }

@@ -2,15 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
-      "/posts/eb-sampler-entropy-bounded-unmasking/index.html",
-      "/posts/revise-dont-freeze-self-correcting-mdlm/index.html",
-      "/posts/block-diffusion-bd3lm/index.html",
-      "/posts/coconut-continuous-latent-reasoning/index.html",
-      "/posts/diffusion-gemma-uniform-state/index.html",
-      "/posts/diffuser-planning/index.html",
-      "/posts/safe-denoiser/index.html",
-      "/posts/safety-aware-denoiser/index.html",
-      "/posts/safety-guided-flow/index.html"
+      "/posts/2026-08-30-first-note/index.html"
     ]
   }
 ]
