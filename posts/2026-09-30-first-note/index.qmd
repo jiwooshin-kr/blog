@@ -39,6 +39,12 @@ AI가 글을 잘 작성해 주는 시대에 직접 글을 쓰는 것이, 어쩌�
 이 주제를 보자마자 "아, 이거 풀어보고 싶은 문제다"라는 생각을 하게 됐습니다.
 이것이 제가 처음 safe generation이라는 주제에 관심을 갖게 된 계기였고, 이후 관련 연구를 진행해 아래 논문들을 게재할 수 있었습니다.
 
+::: {layout-ncol="2"}
+![](images/flight.jpg)
+
+![](images/neurips.jpg)
+:::
+
 <a class="link-card" href="https://arxiv.org/abs/2510.24012" target="_blank" rel="noopener">
 <span class="link-card-body">
 <span class="link-card-site">NeurIPS 2025</span>
@@ -57,6 +63,12 @@ Safe generation 분야의 논문을 찾아보던 중, University of British Colu
 마침 한국에서 열린 ICML 2026에 교수님께서 참여하신다는 것을 알게 되어 메일을 드렸고, 흔쾌히 만나 주셔서 20~30분 정도 연구에 대한 이야기를 나눌 수 있었습니다.
 그 과정에서 교수님께서 연구 협업을 제안해 주셨고, 지난 여름방학 동안 단기 협업을 진행해 그 결과를 ICLR 2027에 제출하였습니다.
 아직 보완할 부분이 많이 보이는 만큼, 리부탈을 잘 준비하면서 더 많이 배우고 성장하고 싶습니다.
+
+::: {layout="[42,58]"}
+![](images/prof-mijungpark.jpg){fig-alt="커피챗 약속을 잡은 이메일"}
+
+![](images/ubc-coworking.jpg){fig-alt="화상 회의로 진행한 코워킹 화면"}
+:::
 
 ## 이번 학기 목표
 
