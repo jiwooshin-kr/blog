@@ -753,8 +753,10 @@ body:has(.quarto-title-banner) #quarto-content > .giscus {
 
 .link-card-body {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.3rem;
+  justify-content: center;
   min-width: 0;
   padding: 0.9rem 1.05rem;
 }
