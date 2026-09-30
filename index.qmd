@@ -59,7 +59,7 @@ Total posts <span id="post-count-number"></span>
 
 **Jiwoo Shin**
 
-Incoming M.S. student at KAIST Graduate School of AI.
+M.S. student at KAIST Graduate School of AI.
 
 Notes on AI research, papers, and everyday things I want to remember.
 
