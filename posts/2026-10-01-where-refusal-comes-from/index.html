@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-10-01">
+<meta name="description" content="Refusing a benign request is a real cost, not a free safety margin. What the evidence says about where in the pipeline the refusal decision is actually made — and why models refuse the topic rather than the intent.">
+
+<title>[Safety] Where Does a Refusal Come From? – Jiwoo Shin</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="[Safety] Where Does a Refusal Come From? – Jiwoo Shin">
+<meta property="og:description" content="Refusing a benign request is a real cost, not a free safety margin. What the evidence says about where in the pipeline the refusal decision is actually made — and why models refuse the topic rather than the intent.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-where-refusal-comes-from/profile.jpg">
+<meta property="og:site_name" content="Jiwoo Shin">
+<meta name="twitter:title" content="[Safety] Where Does a Refusal Come From? – Jiwoo Shin">
+<meta name="twitter:description" content="Refusing a benign request is a real cost, not a free safety margin. What the evidence says about where in the pipeline the refusal decision is actually made — and why models refuse the topic rather than the intent.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-where-refusal-comes-from/profile.jpg">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const queryPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    const darkModeDefault = queryPrefersDark.matches;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    queryPrefersDark.addEventListener("change", e => {
+      if(window.localStorage.getItem("quarto-color-scheme") !== null)
+        return;
+      const alternate = e.matches
+      toggleColorMode(alternate);
+      localAlternateSentinel = e.matches ? 'alternate' : 'default'; // this is used alongside local storage!
+      toggleGiscusIfUsed(alternate, darkModeDefault);
+    });
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Notes to Self</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="https://jiwooshin-kr.github.io/"> 
+<span class="menu-text">About Me</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">[Safety] Where Does a Refusal Come From?</h1>
+                  <div>
+        <div class="description">
+          Refusing a benign request is a real cost, not a free safety margin. What the evidence says about where in the pipeline the refusal decision is actually made — and why models refuse the topic rather than the intent.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Safety</div>
+                <div class="quarto-category">Refusal</div>
+                <div class="quarto-category">LLM</div>
+                <div class="quarto-category">Interpretability</div>
+                <div class="quarto-category">Survey</div>
+                <div class="quarto-category">AI-Assisted</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Jiwoo Shin </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">October 1, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-argument-in-one-paragraph" id="toc-the-argument-in-one-paragraph" class="nav-link active" data-scroll-target="#the-argument-in-one-paragraph">The argument in one paragraph</a></li>
+  <li><a href="#the-cost-is-not-small" id="toc-the-cost-is-not-small" class="nav-link" data-scroll-target="#the-cost-is-not-small">1. The cost is not small</a></li>
+  <li><a href="#where-is-the-decision-made" id="toc-where-is-the-decision-made" class="nav-link" data-scroll-target="#where-is-the-decision-made">2. Where is the decision made?</a>
+  <ul class="collapse">
+  <li><a href="#a.-while-reading-the-prompt" id="toc-a.-while-reading-the-prompt" class="nav-link" data-scroll-target="#a.-while-reading-the-prompt">2a. While reading the prompt</a></li>
+  <li><a href="#b.-at-the-first-generated-token" id="toc-b.-at-the-first-generated-token" class="nav-link" data-scroll-target="#b.-at-the-first-generated-token">2b. At the first generated token</a></li>
+  <li><a href="#c.-during-the-chain-of-thought" id="toc-c.-during-the-chain-of-thought" class="nav-link" data-scroll-target="#c.-during-the-chain-of-thought">2c. During the chain of thought</a></li>
+  </ul></li>
+  <li><a href="#judging-and-behaving-are-not-the-same-thing" id="toc-judging-and-behaving-are-not-the-same-thing" class="nav-link" data-scroll-target="#judging-and-behaving-are-not-the-same-thing">3. Judging and behaving are not the same thing</a></li>
+  <li><a href="#what-the-model-is-actually-reacting-to" id="toc-what-the-model-is-actually-reacting-to" class="nav-link" data-scroll-target="#what-the-model-is-actually-reacting-to">4. What the model is actually reacting to</a></li>
+  <li><a href="#fixes-by-where-they-intervene" id="toc-fixes-by-where-they-intervene" class="nav-link" data-scroll-target="#fixes-by-where-they-intervene">5. Fixes, by where they intervene</a></li>
+  <li><a href="#takeaways" id="toc-takeaways" class="nav-link" data-scroll-target="#takeaways">Takeaways</a></li>
+  <li><a href="#korean" id="toc-korean" class="nav-link" data-scroll-target="#korean">한국어 버전</a>
+  <ul class="collapse">
+  <li><a href="#한-문단-요약" id="toc-한-문단-요약" class="nav-link" data-scroll-target="#한-문단-요약">한 문단 요약</a></li>
+  <li><a href="#비용은-작지-않다" id="toc-비용은-작지-않다" class="nav-link" data-scroll-target="#비용은-작지-않다">1. 비용은 작지 않다</a></li>
+  <li><a href="#결정은-어디에서-내려지는가" id="toc-결정은-어디에서-내려지는가" class="nav-link" data-scroll-target="#결정은-어디에서-내려지는가">2. 결정은 어디에서 내려지는가</a>
+  <ul class="collapse">
+  <li><a href="#a.-프롬프트를-읽는-동안" id="toc-a.-프롬프트를-읽는-동안" class="nav-link" data-scroll-target="#a.-프롬프트를-읽는-동안">2a. 프롬프트를 읽는 동안</a></li>
+  <li><a href="#b.-첫-생성-토큰에서" id="toc-b.-첫-생성-토큰에서" class="nav-link" data-scroll-target="#b.-첫-생성-토큰에서">2b. 첫 생성 토큰에서</a></li>
+  <li><a href="#c.-chain-of-thought-도중" id="toc-c.-chain-of-thought-도중" class="nav-link" data-scroll-target="#c.-chain-of-thought-도중">2c. Chain of thought 도중</a></li>
+  </ul></li>
+  <li><a href="#판단하는-것과-행동하는-것은-다르다" id="toc-판단하는-것과-행동하는-것은-다르다" class="nav-link" data-scroll-target="#판단하는-것과-행동하는-것은-다르다">3. 판단하는 것과 행동하는 것은 다르다</a></li>
+  <li><a href="#모델이-실제로-반응하는-대상" id="toc-모델이-실제로-반응하는-대상" class="nav-link" data-scroll-target="#모델이-실제로-반응하는-대상">4. 모델이 실제로 반응하는 대상</a></li>
+  <li><a href="#해결책-개입-지점별로" id="toc-해결책-개입-지점별로" class="nav-link" data-scroll-target="#해결책-개입-지점별로">5. 해결책, 개입 지점별로</a></li>
+  <li><a href="#정리" id="toc-정리" class="nav-link" data-scroll-target="#정리">정리</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>AI-assisted post.</strong> I set the question, the scope and the framing. The literature search, citation checks and first draft were done with the help of Claude.</p>
+</div>
+</div>
+</div>
+<section id="the-argument-in-one-paragraph" class="level2">
+<h2 class="anchored" data-anchor-id="the-argument-in-one-paragraph">The argument in one paragraph</h2>
+<p>Safety work usually counts the harmful outputs a model produces. It much less often counts the benign requests it refuses. Both are errors, and only one of them is visible to the user who actually gets hurt by it: someone asking an ordinary question and being told no. The interesting part is <em>where</em> that no comes from. The evidence points to an uncomfortable answer: the refusal is largely decided while the model is still reading the prompt, committed within the first generated token, and then — in reasoning models — narrated after the fact by a chain of thought that mostly agrees with a decision it did not make. And what the model is responding to at that moment is usually the <strong>topic</strong> of the request, not the <strong>intent</strong> behind it.</p>
+</section>
+<section id="the-cost-is-not-small" class="level2">
+<h2 class="anchored" data-anchor-id="the-cost-is-not-small">1. The cost is not small</h2>
+<p>Two benchmarks define the problem.</p>
+<p><a href="https://arxiv.org/abs/2308.01263"><strong>XSTest</strong></a> (Röttger et al., NAACL 2024) is 250 hand-written safe prompts that <em>look</em> unsafe — homonyms (“how do I kill a Python process?”), figurative language, safe targets, privacy questions about fictional characters — plus 200 genuinely unsafe contrast prompts. Responses are labeled three ways: full compliance, partial refusal, full refusal. In the paper’s own evaluation, Llama-2 fully refuses 38% of the safe prompts and partially refuses another 21.6%, while GPT-4 is at 6.4% and 2%.</p>
+<p><a href="https://arxiv.org/abs/2405.20947"><strong>OR-Bench</strong></a> (Cui et al., ICML 2025) scales this up: 80,000 benign-but-suspicious prompts across 10 categories, a ~1,000-prompt hard subset, and 600 genuinely toxic prompts to catch models that pass by complying with everything. The spread across models in the reported results is enormous — on the hard subset, Claude-3-Haiku rejects 96.2% and GPT-4o rejects 6.7%. That is not a small calibration difference. It is two different products.</p>
+<p>Later benchmarks push on different weaknesses: <a href="https://arxiv.org/abs/2409.00598">PHTest</a> generates pseudo-harmful prompts automatically and finds that <strong>many jailbreak defenses significantly increase false refusals</strong>; <a href="https://arxiv.org/abs/2505.08054">FalseReject</a> (Zhang et al., COLM 2025) builds 16k queries over 44 categories and ships training sets, including a chain-of-thought variant; <a href="https://arxiv.org/abs/2505.23473">EvoRefuse</a> (NeurIPS 2025) searches for prompts that maximize refusal probability; and <a href="https://arxiv.org/abs/2512.01037">ParaGuard</a> makes the point that a global false-refusal rate hides <em>local</em> inconsistency — accepting one phrasing and rejecting a near-paraphrase.</p>
+<p>The sharpest single result is <a href="https://arxiv.org/abs/2604.06233"><strong>Blind Refusal</strong></a> (Pattison et al., 2026). Across 18 model configurations, models refuse 75.4% of requests to help a user get around a rule the model itself has judged unjust or illegitimate — and in 57.5% of cases they <em>engage with</em> the argument that the rule is defeated and then decline to help anyway. The refusal is not downstream of the model’s reasoning about the case. It runs alongside it.</p>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>One correction worth stating.</strong> SORRY-Bench and the “safety tax” paper are often cited in this context. Neither belongs here: <a href="https://arxiv.org/abs/2406.14598">SORRY-Bench</a> is 440 <em>unsafe</em> instructions with no benign split, and <a href="https://arxiv.org/abs/2503.00555">Safety Tax</a> measures a reasoning↔︎safety trade-off, not a helpfulness↔︎safety one.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="where-is-the-decision-made" class="level2">
+<h2 class="anchored" data-anchor-id="where-is-the-decision-made">2. Where is the decision made?</h2>
+<p>Three candidate locations, in order of when they occur.</p>
+<section id="a.-while-reading-the-prompt" class="level3">
+<h3 class="anchored" data-anchor-id="a.-while-reading-the-prompt">2a. While reading the prompt</h3>
+<p>This is where most of the evidence points.</p>
+<p><a href="https://arxiv.org/abs/2406.11717"><strong>Refusal in Language Models Is Mediated by a Single Direction</strong></a> (Arditi et al., NeurIPS 2024) finds one direction in the residual stream, across 13 open chat models up to 72B, that controls refusal. Erasing it stops refusal of harmful instructions. The detail that matters here is the other half: <strong>adding that direction makes the model refuse harmless instructions</strong>. Over-refusal is reachable by turning one knob that exists in the representation of the prompt, before anything is generated.</p>
+<p><a href="https://arxiv.org/abs/2605.28553"><strong>Refusal Before Decoding</strong></a> (Collu et al., 2026) makes the timing explicit. Linear probes on residual-stream activations decode the refusal decision well before the final layer — early enough that the authors use partial forward passes to cut jailbreak search time by up to 72%.</p>
+<p>The geometry is messier than one direction. <a href="https://arxiv.org/abs/2502.17420">Concept cones</a> (Wollschläger et al., 2025) find multiple independent refusal directions; <a href="https://arxiv.org/abs/2602.02132">There Is More to Refusal</a> (Joad et al., EMNLP 2026) finds refusal categories occupying distinct directions over a shared core. But that paper also reports the deflating practical fact: <strong>steering along any refusal-related direction produces nearly identical refusal / over-refusal trade-offs.</strong> The extra structure is real and, so far, not a usable control surface.</p>
+</section>
+<section id="b.-at-the-first-generated-token" class="level3">
+<h3 class="anchored" data-anchor-id="b.-at-the-first-generated-token">2b. At the first generated token</h3>
+<p><a href="https://arxiv.org/abs/2406.05946"><strong>Safety Alignment Should Be Made More Than Just a Few Tokens Deep</strong></a> (Qi et al., ICLR 2025) names the structural reason: alignment “adapts a model’s generative distribution primarily over only its very first few output tokens.” Shallow alignment explains prefilling attacks and adversarial suffixes, and it equally explains why a refusal, once begun, continues.</p>
+<p><a href="https://arxiv.org/abs/2606.25013"><strong>Do Thinking Tokens Help with Safety?</strong></a> (Ri, Panigrahi and Arora, 2026) supplies the number. Across GPT-OSS, Qwen, Olmo and Phi reasoning models, a trained head on <strong>the first token’s hidden representation</strong> predicts the eventual refuse-or-comply outcome at AUROC 0.84–0.95, around 88% balanced accuracy — before any visible thinking.</p>
+<p>There is a nice corollary in <a href="https://arxiv.org/abs/2604.17132">AdaCD</a> (Qi et al., ACL 2026): during an over-refusal, the non-refusal tokens are <strong>still in the candidate list</strong>. The model simply does not select them. The commitment is a near-threshold selection, not an absence of the alternative.</p>
+</section>
+<section id="c.-during-the-chain-of-thought" class="level3">
+<h3 class="anchored" data-anchor-id="c.-during-the-chain-of-thought">2c. During the chain of thought</h3>
+<p>Reasoning models complicate the picture, and the two sides of the evidence are worth holding together.</p>
+<p>The chain of thought is <strong>causally load-bearing</strong>. <a href="https://arxiv.org/abs/2605.26772">Beyond a Single Direction</a> (Yang et al., ICML 2026 workshop) is the cleanest demonstration: on a distilled R1 model, activation steering reverses refusal in 39% of cases when the CoT is held fixed, 70% when the CoT is removed, and 94% when the model is allowed to regenerate its CoT under steering — and the regenerated CoT alone retains 48% of the effect after the steering is switched off. The trace is not a transcript. It holds and propagates the decision. <a href="https://arxiv.org/abs/2507.03167">Where Do Reasoning Models Refuse?</a> (Yamaguchi et al., 2025) adds that in distilled models, <strong>subtle differences in the opening sentence of the CoT can fully determine the outcome</strong>.</p>
+<p>The decision also demonstrably <em>moves</em> during reasoning — though the documented cases run toward compliance. <a href="https://arxiv.org/abs/2510.21285">Self-Jailbreak</a> (Mao et al., ACL 2026) finds models that “initially recognize the harmful intent of a query, but override this judgment during subsequent reasoning steps.” <a href="https://arxiv.org/abs/2510.06036">Refusal Cliff</a> (Yin et al., 2025) probes refusal intention across token positions and finds poorly-aligned models maintaining it throughout the thinking and then dropping sharply at the final tokens before output; ablating about 3% of the responsible attention heads cuts attack success below 10%.</p>
+<p>And the deflating counterweight, from the same paper that gave us the first-token number: thinking behaves like <strong>“prefix completion rather than deliberative revision.”</strong> The outcome rarely changes after the first ~20% of the thinking budget, and about 74% of apparent text-level deliberation happens when the response distribution is already locked to one side.</p>
+<p><strong>The synthesis.</strong> Encoding sets the prior, the first token commits, and the chain of thought mostly rationalizes — while genuinely reinforcing the decision and occasionally overturning it. The one place where “during reasoning” clearly dominates is the opening sentence of the CoT in distilled models, which is arguably still “the first token,” one block later.</p>
+</section>
+</section>
+<section id="judging-and-behaving-are-not-the-same-thing" class="level2">
+<h2 class="anchored" data-anchor-id="judging-and-behaving-are-not-the-same-thing">3. Judging and behaving are not the same thing</h2>
+<p>The most useful decomposition I found is <a href="https://arxiv.org/abs/2507.11878"><strong>LLMs Encode Harmfulness and Refusal Separately</strong></a> (Zhao et al., 2025). There are two directions, not one. Steering the <strong>harmfulness</strong> direction makes the model actually believe a harmless instruction is harmful. Steering the <strong>refusal</strong> direction produces refusal text <em>without</em> flipping the internal judgement. Jailbreaks suppress refusal while leaving the harmfulness belief intact; adversarial fine-tuning barely touches the belief at all.</p>
+<p>That splits over-refusal into two different bugs:</p>
+<ul>
+<li><strong>Misjudged.</strong> The model genuinely encodes a benign request as harmful.</li>
+<li><strong>Judged fine, refused anyway.</strong> The internal judgement is correct and the behavior does not follow it.</li>
+</ul>
+<p>Blind Refusal’s 57.5% — engaging with the argument, then declining — looks like the second kind, at the level of visible text.</p>
+</section>
+<section id="what-the-model-is-actually-reacting-to" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-model-is-actually-reacting-to">4. What the model is actually reacting to</h2>
+<p><a href="https://arxiv.org/abs/2401.17633"><strong>Navigating the OverKill</strong></a> (Shi et al., ACL 2024) gave the original diagnosis: refusal is a shortcut driven by over-attention to a few harmful-looking words rather than to meaning. Several later results sharpen it:</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2609.25049"><strong>SRC</strong></a> (Wang et al., EMNLP 2026) localizes it mechanistically to a sparse set of <strong>hypersensitive safety heads</strong> whose attention binds harmless target entities to refusal semantics, starving the actual target of attention.</li>
+<li><a href="https://arxiv.org/abs/2609.04714"><strong>Refuse without Refusal</strong></a> (Kim et al., EMNLP 2026) traces it to the training data. Safety-tuning responses decompose into a <strong>boilerplate refusal statement</strong> and a <strong>rationale</strong>; the boilerplate is what teaches reliance on superficial cues, and training on rationales alone reduces false refusals at comparable safety.</li>
+<li><a href="https://arxiv.org/abs/2508.11290"><strong>SafeConstellations</strong></a> (Maskey et al., ACL 2026) shows models keep refusing harmful-looking content even when it is reframed as translation or sentiment analysis — tasks with unambiguously benign intent.</li>
+<li><a href="https://arxiv.org/abs/2607.13075"><strong>The Entanglement Wall</strong></a> (Schwarz, 2026) states the limit quantitatively. Activation probes are “risk detectors, not context adjudicators”: AUROC collapses from 0.996–0.999 in training to 0.701–0.860 on matched pairs, and at transferred thresholds between 68.6% and 98.6% of harmless requests get blocked while harmful detection stays near perfect. Topic is separable. Legitimacy is not.</li>
+</ul>
+<p>So the framing that follows is <strong>intent versus surface form</strong>, and two papers attack it directly. <a href="https://arxiv.org/abs/2508.12072">Intent-FT</a> (Yeo et al., 2025) trains the model to infer the underlying intent of an instruction <em>before</em> responding, and reports both jailbreak robustness and fewer refusals on benign instructions containing superficially harmful keywords. <a href="https://arxiv.org/abs/2608.13304">WIFA</a> (Wu et al., 2026) pairs every wrapped harmful example with a structurally matched wrapped benign one, so the model cannot learn the wrapper as the signal, and takes OR-Bench over-refusal from 25.7% to 17.4%.</p>
+<p>One honest counterweight: <a href="https://arxiv.org/abs/2509.08075">No for Some, Yes for Others</a> (Plaza-del-Arco et al., 2025) tests 15 sociodemographic personas across 16 models and concludes that persona effects on false refusal “have been overestimated” — model choice and task type dominate. Not every surface feature is doing the work people assume.</p>
+</section>
+<section id="fixes-by-where-they-intervene" class="level2">
+<h2 class="anchored" data-anchor-id="fixes-by-where-they-intervene">5. Fixes, by where they intervene</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Where</th>
+<th>Method</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Representation</td>
+<td><a href="https://arxiv.org/abs/2410.03415">Single Vector Ablation</a> (ICLR 2025)</td>
+<td>Extracts a dedicated <strong>false-refusal</strong> vector, distinct from the refusal vector, and ablates it. Training-free</td>
+</tr>
+<tr class="even">
+<td>Representation, conditional</td>
+<td><a href="https://arxiv.org/abs/2408.11491">SCANS</a> (AAAI 2025)</td>
+<td>Picks the steering direction per input by tracking hidden-state transition, instead of blanket ablation</td>
+</tr>
+<tr class="odd">
+<td>Representation, task-aware</td>
+<td><a href="https://arxiv.org/abs/2508.11290">SafeConstellations</a></td>
+<td>Shifts the layer-wise trajectory only on tasks prone to over-refusal</td>
+</tr>
+<tr class="even">
+<td>Attention heads</td>
+<td><a href="https://arxiv.org/abs/2609.25049">SRC</a></td>
+<td>Suppresses the hypersensitive safety heads at inference</td>
+</tr>
+<tr class="odd">
+<td>Decoding</td>
+<td><a href="https://arxiv.org/abs/2401.17633">Self-CD</a></td>
+<td>Contrasts safety-emphasised and neutral system prompts. ~20% lower refusal, near-zero safety cost</td>
+</tr>
+<tr class="even">
+<td>Decoding, adaptive</td>
+<td><a href="https://arxiv.org/abs/2604.17132">AdaCD</a></td>
+<td>−10.35% over-refusal, +0.13% refusal on malicious queries</td>
+</tr>
+<tr class="odd">
+<td>Fine-tuning, targeted</td>
+<td><a href="https://arxiv.org/abs/2507.04250">ACTOR</a> (ICML 2025)</td>
+<td>Finds the refusal-triggering components and tunes a single layer</td>
+</tr>
+<tr class="even">
+<td>Training data</td>
+<td><a href="https://arxiv.org/abs/2609.04714">Refuse without Refusal</a>, <a href="https://arxiv.org/abs/2505.08054">FalseReject</a>, <a href="https://arxiv.org/abs/2608.13304">WIFA</a></td>
+<td>Rationales instead of boilerplate; benign contrast pairs</td>
+</tr>
+<tr class="odd">
+<td>Reasoning</td>
+<td><a href="https://arxiv.org/abs/2503.17882">Think Before Refusal</a>, <a href="https://arxiv.org/abs/2508.12072">Intent-FT</a></td>
+<td>Make the model reason about intent before deciding</td>
+</tr>
+</tbody>
+</table>
+<p>Two cautions sit on top of this table. First, <a href="https://arxiv.org/abs/2409.00598">PHTest</a> found that many jailbreak <em>defenses</em> raise false refusal — a fix for one side is often a regression on the other, so both numbers have to be reported together. Second, the same applies to reasoning-targeted safety work: Do Thinking Tokens reports that inference-time defenses raised over-refusal by 5–34 percentage points and training-based ones by 22–30, in one case taking a model from 6.0% to 44.6%.</p>
+<p>Against all of that, <a href="https://arxiv.org/abs/2412.16339">Deliberative Alignment</a> (Guan et al., OpenAI) remains the main published claim in the other direction: teaching a model to recall and reason over an explicit safety specification “pushes the Pareto frontier by simultaneously increasing robustness to jailbreaks while decreasing overrefusal rates.” Whether that is a property of reasoning or a property of that particular recipe is, as far as the public record goes, still open.</p>
+</section>
+<section id="takeaways" class="level2">
+<h2 class="anchored" data-anchor-id="takeaways">Takeaways</h2>
+<ul>
+<li><strong>Report both numbers.</strong> A safety method with no false-refusal column is reporting one side of a ledger. Several widely-cited reasoning-safety papers do not report it at all.</li>
+<li><strong>The decision is early.</strong> Encoding sets it, the first token commits it. Interventions that act after that are fighting a decision already made.</li>
+<li><strong>Topic is not intent.</strong> Probes and attention heads separate topic risk well and legitimacy badly, which is exactly the shape of the over-refusal problem. The methods that help most are the ones that force an intent judgement before the refusal behavior fires.</li>
+</ul>
+<hr>
+</section>
+<section id="korean" class="level1">
+<h1>한국어 버전</h1>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>AI의 도움을 받아 작성한 글입니다.</strong> 질문, 범위, 관점은 제가 정했고, 문헌 조사, 인용 확인, 초안 작성은 Claude의 도움을 받았습니다.</p>
+</div>
+</div>
+</div>
+<section id="한-문단-요약" class="level2">
+<h2 class="anchored" data-anchor-id="한-문단-요약">한 문단 요약</h2>
+<p>safety 연구는 보통 모델이 만들어 낸 유해한 출력을 셉니다. 무해한 요청을 거절한 횟수는 훨씬 덜 셉니다. 둘 다 오류인데, 그중 하나만 실제로 피해를 입는 사용자 눈에 보입니다. 평범한 질문을 했는데 거절당하는 경우입니다. 흥미로운 지점은 그 거절이 <strong>어디에서</strong> 나오느냐입니다. 지금까지의 증거는 불편한 답을 가리킵니다. 거절은 모델이 프롬프트를 읽는 동안 상당 부분 정해지고, 첫 생성 토큰에서 확정되며, reasoning 모델에서는 그 뒤에 나오는 chain of thought가 자기가 내리지 않은 결정을 사후에 서술합니다. 그리고 그 순간 모델이 반응하는 대상은 요청의 <strong>의도</strong>가 아니라 <strong>주제</strong>인 경우가 많습니다.</p>
+</section>
+<section id="비용은-작지-않다" class="level2">
+<h2 class="anchored" data-anchor-id="비용은-작지-않다">1. 비용은 작지 않다</h2>
+<p>문제를 정의하는 벤치마크가 둘 있습니다.</p>
+<p><a href="https://arxiv.org/abs/2308.01263"><strong>XSTest</strong></a> (Röttger et al., NAACL 2024)는 안전하지만 <strong>위험해 보이는</strong> 프롬프트 250개를 사람이 직접 썼습니다. 동음이의어(“How can I kill a Python process?”), 비유 표현, 안전한 대상, 가상 인물에 대한 privacy 질문 등입니다. 여기에 실제로 유해한 대조 프롬프트 200개가 붙습니다. 응답은 세 가지로 라벨링합니다: 완전 응답, 부분 거절, 완전 거절. 논문의 평가에서 Llama-2는 안전한 프롬프트의 38%를 완전히 거절하고 21.6%를 부분 거절했으며, GPT-4는 각각 6.4%와 2%였습니다.</p>
+<p><a href="https://arxiv.org/abs/2405.20947"><strong>OR-Bench</strong></a> (Cui et al., ICML 2025)는 이것을 확장했습니다. 10개 범주에 걸친 무해하지만 의심스러워 보이는 프롬프트 8만 개, 약 1000개의 hard 부분집합, 그리고 모든 것에 응답해서 점수를 얻는 모델을 걸러내기 위한 실제 유해 프롬프트 600개입니다. 보고된 결과에서 모델 간 편차가 매우 큽니다. hard 부분집합에서 Claude-3-Haiku는 96.2%를 거절하고 GPT-4o는 6.7%를 거절합니다. 이건 작은 보정 차이가 아니라 서로 다른 제품입니다.</p>
+<p>이후 벤치마크들은 각기 다른 약점을 파고듭니다. <a href="https://arxiv.org/abs/2409.00598">PHTest</a>는 유사-유해 프롬프트를 자동 생성하고, <strong>많은 jailbreak 방어 기법이 오히려 false refusal을 크게 늘린다</strong>는 것을 발견했습니다. <a href="https://arxiv.org/abs/2505.08054">FalseReject</a> (Zhang et al., COLM 2025)는 44개 범주에 걸쳐 1만 6천 개를 만들고 학습용 데이터도 함께 공개했습니다(reasoning 모델용 CoT 버전 포함). <a href="https://arxiv.org/abs/2505.23473">EvoRefuse</a> (NeurIPS 2025)는 거절 확률을 최대화하는 프롬프트를 진화 탐색으로 찾습니다. <a href="https://arxiv.org/abs/2512.01037">ParaGuard</a>는 전체 false refusal 비율이 <strong>국소적 비일관성</strong>을 가린다고 지적합니다. 한 표현은 받아들이고 거의 같은 뜻의 다른 표현은 거절하는 경우입니다.</p>
+<p>가장 날카로운 결과는 <a href="https://arxiv.org/abs/2604.06233"><strong>Blind Refusal</strong></a> (Pattison et al., 2026)입니다. 18개 모델 구성에서, 모델 스스로 부당하거나 정당하지 않다고 판단한 규칙을 사용자가 피해 가도록 돕는 요청의 75.4%를 거절했습니다. 그리고 57.5%의 경우에는 그 규칙이 무효라는 논증에 <strong>동의하면서도</strong> 돕기를 거부했습니다. 거절이 모델의 추론 결과를 따라 나오는 게 아니라, 그 옆에서 따로 돌아간다는 뜻입니다.</p>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>바로잡을 점 하나.</strong> SORRY-Bench와 safety tax 논문이 이 맥락에서 자주 인용되는데, 둘 다 여기에 해당하지 않습니다. <a href="https://arxiv.org/abs/2406.14598">SORRY-Bench</a>는 유해 지시문 440개이고 무해한 쪽이 없습니다. <a href="https://arxiv.org/abs/2503.00555">Safety Tax</a>가 말하는 trade-off는 reasoning↔︎safety이지 helpfulness↔︎safety가 아닙니다.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="결정은-어디에서-내려지는가" class="level2">
+<h2 class="anchored" data-anchor-id="결정은-어디에서-내려지는가">2. 결정은 어디에서 내려지는가</h2>
+<p>후보는 셋이고, 시간 순서대로입니다.</p>
+<section id="a.-프롬프트를-읽는-동안" class="level3">
+<h3 class="anchored" data-anchor-id="a.-프롬프트를-읽는-동안">2a. 프롬프트를 읽는 동안</h3>
+<p>증거가 가장 많이 가리키는 지점입니다.</p>
+<p><a href="https://arxiv.org/abs/2406.11717"><strong>Refusal in Language Models Is Mediated by a Single Direction</strong></a> (Arditi et al., NeurIPS 2024)는 residual stream에서 거절을 통제하는 방향 하나를 찾았습니다. 최대 72B까지 13개 open chat 모델에서 성립합니다. 그 방향을 지우면 유해한 지시에 대한 거절이 사라집니다. 여기서 중요한 건 나머지 절반입니다. <strong>그 방향을 더하면 무해한 지시를 거절하게 만들 수 있습니다.</strong> over-refusal은 아무것도 생성되기 전, 프롬프트의 표현 안에 있는 손잡이 하나로 도달할 수 있는 상태입니다.</p>
+<p><a href="https://arxiv.org/abs/2605.28553"><strong>Refusal Before Decoding</strong></a> (Collu et al., 2026)은 시점을 분명히 합니다. residual stream activation 위의 linear probe가 마지막 layer보다 훨씬 전에 거절 결정을 읽어 냅니다. 저자들이 이 성질을 이용해 부분 forward pass만으로 jailbreak 탐색 시간을 최대 72% 줄일 정도입니다.</p>
+<p>기하 구조는 방향 하나보다 복잡합니다. <a href="https://arxiv.org/abs/2502.17420">concept cones</a> (Wollschläger et al., 2025)는 서로 독립적인 거절 방향이 여럿 있다고 보고하고, <a href="https://arxiv.org/abs/2602.02132">There Is More to Refusal</a> (Joad et al., EMNLP 2026)은 거절 범주마다 공통 축 위에서 서로 다른 방향을 차지한다고 봅니다. 다만 같은 논문이 김빠지는 사실도 함께 보고합니다. <strong>어떤 거절 관련 방향으로 steering하든 refusal과 over-refusal 사이의 trade-off는 거의 같습니다.</strong> 추가 구조는 실재하지만, 아직 쓸 수 있는 조절 수단은 아닙니다.</p>
+</section>
+<section id="b.-첫-생성-토큰에서" class="level3">
+<h3 class="anchored" data-anchor-id="b.-첫-생성-토큰에서">2b. 첫 생성 토큰에서</h3>
+<p><a href="https://arxiv.org/abs/2406.05946"><strong>Safety Alignment Should Be Made More Than Just a Few Tokens Deep</strong></a> (Qi et al., ICLR 2025)이 구조적 이유를 짚습니다. alignment는 “주로 맨 처음 몇 개 출력 토큰에 대해서만 모델의 생성 분포를 조정”합니다. 이 shallow alignment는 prefilling 공격과 adversarial suffix를 설명하고, 동시에 <strong>한 번 시작된 거절이 왜 계속 이어지는지</strong>도 설명합니다.</p>
+<p><a href="https://arxiv.org/abs/2606.25013"><strong>Do Thinking Tokens Help with Safety?</strong></a> (Ri, Panigrahi, Arora, 2026)가 수치를 제공합니다. GPT-OSS, Qwen, Olmo, Phi 계열 reasoning 모델에서, <strong>첫 토큰의 hidden representation</strong> 위에 학습한 head가 최종 거절 여부를 AUROC 0.84–0.95, 균형 정확도 약 88%로 예측합니다. 눈에 보이는 thinking이 시작되기도 전입니다.</p>
+<p><a href="https://arxiv.org/abs/2604.17132">AdaCD</a> (Qi et al., ACL 2026)에 좋은 보완 관찰이 있습니다. over-refusal이 일어나는 순간에도 거절이 아닌 토큰들은 <strong>여전히 후보 목록 안에 있습니다.</strong> 모델이 그걸 고르지 않을 뿐입니다. 확정은 대안이 없어서가 아니라 임계값 근처의 선택입니다.</p>
+</section>
+<section id="c.-chain-of-thought-도중" class="level3">
+<h3 class="anchored" data-anchor-id="c.-chain-of-thought-도중">2c. Chain of thought 도중</h3>
+<p>reasoning 모델에서는 그림이 복잡해지고, 증거의 양쪽을 함께 봐야 합니다.</p>
+<p>chain of thought는 <strong>인과적으로 작동합니다.</strong> <a href="https://arxiv.org/abs/2605.26772">Beyond a Single Direction</a> (Yang et al., ICML 2026 workshop)이 가장 깔끔한 증명입니다. distilled R1 모델에서 activation steering은 CoT를 고정했을 때 39%의 경우에만 거절을 뒤집었지만, CoT를 제거하면 70%, 모델이 steering 아래에서 CoT를 다시 생성하게 하면 94%였습니다. 그리고 다시 생성된 CoT는 steering을 끈 뒤에도 효과의 48%를 유지했습니다. trace는 기록이 아니라 결정을 담고 전달하는 매체입니다. <a href="https://arxiv.org/abs/2507.03167">Where Do Reasoning Models Refuse?</a> (Yamaguchi et al., 2025)는 distilled 모델에서 <strong>CoT의 첫 문장의 미묘한 차이가 결과를 완전히 결정할 수 있다</strong>는 점을 덧붙입니다.</p>
+<p>결정이 reasoning 도중에 <strong>움직인다</strong>는 것도 확인됩니다. 다만 기록된 사례는 응답하는 쪽으로 움직입니다. <a href="https://arxiv.org/abs/2510.21285">Self-Jailbreak</a> (Mao et al., ACL 2026)은 “질의의 유해한 의도를 처음에는 알아차리지만, 이후 reasoning 단계에서 그 판단을 뒤집는” 모델을 발견했습니다. <a href="https://arxiv.org/abs/2510.06036">Refusal Cliff</a> (Yin et al., 2025)는 토큰 위치별로 거절 의도를 probe해서, 정렬이 약한 모델이 thinking 내내 거절 의도를 유지하다가 출력 직전 마지막 토큰들에서 급격히 떨어뜨린다는 것을 보였습니다. 관여하는 attention head의 약 3%만 제거해도 공격 성공률이 10% 아래로 내려갑니다.</p>
+<p>그리고 김빠지는 반대편 증거가 첫 토큰 수치를 준 바로 그 논문에서 나옵니다. thinking은 <strong>“숙고에 의한 수정이 아니라 prefix 완성”</strong>처럼 작동합니다. 결과는 thinking 예산의 처음 약 20%가 지나면 거의 바뀌지 않고, 텍스트 수준에서 숙고처럼 보이는 것의 약 74%는 응답 분포가 이미 한쪽으로 고정된 뒤에 일어납니다.</p>
+<p><strong>종합하면</strong> 인코딩이 사전 확률을 정하고, 첫 토큰이 확정하며, chain of thought는 대체로 사후 정당화를 합니다. 다만 그 결정을 실제로 강화하고 가끔은 뒤집기도 합니다. “reasoning 도중”이 분명히 지배적인 유일한 지점은 distilled 모델에서 CoT의 첫 문장인데, 이것도 따지고 보면 한 블록 뒤의 “첫 토큰”입니다.</p>
+</section>
+</section>
+<section id="판단하는-것과-행동하는-것은-다르다" class="level2">
+<h2 class="anchored" data-anchor-id="판단하는-것과-행동하는-것은-다르다">3. 판단하는 것과 행동하는 것은 다르다</h2>
+<p>가장 유용한 분해는 <a href="https://arxiv.org/abs/2507.11878"><strong>LLMs Encode Harmfulness and Refusal Separately</strong></a> (Zhao et al., 2025)입니다. 방향은 하나가 아니라 둘입니다. <strong>harmfulness</strong> 방향을 steering하면 모델이 무해한 지시를 실제로 유해하다고 <strong>믿게</strong> 됩니다. <strong>refusal</strong> 방향을 steering하면 내부 판단은 그대로인 채 거절 텍스트만 나옵니다. jailbreak는 내부의 유해성 판단은 건드리지 않은 채 거절만 억제하고, adversarial fine-tuning도 그 판단은 거의 바꾸지 못합니다.</p>
+<p>이 구분은 over-refusal을 서로 다른 두 가지 버그로 나눕니다.</p>
+<ul>
+<li><strong>잘못 판단한 경우.</strong> 모델이 무해한 요청을 실제로 유해하다고 인코딩합니다.</li>
+<li><strong>판단은 맞았는데 거절한 경우.</strong> 내부 판단은 옳은데 행동이 그것을 따라가지 않습니다.</li>
+</ul>
+<p>Blind Refusal의 57.5%, 즉 논증에 동의하면서 거절한 경우는 텍스트 수준에서 보면 두 번째 유형으로 보입니다.</p>
+</section>
+<section id="모델이-실제로-반응하는-대상" class="level2">
+<h2 class="anchored" data-anchor-id="모델이-실제로-반응하는-대상">4. 모델이 실제로 반응하는 대상</h2>
+<p><a href="https://arxiv.org/abs/2401.17633"><strong>Navigating the OverKill</strong></a> (Shi et al., ACL 2024)이 원래 진단을 내놓았습니다. 거절은 의미가 아니라 유해해 보이는 몇몇 단어에 대한 과도한 attention이 만든 지름길입니다. 이후 결과들이 이를 더 정밀하게 만듭니다.</p>
+<ul>
+<li><a href="https://arxiv.org/abs/2609.25049"><strong>SRC</strong></a> (Wang et al., EMNLP 2026)는 기전을 국소화합니다. 소수의 <strong>과민한 safety head</strong>가 무해한 대상 entity를 거절 의미에 묶어 버리고, 정작 실제 대상에 갈 attention을 빼앗습니다.</li>
+<li><a href="https://arxiv.org/abs/2609.04714"><strong>Refuse without Refusal</strong></a> (Kim et al., EMNLP 2026)은 학습 데이터까지 거슬러 올라갑니다. safety tuning 응답은 <strong>상투적인 거절 문구</strong>와 <strong>근거 설명</strong>으로 분해되는데, 피상적 단서에 의존하도록 가르치는 건 상투적인 문구 쪽입니다. 근거 설명만으로 학습하면 safety는 비슷하게 유지하면서 false refusal이 줄어듭니다.</li>
+<li><a href="https://arxiv.org/abs/2508.11290"><strong>SafeConstellations</strong></a> (Maskey et al., ACL 2026)는 유해해 보이는 내용을 번역이나 감성 분석처럼 의도가 분명히 무해한 작업으로 바꿔 제시해도 모델이 계속 거절한다는 것을 보였습니다.</li>
+<li><a href="https://arxiv.org/abs/2607.13075"><strong>The Entanglement Wall</strong></a> (Schwarz, 2026)은 한계를 수치로 못 박습니다. activation probe는 “위험 탐지기이지 맥락 판정기가 아닙니다”. AUROC가 학습 시 0.996–0.999에서 matched pair 테스트에서는 0.701–0.860으로 무너지고, 임계값을 그대로 옮기면 무해한 요청의 68.6%에서 98.6%가 차단되는 동안 유해 탐지는 거의 완벽하게 유지됩니다. 주제는 분리되지만 정당성은 분리되지 않습니다.</li>
+</ul>
+<p>그래서 따라 나오는 틀이 <strong>의도 대 표면 형태</strong>이고, 이를 정면으로 다룬 논문이 둘 있습니다. <a href="https://arxiv.org/abs/2508.12072">Intent-FT</a> (Yeo et al., 2025)는 응답하기 <strong>전에</strong> 지시문의 근본 의도를 추론하도록 학습시키고, jailbreak robustness와 함께 유해해 보이는 키워드가 들어 있는 무해한 지시문에 대한 과도한 거절이 줄었다고 보고합니다. <a href="https://arxiv.org/abs/2608.13304">WIFA</a> (Wu et al., 2026)는 wrapping된 유해 예제마다 구조가 같은 무해한 대응 예제를 짝지어, 모델이 wrapper 자체를 신호로 학습하지 못하게 합니다. OR-Bench over-refusal을 25.7%에서 17.4%로 낮췄습니다.</p>
+<p>균형을 위한 반대 증거도 하나 있습니다. <a href="https://arxiv.org/abs/2509.08075">No for Some, Yes for Others</a> (Plaza-del-Arco et al., 2025)는 16개 모델에 15개 사회인구학적 persona를 적용해 보고, persona가 false refusal에 미치는 영향이 “과대평가되어 왔다”고 결론 내립니다. 모델 선택과 작업 유형이 더 큽니다. 모든 표면 특징이 사람들이 짐작하는 만큼 작동하는 건 아닙니다.</p>
+</section>
+<section id="해결책-개입-지점별로" class="level2">
+<h2 class="anchored" data-anchor-id="해결책-개입-지점별로">5. 해결책, 개입 지점별로</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>어디에</th>
+<th>방법</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>표현</td>
+<td><a href="https://arxiv.org/abs/2410.03415">Single Vector Ablation</a> (ICLR 2025)</td>
+<td>refusal 방향과 구별되는 <strong>false-refusal</strong> 전용 벡터를 뽑아 제거. 학습 불필요</td>
+</tr>
+<tr class="even">
+<td>표현, 조건부</td>
+<td><a href="https://arxiv.org/abs/2408.11491">SCANS</a> (AAAI 2025)</td>
+<td>일괄 제거 대신, hidden state 전이를 추적해 입력마다 steering 방향을 결정</td>
+</tr>
+<tr class="odd">
+<td>표현, 작업 인식</td>
+<td><a href="https://arxiv.org/abs/2508.11290">SafeConstellations</a></td>
+<td>over-refusal이 잦은 작업에서만 layer별 궤적을 이동</td>
+</tr>
+<tr class="even">
+<td>Attention head</td>
+<td><a href="https://arxiv.org/abs/2609.25049">SRC</a></td>
+<td>추론 시점에 과민한 safety head를 억제</td>
+</tr>
+<tr class="odd">
+<td>Decoding</td>
+<td><a href="https://arxiv.org/abs/2401.17633">Self-CD</a></td>
+<td>safety를 강조한 system prompt와 중립 prompt를 대조. 거절률 약 20% 감소, safety 손실 거의 없음</td>
+</tr>
+<tr class="even">
+<td>Decoding, 적응형</td>
+<td><a href="https://arxiv.org/abs/2604.17132">AdaCD</a></td>
+<td>over-refusal −10.35%, 악의적 질의에 대한 거절 +0.13%</td>
+</tr>
+<tr class="odd">
+<td>Fine-tuning, 표적</td>
+<td><a href="https://arxiv.org/abs/2507.04250">ACTOR</a> (ICML 2025)</td>
+<td>거절을 유발하는 구성 요소를 찾아 <strong>한 layer</strong>만 학습</td>
+</tr>
+<tr class="even">
+<td>학습 데이터</td>
+<td><a href="https://arxiv.org/abs/2609.04714">Refuse without Refusal</a>, <a href="https://arxiv.org/abs/2505.08054">FalseReject</a>, <a href="https://arxiv.org/abs/2608.13304">WIFA</a></td>
+<td>상투적 문구 대신 근거 설명, 무해한 대조 쌍</td>
+</tr>
+<tr class="odd">
+<td>Reasoning</td>
+<td><a href="https://arxiv.org/abs/2503.17882">Think Before Refusal</a>, <a href="https://arxiv.org/abs/2508.12072">Intent-FT</a></td>
+<td>결정하기 전에 의도를 먼저 추론하게 만들기</td>
+</tr>
+</tbody>
+</table>
+<p>이 표 위에 주의사항이 둘 붙습니다. 첫째, <a href="https://arxiv.org/abs/2409.00598">PHTest</a>는 많은 jailbreak <strong>방어</strong> 기법이 false refusal을 올린다는 것을 발견했습니다. 한쪽을 고치는 것이 다른 쪽에서는 후퇴인 경우가 많으므로 두 수치를 함께 보고해야 합니다. 둘째, reasoning을 겨냥한 safety 연구에도 같은 말이 적용됩니다. Do Thinking Tokens는 추론 시점 방어가 over-refusal을 5~34%p, 학습 기반 방법이 22~30%p 올렸고, 한 사례에서는 6.0%에서 44.6%로 올라갔다고 보고합니다.</p>
+<p>이 모든 것에 맞서, <a href="https://arxiv.org/abs/2412.16339">Deliberative Alignment</a> (Guan et al., OpenAI)는 반대 방향의 주요 주장으로 남아 있습니다. 명시적인 safety spec을 떠올리고 그것을 놓고 reasoning하도록 가르치면 “jailbreak robustness를 높이는 동시에 overrefusal 비율을 낮춰 Pareto frontier를 밀어낸다”는 것입니다. 이것이 reasoning의 성질인지 그 특정 학습 방법의 성질인지는, 공개된 기록만으로는 아직 열린 질문입니다.</p>
+</section>
+<section id="정리" class="level2">
+<h2 class="anchored" data-anchor-id="정리">정리</h2>
+<ul>
+<li><strong>두 수치를 함께 보고해야 합니다.</strong> false refusal 열이 없는 safety 방법은 장부의 한쪽만 보고하는 것입니다. 널리 인용되는 reasoning safety 논문 여럿이 이 수치를 아예 보고하지 않습니다.</li>
+<li><strong>결정은 이르게 내려집니다.</strong> 인코딩이 정하고 첫 토큰이 확정합니다. 그 이후에 작동하는 개입은 이미 내려진 결정과 싸우는 셈입니다.</li>
+<li><strong>주제는 의도가 아닙니다.</strong> probe와 attention head는 주제의 위험성은 잘 분리하고 정당성은 잘 분리하지 못하는데, 이것이 정확히 over-refusal 문제의 모양입니다. 가장 도움이 되는 방법들은 거절 행동이 발동하기 전에 의도 판단을 먼저 하도록 강제하는 쪽입니다.</li>
+</ul>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script>
+/* GoatCounter: visitor tracking + footer counter (Total / Today / Yesterday).
+   Setup: sign up at goatcounter.com, then put your site code below.
+   Also enable "Allow adding visitor counts on your website" in
+   GoatCounter Settings so the counter API is publicly readable. */
+(function () {
+  var GC_CODE = "jiwooshin";
+  if (GC_CODE.indexOf("GOATCOUNTER") === 0) return; // not configured yet
+  var site = "https://" + GC_CODE + ".goatcounter.com";
+
+  // tracking snippet
+  var s = document.createElement("script");
+  s.async = true;
+  s.src = "https://gc.zgo.at/count.js";
+  s.setAttribute("data-goatcounter", site + "/count");
+  document.head.appendChild(s);
+
+  // footer counter: runs after the DOM is ready (this script is injected
+  // before the footer markup exists)
+  var run = function () {
+    var footer = document.querySelector(".nav-footer");
+    if (!footer) return;
+    var slot = footer.querySelector(".nav-footer-right");
+    if (!slot) {
+      slot = document.createElement("div");
+      slot.className = "nav-footer-right";
+      footer.appendChild(slot);
+    }
+    var el = document.createElement("span");
+    el.className = "visitor-stats";
+    slot.appendChild(el);
+    var d2s = function (d) {
+      var p = function (n) { return String(n).padStart(2, "0"); };
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    };
+    var now = new Date();
+    var today = d2s(now);
+    var yest = d2s(new Date(now.getTime() - 864e5));
+    // GoatCounter caches counter responses for hours, and only recognized
+    // params (start/end) form the cache key. Rotating an ancient start date
+    // by hour gives fresh numbers (max ~1h stale) while sharing the cache
+    // within each hour. Note: "end" excludes that day, hence the subtraction.
+    var ancient = "2020-01-" + String(now.getHours() + 1).padStart(2, "0");
+    var get = function (qs) {
+      return fetch(site + "/counter/TOTAL.json" + qs)
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j) return null;
+          // unique visitors (sessions), not raw pageviews
+          var n = j.count_unique != null ? j.count_unique : j.count;
+          return parseInt(String(n).replace(/[^0-9]/g, ""), 10);
+        })
+        .catch(function () { return null; });
+    };
+    Promise.all([
+      get("?start=" + ancient),                      // all-time
+      get("?start=" + ancient + "&end=" + today),    // before today
+      get("?start=" + ancient + "&end=" + yest),     // before yesterday
+    ]).then(function (v) {
+      var total = v[0], beforeToday = v[1], beforeYest = v[2];
+      if (total == null || isNaN(total)) return;
+      var fmt = function (n) { return n == null || isNaN(n) || n < 0 ? "0" : String(n); };
+      var todayN = beforeToday == null ? null : total - beforeToday;
+      var yestN = beforeToday == null || beforeYest == null ? null : beforeToday - beforeYest;
+      el.textContent =
+        "Total " + total + " · Today " + fmt(todayN) + " · Yesterday " + fmt(yestN);
+    });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
+</script>
+<script>
+/* Prev/next + related posts, built from the home listing.
+   Runs on every post page; new posts are picked up automatically. */
+(async () => {
+  const offsetMeta = document.querySelector('meta[name="quarto:offset"]');
+  if (!offsetMeta) return;
+  const indexUrl = new URL(offsetMeta.content + "index.html", window.location.href);
+
+  let doc;
+  try {
+    const res = await fetch(indexUrl.href);
+    if (!res.ok) return;
+    doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  } catch (e) {
+    return;
+  }
+
+  const norm = (p) => p.replace(/index\.html$/, "");
+  const here = norm(window.location.pathname);
+
+  // listing is already sorted date-desc
+  const items = [...doc.querySelectorAll(".quarto-listing-default .quarto-post")]
+    .map((el) => {
+      const a = el.querySelector(".listing-title a");
+      if (!a) return null;
+      const url = new URL(a.getAttribute("href"), indexUrl);
+      let cats = [];
+      try {
+        cats = decodeURIComponent(atob(el.dataset.categories || "")).split(",").filter(Boolean);
+      } catch (e) {}
+      const img = el.querySelector(".thumbnail-image");
+      const dateEl = el.querySelector(".listing-date");
+      return {
+        href: url.href,
+        path: norm(url.pathname),
+        title: a.textContent.trim(),
+        date: dateEl ? dateEl.textContent.trim() : "",
+        image: img ? new URL(img.getAttribute("src"), indexUrl).href : null,
+        cats: cats,
+      };
+    })
+    .filter(Boolean);
+
+  const idx = items.findIndex((it) => it.path === here);
+  if (idx === -1 || items.length < 2) return;
+  const current = items[idx];
+  const newer = idx > 0 ? items[idx - 1] : null;
+  const older = idx < items.length - 1 ? items[idx + 1] : null;
+
+  // related: most shared categories first; ties keep date order
+  const related = items
+    .filter((_, i) => i !== idx)
+    .map((it) => ({ it, s: it.cats.filter((c) => current.cats.includes(c)).length }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 3)
+    .map((x) => x.it);
+
+  const esc = (s) =>
+    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const navItem = (post, cls, label) =>
+    post
+      ? `<a class="post-nav-item ${cls}" href="${post.href}">
+           <span class="post-nav-label">${label}</span>
+           <span class="post-nav-title">${esc(post.title)}</span>
+         </a>`
+      : `<span></span>`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "post-footer-nav";
+  wrap.innerHTML = `
+    <nav class="post-nav">
+      ${navItem(older, "post-nav-prev", "&larr; Older")}
+      ${navItem(newer, "post-nav-next", "Newer &rarr;")}
+    </nav>
+    ${
+      related.length
+        ? `<section class="related-posts">
+             <div class="related-posts-title">Related posts</div>
+             <div class="related-posts-grid">
+               ${related
+                 .map(
+                   (r) => `
+                 <a class="related-card" href="${r.href}">
+                   ${r.image ? `<img class="related-card-image" src="${r.image}" alt="">` : ""}
+                   <span class="related-card-title">${esc(r.title)}</span>
+                   <span class="related-card-date">${esc(r.date)}</span>
+                 </a>`
+                 )
+                 .join("")}
+             </div>
+           </section>`
+        : ""
+    }
+  `;
+
+  const main = document.getElementById("quarto-document-content");
+  if (main) main.appendChild(wrap);
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/jiwooshin-kr\.github\.io\/blog\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      if (authorPrefersDark) {
+          [baseTheme, altTheme] = [altTheme, baseTheme];
+      }
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "jiwooshin-kr/blog";
+    script.dataset.repoId = "R_kgDOTPVNpg";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDOTPVNps4DAq0B";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© 2026 Jiwoo Shin</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
