@@ -17,7 +17,7 @@
 <generator>quarto-1.9.38</generator>
 <lastBuildDate>Wed, 30 Sep 2026 15:00:00 GMT</lastBuildDate>
 <item>
-  <title>[Related Work] How Reasoning Models Are Kept Safe: A Map by Approach</title>
+  <title>[Safety] How Reasoning Models Are Kept Safe: A Map by Approach</title>
   <dc:creator>Jiwoo Shin</dc:creator>
   <link>https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/</link>
   <description><![CDATA[ 
@@ -27,6 +27,16 @@
 
 
 
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>AI-assisted post.</strong> I set the question, the scope and the framing. The literature search, citation checks and first draft were done with the help of Claude.</p>
+</div>
+</div>
+</div>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
 <p>Long chain-of-thought models such as o1 and DeepSeek-R1 created a safety problem that chat models did not have. The model now writes a long trace before it answers, and that trace can be unsafe even when the answer is a refusal. <a href="https://arxiv.org/abs/2502.12659">Hidden Risks of LRMs</a> found the thinking process more dangerous than the final answer, and <a href="https://arxiv.org/abs/2605.05678">Chain of Risk</a> gave the two failure types names: a <strong>leak</strong> is an unsafe trace with a safe answer, and an <strong>escape</strong> is a benign trace with an unsafe answer.</p>
@@ -161,10 +171,11 @@
 </section>
 
  ]]></description>
-  <category>Related-Work</category>
   <category>Safety</category>
   <category>Reasoning</category>
   <category>LLM</category>
+  <category>Survey</category>
+  <category>AI-Assisted</category>
   <guid>https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/</guid>
   <pubDate>Wed, 30 Sep 2026 15:00:00 GMT</pubDate>
 </item>

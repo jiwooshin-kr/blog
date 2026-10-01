@@ -10,7 +10,7 @@
 <meta name="dcterms.date" content="2026-10-01">
 <meta name="description" content="A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.">
 
-<title>[Related Work] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin</title>
+<title>[Safety] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -81,11 +81,11 @@ ul.task-list li input[type="checkbox"] {
 
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="[Related Work] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin">
+<meta property="og:title" content="[Safety] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin">
 <meta property="og:description" content="A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.">
 <meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/profile.jpg">
 <meta property="og:site_name" content="Jiwoo Shin">
-<meta name="twitter:title" content="[Related Work] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin">
+<meta name="twitter:title" content="[Safety] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin">
 <meta name="twitter:description" content="A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.">
 <meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/profile.jpg">
 <meta name="twitter:card" content="summary_large_image">
@@ -299,17 +299,18 @@ ul.task-list li input[type="checkbox"] {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">[Related Work] How Reasoning Models Are Kept Safe: A Map by Approach</h1>
+      <h1 class="title">[Safety] How Reasoning Models Are Kept Safe: A Map by Approach</h1>
                   <div>
         <div class="description">
           A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.
         </div>
       </div>
                           <div class="quarto-categories">
-                <div class="quarto-category">Related-Work</div>
                 <div class="quarto-category">Safety</div>
                 <div class="quarto-category">Reasoning</div>
                 <div class="quarto-category">LLM</div>
+                <div class="quarto-category">Survey</div>
+                <div class="quarto-category">AI-Assisted</div>
               </div>
                   </div>
   </div>
@@ -367,6 +368,16 @@ ul.task-list li input[type="checkbox"] {
 
 
 
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>AI-assisted post.</strong> I set the question, the scope and the framing. The literature search, citation checks and first draft were done with the help of Claude.</p>
+</div>
+</div>
+</div>
 <section id="tldr" class="level2">
 <h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
 <p>Long chain-of-thought models such as o1 and DeepSeek-R1 created a safety problem that chat models did not have. The model now writes a long trace before it answers, and that trace can be unsafe even when the answer is a refusal. <a href="https://arxiv.org/abs/2502.12659">Hidden Risks of LRMs</a> found the thinking process more dangerous than the final answer, and <a href="https://arxiv.org/abs/2605.05678">Chain of Risk</a> gave the two failure types names: a <strong>leak</strong> is an unsafe trace with a safe answer, and an <strong>escape</strong> is a benign trace with an unsafe answer.</p>
