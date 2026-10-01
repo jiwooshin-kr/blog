@@ -1,10 +1,14 @@
 ---
-title: "[Related Work] How Reasoning Models Are Kept Safe: A Map by Approach"
+title: "[Safety] How Reasoning Models Are Kept Safe: A Map by Approach"
 description: "A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them."
 author: "Jiwoo Shin"
 date: "2026-10-01"
-categories: [Related-Work, Safety, Reasoning, LLM]
+categories: [Safety, Reasoning, LLM, Survey, AI-Assisted]
 ---
+
+::: {.callout-note appearance="simple"}
+**AI-assisted post.** I set the question, the scope and the framing. The literature search, citation checks and first draft were done with the help of Claude.
+:::
 
 ## TL;DR
 
