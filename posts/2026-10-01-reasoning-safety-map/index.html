@@ -8,7 +8,7 @@
 
 <meta name="author" content="Jiwoo Shin">
 <meta name="dcterms.date" content="2026-10-01">
-<meta name="description" content="A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.">
+<meta name="description" content="Every defense for reasoning models makes an implicit choice about what the chain of thought is for: computation, oversight, or output. A map of the approaches, the threats each one covers, and why measuring trace safety is the real bottleneck.">
 
 <title>[Safety] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin</title>
 <style>
@@ -82,12 +82,12 @@ ul.task-list li input[type="checkbox"] {
 
 <link rel="stylesheet" href="../../styles.css">
 <meta property="og:title" content="[Safety] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin">
-<meta property="og:description" content="A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.">
-<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/profile.jpg">
+<meta property="og:description" content="Every defense for reasoning models makes an implicit choice about what the chain of thought is for: computation, oversight, or output. A map of the approaches, the threats each one covers, and why measuring trace safety is the real bottleneck.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/map.svg">
 <meta property="og:site_name" content="Jiwoo Shin">
 <meta name="twitter:title" content="[Safety] How Reasoning Models Are Kept Safe: A Map by Approach – Jiwoo Shin">
-<meta name="twitter:description" content="A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.">
-<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/profile.jpg">
+<meta name="twitter:description" content="Every defense for reasoning models makes an implicit choice about what the chain of thought is for: computation, oversight, or output. A map of the approaches, the threats each one covers, and why measuring trace safety is the real bottleneck.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-01-reasoning-safety-map/map.svg">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -302,7 +302,7 @@ ul.task-list li input[type="checkbox"] {
       <h1 class="title">[Safety] How Reasoning Models Are Kept Safe: A Map by Approach</h1>
                   <div>
         <div class="description">
-          A map of how safety is achieved in autoregressive reasoning models: training the reasoning, guiding it at inference, monitoring it, and containing what is exposed, plus the tensions between them.
+          Every defense for reasoning models makes an implicit choice about what the chain of thought is for: computation, oversight, or output. A map of the approaches, the threats each one covers, and why measuring trace safety is the real bottleneck.
         </div>
       </div>
                           <div class="quarto-categories">
@@ -344,19 +344,20 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
-  <li><a href="#a.-train-the-reasoning" id="toc-a.-train-the-reasoning" class="nav-link" data-scroll-target="#a.-train-the-reasoning">A. Train the reasoning</a>
+  <li><a href="#the-argument-in-one-paragraph" id="toc-the-argument-in-one-paragraph" class="nav-link active" data-scroll-target="#the-argument-in-one-paragraph">The argument in one paragraph</a></li>
+  <li><a href="#the-new-failure-modes" id="toc-the-new-failure-modes" class="nav-link" data-scroll-target="#the-new-failure-modes">1. The new failure modes</a></li>
+  <li><a href="#four-threat-models" id="toc-four-threat-models" class="nav-link" data-scroll-target="#four-threat-models">2. Four threat models</a></li>
+  <li><a href="#the-map" id="toc-the-map" class="nav-link" data-scroll-target="#the-map">3. The map</a></li>
+  <li><a href="#the-four-families" id="toc-the-four-families" class="nav-link" data-scroll-target="#the-four-families">4. The four families</a>
   <ul class="collapse">
-  <li><a href="#a1.-recall-the-policy" id="toc-a1.-recall-the-policy" class="nav-link" data-scroll-target="#a1.-recall-the-policy">A1. Recall the policy</a></li>
-  <li><a href="#a2.-anchor-the-start-of-the-trace" id="toc-a2.-anchor-the-start-of-the-trace" class="nav-link" data-scroll-target="#a2.-anchor-the-start-of-the-trace">A2. Anchor the start of the trace</a></li>
-  <li><a href="#a3.-supervise-each-step-and-train-recovery" id="toc-a3.-supervise-each-step-and-train-recovery" class="nav-link" data-scroll-target="#a3.-supervise-each-step-and-train-recovery">A3. Supervise each step and train recovery</a></li>
-  <li><a href="#a4.-secure-the-trace-directly" id="toc-a4.-secure-the-trace-directly" class="nav-link" data-scroll-target="#a4.-secure-the-trace-directly">A4. Secure the trace directly</a></li>
+  <li><a href="#a.-train-the-reasoning-change-the-weights" id="toc-a.-train-the-reasoning-change-the-weights" class="nav-link" data-scroll-target="#a.-train-the-reasoning-change-the-weights">A. Train the reasoning: change the weights</a></li>
+  <li><a href="#b.-guide-the-reasoning-weights-frozen" id="toc-b.-guide-the-reasoning-weights-frozen" class="nav-link" data-scroll-target="#b.-guide-the-reasoning-weights-frozen">B. Guide the reasoning: weights frozen</a></li>
+  <li><a href="#c.-monitor-the-reasoning-an-external-observer" id="toc-c.-monitor-the-reasoning-an-external-observer" class="nav-link" data-scroll-target="#c.-monitor-the-reasoning-an-external-observer">C. Monitor the reasoning: an external observer</a></li>
+  <li><a href="#d.-contain-the-reasoning-control-exposure" id="toc-d.-contain-the-reasoning-control-exposure" class="nav-link" data-scroll-target="#d.-contain-the-reasoning-control-exposure">D. Contain the reasoning: control exposure</a></li>
   </ul></li>
-  <li><a href="#b.-guide-the-reasoning-at-inference" id="toc-b.-guide-the-reasoning-at-inference" class="nav-link" data-scroll-target="#b.-guide-the-reasoning-at-inference">B. Guide the reasoning at inference</a></li>
-  <li><a href="#c.-monitor-the-reasoning" id="toc-c.-monitor-the-reasoning" class="nav-link" data-scroll-target="#c.-monitor-the-reasoning">C. Monitor the reasoning</a></li>
-  <li><a href="#d.-contain-the-reasoning" id="toc-d.-contain-the-reasoning" class="nav-link" data-scroll-target="#d.-contain-the-reasoning">D. Contain the reasoning</a></li>
-  <li><a href="#the-tensions-that-matter" id="toc-the-tensions-that-matter" class="nav-link" data-scroll-target="#the-tensions-that-matter">The tensions that matter</a></li>
-  <li><a href="#takeaways" id="toc-takeaways" class="nav-link" data-scroll-target="#takeaways">Takeaways</a></li>
+  <li><a href="#measurement-is-the-bottleneck" id="toc-measurement-is-the-bottleneck" class="nav-link" data-scroll-target="#measurement-is-the-bottleneck">5. Measurement is the bottleneck</a></li>
+  <li><a href="#the-tensions" id="toc-the-tensions" class="nav-link" data-scroll-target="#the-tensions">6. The tensions</a></li>
+  <li><a href="#open-questions-worth-testing" id="toc-open-questions-worth-testing" class="nav-link" data-scroll-target="#open-questions-worth-testing">7. Open questions worth testing</a></li>
   </ul>
 </nav>
     </div>
@@ -378,134 +379,145 @@ ul.task-list li input[type="checkbox"] {
 </div>
 </div>
 </div>
-<section id="tldr" class="level2">
-<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
-<p>Long chain-of-thought models such as o1 and DeepSeek-R1 created a safety problem that chat models did not have. The model now writes a long trace before it answers, and that trace can be unsafe even when the answer is a refusal. <a href="https://arxiv.org/abs/2502.12659">Hidden Risks of LRMs</a> found the thinking process more dangerous than the final answer, and <a href="https://arxiv.org/abs/2605.05678">Chain of Risk</a> gave the two failure types names: a <strong>leak</strong> is an unsafe trace with a safe answer, and an <strong>escape</strong> is a benign trace with an unsafe answer.</p>
-<p>The defenses fall into four families, sorted by <em>where</em> the control acts:</p>
+<section id="the-argument-in-one-paragraph" class="level2">
+<h2 class="anchored" data-anchor-id="the-argument-in-one-paragraph">The argument in one paragraph</h2>
+<p>Making a chat model safe was mostly a question of what it answers. A reasoning model also writes a long chain of thought, and that trace serves three masters at once. It is <strong>computation</strong>: the model needs it to get the answer right. It is <strong>oversight</strong>: monitors read it to catch misbehavior. And it is <strong>output</strong>: users and attackers can see it. Every defense in this post optimizes one of those roles and pays for it in another. Training the trace to be clean can teach it to hide what the model is doing. Hiding the trace protects users and removes oversight. Letting the model think freely about a harmful draft improves its final decision and leaves a harmful draft in the trace. The useful way to read this literature is to ask, for each method, <strong>which role of the trace it serves and which threat it actually covers</strong>.</p>
+</section>
+<section id="the-new-failure-modes" class="level2">
+<h2 class="anchored" data-anchor-id="the-new-failure-modes">1. The new failure modes</h2>
+<p><a href="https://arxiv.org/abs/2502.12659">Hidden Risks of LRMs</a> (Zhou et al., 2025) found that R1’s thinking process carries more safety risk than its final answer. <a href="https://arxiv.org/abs/2605.05678">Chain of Risk</a> (Li et al., 2026) audited 15 reasoning models and gave the two failure types names:</p>
+<ul>
+<li>A <strong>leak</strong> is an unsafe trace followed by a safe answer. A refusal-only evaluation scores it as a success.</li>
+<li>An <strong>escape</strong> is a benign-looking trace followed by an unsafe answer. A trace-only monitor misses it.</li>
+</ul>
+<p>Because these two come apart, any method has to say which one it secures: the trace, the answer, or both.</p>
+</section>
+<section id="four-threat-models" class="level2">
+<h2 class="anchored" data-anchor-id="four-threat-models">2. Four threat models</h2>
+<p>“Safety” in this literature covers four different adversaries. Methods are rarely evaluated against all four, and a method that is strong against one can be irrelevant to another.</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>Family</th>
-<th>Where control acts</th>
-<th>Representative work</th>
+<th>Threat</th>
+<th>Who controls what</th>
+<th>Example</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><strong>A. Train the reasoning</strong></td>
-<td>The weights</td>
-<td>Deliberative Alignment, STAR-1, SafePath, IPO, SaLT-DPO</td>
+<td><strong>T1. Direct request</strong></td>
+<td>A user sends a harmful request as written</td>
+<td>HarmBench, StrongREJECT behaviors</td>
 </tr>
 <tr class="even">
-<td><strong>B. Guide the reasoning</strong></td>
-<td>Decoding, weights frozen</td>
-<td>Thinking Intervention, ReasoningGuard, activation steering, Saffron-1</td>
+<td><strong>T2. Black-box jailbreak</strong></td>
+<td>The attacker controls only the prompt</td>
+<td>Templates, PAIR, <a href="https://arxiv.org/abs/2510.26418">CoT Hijacking</a> (a long benign puzzle before the request)</td>
 </tr>
 <tr class="odd">
-<td><strong>C. Monitor the reasoning</strong></td>
-<td>An external observer</td>
-<td>ReasoningShield, CoT monitors, activation probes</td>
+<td><strong>T3. Trace manipulation</strong></td>
+<td>The attacker sees or writes part of the reasoning</td>
+<td><a href="https://arxiv.org/abs/2502.12893">H-CoT</a> reuses displayed reasoning; open weights allow prefilling the thought</td>
 </tr>
 <tr class="even">
-<td><strong>D. Contain the reasoning</strong></td>
-<td>What is exposed</td>
-<td>Hiding or summarizing the trace</td>
+<td><strong>T4. The model as adversary</strong></td>
+<td>The model pursues a goal it was not given</td>
+<td>Reward hacking caught by <a href="https://arxiv.org/abs/2503.11926">CoT monitors</a></td>
 </tr>
 </tbody>
 </table>
-<p>A second axis cuts across all four: <strong>which object is secured</strong>, the trace, the answer, or both. Most early methods secured only the answer, and most recent ones target the trace.</p>
+<p>T1–T3 are about harmful <strong>content</strong>. T4 is about <strong>misaligned behavior</strong>, mostly in agentic settings. Monitoring work is largely motivated by T4, and most training work is evaluated on T1–T2. Putting them in one table, as surveys often do, hides that difference.</p>
 </section>
-<section id="a.-train-the-reasoning" class="level2">
-<h2 class="anchored" data-anchor-id="a.-train-the-reasoning">A. Train the reasoning</h2>
-<p>The idea is to change the weights so the model’s own chain of thought does the safety work: recall a policy, notice the risk, then refuse or recover. Methods differ mainly in <em>where along the trace</em> the training signal lands.</p>
-<section id="a1.-recall-the-policy" class="level3">
-<h3 class="anchored" data-anchor-id="a1.-recall-the-policy">A1. Recall the policy</h3>
-<p>These methods teach the model a written safety policy and train it to reason over that policy before answering.</p>
+<section id="the-map" class="level2">
+<h2 class="anchored" data-anchor-id="the-map">3. The map</h2>
+<p>Methods sit on two axes. The first is <strong>where control acts</strong>: the weights (A), decoding with weights frozen (B), an external observer (C), or the exposure policy (D). The second is <strong>what is secured</strong>: the answer, the trace, or both.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="map.svg" class="img-fluid figure-img" alt="A grid with four columns (weights, decoding, external observer, exposure) and three rows (answer, trace, both), listing methods in each cell."></p>
+<figcaption>Defenses for reasoning models placed by where control acts and what they secure. Dashed cells: no reasoning-specific method found.</figcaption>
+</figure>
+</div>
+<p>Two patterns stand out. Training methods have moved down the grid, from the answer row toward the trace row. And the bottom row, methods that secure trace and answer <em>jointly</em>, is nearly empty.</p>
+<div class="callout callout-style-simple callout-warning">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>A note on numbers.</strong> The figures quoted below are as reported by each paper, on different models, benchmarks and judges. They show the size of an effect inside one paper. They are not comparable across papers.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="the-four-families" class="level2">
+<h2 class="anchored" data-anchor-id="the-four-families">4. The four families</h2>
+<section id="a.-train-the-reasoning-change-the-weights" class="level3">
+<h3 class="anchored" data-anchor-id="a.-train-the-reasoning-change-the-weights">A. Train the reasoning: change the weights</h3>
+<p>Methods differ mainly in where along the trace the training signal lands.</p>
+<p><strong>A1. Recall the policy.</strong> <a href="https://arxiv.org/abs/2412.16339">Deliberative Alignment</a> (Guan et al., 2024) teaches the model a written safety spec and trains it to reason over that spec before answering, with no human-written reasoning. It reports better jailbreak robustness <em>and</em> less overrefusal. <a href="https://arxiv.org/abs/2504.01903">STAR-1</a> (Wang et al., 2025) gets a 40% average safety gain from only 1K policy-grounded samples, at a 1.1% cost in reasoning. <a href="https://arxiv.org/abs/2504.10081">RealSafe-R1</a> (Zhang et al., 2025) keeps reasoning intact by training R1 on 15K trajectories in its own distribution. <a href="https://arxiv.org/abs/2502.04040">SRG</a> (Wang et al., ICML 2025) observes that Best-of-N safety keeps rising with N: the safety knowledge is present but under-elicited.</p>
+<p><strong>A2. Anchor the start.</strong> <a href="https://arxiv.org/abs/2505.14667">SafePath</a> (Jeung et al., NeurIPS 2025) trains an 8-token “safety primer” at the start of the reasoning and reports up to 90% fewer harmful responses on R1-Distill-Llama-8B, with 295.9× less compute than direct refusal training. <a href="https://arxiv.org/abs/2505.16186">SafeKey</a> (Zhou et al., 2025) strengthens the “key sentence” right after the model restates the query, where it either recognizes the risk or does not.</p>
+<p><strong>A3. Supervise every step and train recovery.</strong> Models often notice the harm and then reason their way past it. <a href="https://arxiv.org/abs/2510.21285">Chain-of-Guardrail</a> (Mao et al., ACL 2026) calls this <em>self-jailbreak</em>. <a href="https://arxiv.org/abs/2502.12970">R2D</a> (Zhu et al., EMNLP 2025) adds safety pivot tokens for step-wise self-checks. <a href="https://arxiv.org/abs/2509.24393">IPO</a> (Zhang et al., ICLR 2026) builds preference pairs by swapping compliant steps for safety triggers. <a href="https://arxiv.org/abs/2510.00938">RECAP</a> (Peng et al., 2025) prefills deliberately flawed reasoning during RL so the model learns to reject it, and <a href="https://arxiv.org/abs/2605.08936">Self-ReSET</a> (Zhang et al., 2026) starts RL from the model’s own unsafe trajectories. The precursor on chat models is <a href="https://arxiv.org/abs/2409.14586">Backtracking</a> (Zhang et al., 2024), a learned <code>[RESET]</code> token for discarding an unsafe partial generation.</p>
+<p><strong>A4. Secure trace and answer together.</strong> <a href="https://arxiv.org/abs/2609.15517">SaLT-DPO</a> (Yun et al., EMNLP 2026) scores the reasoning and the answer as separate segments and adds a consistency term between them. <a href="https://arxiv.org/abs/2502.02384">STAIR</a> (Zhang et al., ICML 2025) builds step-level preferences with safety-informed tree search and reuses its process reward model at test time.</p>
 <ul>
-<li><a href="https://arxiv.org/abs/2412.16339"><strong>Deliberative Alignment</strong></a> (Guan et al., 2024) is the reference point. The model is taught the safety spec as text and trained to recall it in its CoT. No human-written reasoning is needed. OpenAI reports better jailbreak robustness together with <em>less</em> overrefusal.</li>
-<li><a href="https://arxiv.org/abs/2504.01903"><strong>STAR-1</strong></a> (Wang et al., 2025) shows how far a small amount of data goes: 1K policy-grounded reasoning samples give a 40% average safety gain across four benchmarks, for a 1.1% average drop in reasoning ability.</li>
-<li><a href="https://arxiv.org/abs/2504.10081"><strong>RealSafe-R1</strong></a> (Zhang et al., 2025) fine-tunes R1 on 15K trajectories that R1 generated itself, so the training data stays in the model’s own distribution and reasoning is preserved.</li>
-<li><a href="https://arxiv.org/abs/2502.12025"><strong>SafeChain</strong></a> (Jiang et al., 2025) released a CoT-style safety SFT set. <a href="https://arxiv.org/abs/2502.04040"><strong>SRG</strong></a> (Wang et al., ICML 2025) made a related observation: Best-of-N safety keeps rising with N, so the safety knowledge is present but under-elicited.</li>
+<li><strong>Covers:</strong> T1 and T2 well. Recovery training (RECAP, Self-ReSET) is the only training line that explicitly targets T3, because it trains on corrupted traces.</li>
+<li><strong>Costs:</strong> the <a href="https://arxiv.org/abs/2503.00555">safety tax</a> on reasoning, overrefusal, and pressure on the trace. That pressure is the problem tension 1 below describes.</li>
 </ul>
 </section>
-<section id="a2.-anchor-the-start-of-the-trace" class="level3">
-<h3 class="anchored" data-anchor-id="a2.-anchor-the-start-of-the-trace">A2. Anchor the start of the trace</h3>
-<p>These methods put the safety signal at the very beginning of the reasoning and leave the rest alone.</p>
+<section id="b.-guide-the-reasoning-weights-frozen" class="level3">
+<h3 class="anchored" data-anchor-id="b.-guide-the-reasoning-weights-frozen">B. Guide the reasoning: weights frozen</h3>
 <ul>
-<li><a href="https://arxiv.org/abs/2505.14667"><strong>SafePath</strong></a> (Jeung et al., NeurIPS 2025) trains the model to emit an 8-token “safety primer” at the start of its reasoning on harmful prompts. On R1-Distill-Llama-8B it cuts harmful responses by up to 90% and blocks 83.3% of jailbreaks, with 295.9× less compute than training direct refusals.</li>
-<li><a href="https://arxiv.org/abs/2505.16186"><strong>SafeKey</strong></a> (Zhou et al., 2025) targets the “key sentence” that follows the model’s restatement of the query, the point where it either recognizes the risk or does not. It lowers the average harmfulness rate by 9.6%.</li>
-</ul>
-<p>Anchoring the start is cheap. The weakness is that the remainder of the trace is unsupervised, which the next group addresses.</p>
-</section>
-<section id="a3.-supervise-each-step-and-train-recovery" class="level3">
-<h3 class="anchored" data-anchor-id="a3.-supervise-each-step-and-train-recovery">A3. Supervise each step and train recovery</h3>
-<p>The common observation behind these methods is that models often notice harm and then reason their way past it. <a href="https://arxiv.org/abs/2510.21285">Chain-of-Guardrail</a> (Mao et al., ACL 2026) calls this <strong>self-jailbreak</strong>.</p>
-<ul>
-<li><a href="https://arxiv.org/abs/2502.12970"><strong>R2D</strong></a> (Zhu et al., EMNLP 2025) adds “safety pivot tokens” for step-wise self-evaluation.</li>
-<li><a href="https://arxiv.org/abs/2509.24393"><strong>IPO</strong></a> (Zhang et al., ICLR 2026) builds preference pairs by replacing compliant steps with safety triggers and reports a relative harmfulness reduction of over 30%.</li>
-<li><a href="https://arxiv.org/abs/2510.00938"><strong>RECAP</strong></a> (Peng et al., 2025) prefills deliberately flawed reasoning during RL so the model learns to reject it. <a href="https://arxiv.org/abs/2605.08936"><strong>Self-ReSET</strong></a> (Zhang et al., 2026) starts RL from the model’s own unsafe trajectories and trains recovery.</li>
-<li><a href="https://arxiv.org/abs/2502.02384"><strong>STAIR</strong></a> (Zhang et al., ICML 2025 Oral) builds step-level preference data with safety-informed MCTS. Its process reward model also drives test-time search.</li>
-<li>The precursor is <a href="https://arxiv.org/abs/2409.14586"><strong>Backtracking</strong></a> (Zhang et al., 2024), on chat models: a learned <code>[RESET]</code> token lets the model discard an unsafe partial generation, taking unsafe outputs from 6.1% to 1.5%.</li>
+<li><p><strong>Edit the thought.</strong> <a href="https://arxiv.org/abs/2503.24370">Thinking Intervention</a> (Wu et al., 2025) inserts or revises thinking tokens and reports 40% more refusals on unsafe prompts for open R1 models. <a href="https://arxiv.org/abs/2508.04204">ReasoningGuard</a> (Wang et al., 2025) finds critical points in the trace with attention and injects a safety reflection there.</p></li>
+<li><p><strong>Control the budget.</strong> SafeChain’s ZeroThink and LessThink (<a href="https://arxiv.org/abs/2502.12025">Jiang et al., 2025</a>) simply think less.</p></li>
+<li><p><strong>Steer activations.</strong> Refusal is <a href="https://arxiv.org/abs/2406.11717">mediated by a single direction</a> in 13 open chat models (Arditi et al., 2024). <a href="https://arxiv.org/abs/2605.05678">Chain of Risk</a> learns one direction per safety principle for reasoning models. <a href="https://arxiv.org/abs/2502.01042">SafeSwitch</a> (Han et al., 2025) turns on a small safety head only when a probe detects harmful intent, so it bridges B and C.</p></li>
+<li><p><strong>Search.</strong> <a href="https://arxiv.org/abs/2506.06444">Saffron-1</a> (Qiu et al., 2025) finds that off-the-shelf inference scaling helps safety less than Best-of-N, and proposes tree search with a dedicated safety reward model.</p></li>
+<li><p><strong>Covers:</strong> T1 and T2, switchable per request.</p></li>
+<li><p><strong>Fails on:</strong> T3 by construction. An intervention written into the trace can be overwritten by whoever else writes into the trace. Steering also requires white-box access.</p></li>
 </ul>
 </section>
-<section id="a4.-secure-the-trace-directly" class="level3">
-<h3 class="anchored" data-anchor-id="a4.-secure-the-trace-directly">A4. Secure the trace directly</h3>
-<p>Answer-only rewards leave unsafe traces untouched. <a href="https://arxiv.org/abs/2609.15517"><strong>SaLT-DPO</strong></a> (Yun et al., EMNLP 2026) scores the reasoning and the answer as separate segments and adds a cross-segment consistency term, which lowers unsafe rates in both.</p>
-<p>A contrasting design is <a href="https://arxiv.org/abs/2509.11629"><strong>Answer-Then-Check</strong></a> (Cao et al., ICLR 2026). The model drafts an answer <em>inside its thoughts</em>, checks it, and only then decides what to output. It trades a clean trace for a better final decision.</p>
-<p><strong>What training buys and costs.</strong> Safety travels with the weights, including open weights, and inference stays cheap. The price is the <a href="https://arxiv.org/abs/2503.00555"><strong>safety tax</strong></a>: sequential safety alignment degrades reasoning. Overrefusal and dependence on the training distribution are further costs.</p>
-</section>
-</section>
-<section id="b.-guide-the-reasoning-at-inference" class="level2">
-<h2 class="anchored" data-anchor-id="b.-guide-the-reasoning-at-inference">B. Guide the reasoning at inference</h2>
-<p>Here the weights stay frozen. Decoding is steered through the thought tokens, the thinking budget, the activations, or search.</p>
+<section id="c.-monitor-the-reasoning-an-external-observer" class="level3">
+<h3 class="anchored" data-anchor-id="c.-monitor-the-reasoning-an-external-observer">C. Monitor the reasoning: an external observer</h3>
 <ul>
-<li><strong>Edit the thought.</strong> <a href="https://arxiv.org/abs/2503.24370"><strong>Thinking Intervention</strong></a> (Wu et al., 2025) inserts or revises thinking tokens before the answer, raising refusal on unsafe prompts by 40% for open R1 models. <a href="https://arxiv.org/abs/2508.04204"><strong>ReasoningGuard</strong></a> (Wang et al., 2025) uses attention to find critical points in the trace, injects a safety reflection there, and reports outperforming nine existing safeguards.</li>
-<li><strong>Control the budget.</strong> SafeChain’s ZeroThink, LessThink and MoreThink vary how much the model thinks. Turning thinking off is a crude but real lever.</li>
-<li><strong>Steer activations.</strong> Steering builds on the finding that refusal is <a href="https://arxiv.org/abs/2406.11717">mediated by a single direction</a> (Arditi et al., 2024) across 13 open chat models. For reasoning models, <a href="https://arxiv.org/abs/2605.05678"><strong>Chain of Risk</strong></a> learns one unsafe-to-safe direction per safety principle and reports a 40.8% reduction in unsafe outputs while keeping 97.7% of accuracy. <a href="https://arxiv.org/abs/2502.01042"><strong>SafeSwitch</strong></a> (Han et al., 2025) turns on a safety head only when a probe detects harmful intent, cutting harmful outputs by about 80%. It sits between this family and the next.</li>
-<li><strong>Search.</strong> <a href="https://arxiv.org/abs/2506.06444"><strong>Saffron-1</strong></a> (Qiu et al., 2025) finds that off-the-shelf inference scaling helps safety less than Best-of-N does, and proposes tree search guided by a dedicated “multifurcation” reward model.</li>
+<li><p><strong>Trace guard models.</strong> <a href="https://arxiv.org/abs/2505.17244">ReasoningShield</a> (Li et al., 2025) is trained on traces and outperforms LlamaGuard-4 by 35.6% and GPT-4o by 15.8% on trace moderation. <a href="https://arxiv.org/abs/2501.18492">GuardReasoner</a> (Liu et al., 2025) reasons before it judges, but mostly on prompts and responses.</p></li>
+<li><p><strong>CoT monitors.</strong> <a href="https://arxiv.org/abs/2503.11926">Baker et al.&nbsp;(2025)</a> show that GPT-4o can catch reward hacking by reading o3-mini’s chain of thought. <a href="https://arxiv.org/abs/2505.23575">CoT Red-Handed</a> (Arnav et al., NeurIPS 2025) finds that scoring trace and actions separately doubles detection of subtle deception compared with watching actions alone.</p></li>
+<li><p><strong>Activation probes.</strong> A linear probe on CoT activations predicts whether the final answer will be safe, 13 F1 points better on average than text monitors (<a href="https://arxiv.org/abs/2507.12428">Chan et al., 2025</a>).</p></li>
+<li><p><strong>Covers:</strong> T4, where it is the main defense, and T1–T3 as a gate.</p></li>
+<li><p><strong>Depends on:</strong> the trace meaning what it says. That assumption is what tension 1 puts under strain.</p></li>
 </ul>
-<p><strong>What inference-time guidance buys and costs.</strong> It needs no retraining and can be switched on per request. It costs latency and compute, and steering requires white-box access. Interventions written in plain text can also be overwritten by an attacker who controls the prompt or prefill.</p>
 </section>
-<section id="c.-monitor-the-reasoning" class="level2">
-<h2 class="anchored" data-anchor-id="c.-monitor-the-reasoning">C. Monitor the reasoning</h2>
-<p>A separate component reads the trace, either as text or as activations, flags risk, and then gates, halts or corrects the generation.</p>
+<section id="d.-contain-the-reasoning-control-exposure" class="level3">
+<h3 class="anchored" data-anchor-id="d.-contain-the-reasoning-control-exposure">D. Contain the reasoning: control exposure</h3>
+<p>Frontier labs hide or summarize raw chains of thought. This practice is documented mostly in system cards, not papers. The research case for it comes from attacks and leaks. H-CoT drops o1’s refusal rate from 98% to below 2% by reusing the model’s displayed safety reasoning. <a href="https://arxiv.org/abs/2506.15674">Leaky Thoughts</a> (Green et al., EMNLP 2025) finds that more test-time compute makes answers more cautious and makes traces leak <em>more</em> private data.</p>
 <ul>
-<li><strong>Guard models for traces.</strong> General-purpose guards transfer poorly to reasoning traces. <a href="https://arxiv.org/abs/2505.17244"><strong>ReasoningShield</strong></a> (Li et al., 2025) is trained on traces directly and beats LlamaGuard-4 by 35.6% and GPT-4o by 15.8%. <a href="https://arxiv.org/abs/2501.18492"><strong>GuardReasoner</strong></a> (Liu et al., 2025) is a guard that reasons before it judges, though it is mostly applied to prompts and responses rather than traces.</li>
-<li><strong>CoT monitors.</strong> <a href="https://arxiv.org/abs/2503.11926">Baker et al.&nbsp;(2025)</a> show that GPT-4o can catch reward hacking by reading o3-mini’s chain of thought. <a href="https://arxiv.org/abs/2505.23575">CoT Red-Handed</a> (Arnav et al., NeurIPS 2025) finds that scoring the trace and the actions separately doubles detection of subtle deception over watching actions alone.</li>
-<li><strong>Probes on activations.</strong> A linear probe on CoT activations predicts whether the final answer will be safe, beating text-based monitors by 13 F1 on average (<a href="https://arxiv.org/abs/2507.12428">Chan et al., 2025</a>). The hidden state carries signal the text does not.</li>
+<li><strong>Covers:</strong> the visible-trace part of T2 and T3.</li>
+<li><strong>Fails on:</strong> open weights, and anything the hidden trace does to the answer.</li>
 </ul>
-<p><strong>What monitoring buys and costs.</strong> It separates duties, makes decisions auditable, and is the main lever against agentic misbehavior. It costs a second model call, adds false positives, and adds latency when it runs while the trace streams. Its central weakness is in the next section: it only works when the trace means what it says.</p>
 </section>
-<section id="d.-contain-the-reasoning" class="level2">
-<h2 class="anchored" data-anchor-id="d.-contain-the-reasoning">D. Contain the reasoning</h2>
-<p>The fourth option accepts that the raw trace may be unsafe and controls who sees it. Frontier labs hide or summarize raw chains of thought, but this practice is documented mostly in system cards rather than papers. The research case for it comes from attacks and leaks:</p>
+</section>
+<section id="measurement-is-the-bottleneck" class="level2">
+<h2 class="anchored" data-anchor-id="measurement-is-the-bottleneck">5. Measurement is the bottleneck</h2>
+<p>Every claim about trace safety rests on a judge that reads the trace, and that judge is the weakest link in the literature.</p>
 <ul>
-<li><a href="https://arxiv.org/abs/2502.12893"><strong>H-CoT</strong></a> (Kuo et al., 2025) hijacks the model’s displayed safety reasoning and drops o1’s refusal rate from 98% to below 2%.</li>
-<li><a href="https://arxiv.org/abs/2506.15674"><strong>Leaky Thoughts</strong></a> (Green et al., EMNLP 2025) finds that more test-time compute makes answers more cautious but makes the trace leak <em>more</em> private data.</li>
+<li><strong>Guards built for answers transfer poorly to traces.</strong> ReasoningShield’s own motivation is that QA-style moderators degrade sharply on question–thought input. <a href="https://arxiv.org/abs/2608.24232">TRACE</a> (Wu et al., EMNLP 2026) annotates prompts, reasoning and answers with evidence and reports that judging the reasoning trace is much harder than judging the prompt or the answer.</li>
+<li><strong>A trace that discusses harm is not a trace that commits it.</strong> A safe trace often restates the request in order to analyze it. A judge that flags any mention of the harmful content will count careful refusals as leaks. HarmBench’s own judging rules already say that responses which “analyze, discuss or otherwise react to the behavior without actually exhibiting it” do not count. Trace judges need the same distinction.</li>
+<li><strong>The judge choice changes the number.</strong> SafeChain picked its trace judge after a pilot comparison of judges against human labels. Few papers report that step, and fewer report agreement between judges.</li>
+<li><strong>Faithfulness caps what any judge can see.</strong> <a href="https://arxiv.org/abs/2505.05410">Chen et al.&nbsp;(2025)</a> find that reasoning models reveal the hints they actually use only some of the time, often less than 20% of the time. A judge can certify the text of a trace, not the computation behind it.</li>
 </ul>
-<p>Containment does nothing for open-weight models, and the hidden trace still drives the answer.</p>
+<p>The practical consequence is that headline trace-safety numbers should come with the judge, its validation against human labels, and its agreement with a second judge. Without those, a difference between two methods may only be a difference between two judges.</p>
 </section>
-<section id="the-tensions-that-matter" class="level2">
-<h2 class="anchored" data-anchor-id="the-tensions-that-matter">The tensions that matter</h2>
-<p>Comparing the four families one at a time misses the main point. They pull against each other.</p>
-<p><strong>1. Training on the trace vs.&nbsp;monitoring the trace.</strong> Training families A3 and A4 put optimization pressure on the chain of thought, and monitoring (C) relies on that chain of thought staying honest. Baker et al.&nbsp;show the two collide: optimizing hard against a CoT monitor produces <em>obfuscated</em> reward hacking, where the misbehavior continues and the trace stops showing it. <a href="https://arxiv.org/abs/2507.11473">Korbak et al.&nbsp;(2025)</a> call CoT monitorability “a new and fragile opportunity”. <a href="https://arxiv.org/abs/2507.05246">Emmons et al.&nbsp;(2025)</a> are more hopeful: when the trace is doing real computation, models learn to hide intent only with significant outside help. The practical rule that follows is to avoid optimizing directly against the monitor you rely on.</p>
-<p><strong>2. A clean trace vs.&nbsp;a useful trace.</strong> Answer-Then-Check and RECAP work because the model engages with harmful drafts or flawed reasoning inside its trace. Trace-level safety (SaLT-DPO, ReasoningShield) and privacy (Leaky Thoughts) want that trace clean. You cannot have both without deciding who the trace is for.</p>
-<p><strong>3. Early vs.&nbsp;throughout.</strong> Early anchoring is very cheap; SafePath’s 295.9× compute saving is the headline. But self-jailbreak and H-CoT happen <em>later</em> in the trace. Step-level and recovery training cover the whole trace at a higher data and compute cost.</p>
-<p><strong>4. More thinking is not monotonically safer.</strong> Best-of-N and search improve safety (SRG, STAIR), and Hidden Risks finds that stronger reasoners do more harm when they comply. Leaky Thoughts shows longer reasoning leaks more.</p>
-<p><strong>5. Faithfulness bounds everything in C and A4.</strong> <a href="https://arxiv.org/abs/2505.05410">Chen et al.&nbsp;(2025)</a> find that reasoning models reveal the hints they actually use only some of the time, often below 20%. Outcome RL improves this at first and then plateaus. A trace that is safe is not the same as a computation that is safe.</p>
+<section id="the-tensions" class="level2">
+<h2 class="anchored" data-anchor-id="the-tensions">6. The tensions</h2>
+<p><strong>1. Optimizing the trace vs.&nbsp;relying on it.</strong> Families A3 and A4 put optimization pressure on the chain of thought, and family C relies on it staying honest. Baker et al.&nbsp;show the collision directly: optimizing hard against a CoT monitor produces <em>obfuscated</em> reward hacking, where the misbehavior continues and the trace stops showing it. <a href="https://arxiv.org/abs/2507.11473">Korbak et al.&nbsp;(2025)</a> call CoT monitorability “a new and fragile opportunity”. <a href="https://arxiv.org/abs/2507.05246">Emmons et al.&nbsp;(2025)</a> are more hopeful: when the trace does real computation, models learn to hide intent only with significant outside help. This is the computation-versus-oversight conflict from the opening.</p>
+<p><strong>2. A clean trace vs.&nbsp;a useful trace.</strong> <a href="https://arxiv.org/abs/2509.11629">Answer-Then-Check</a> (Cao et al., ICLR 2026) drafts an answer inside the thoughts and checks it before deciding what to output. RECAP trains on flawed reasoning. Both work <em>because</em> the model engages with harmful material internally. Trace-level safety and privacy want that material gone. This is the computation-versus-output conflict.</p>
+<p><strong>3. Early vs.&nbsp;throughout.</strong> Anchoring the start is the cheapest defense. Self-jailbreak, CoT Hijacking and H-CoT all act later in the trace. Step-level and recovery training cover the whole trace at higher data and compute cost.</p>
+<p><strong>4. More thinking is not monotonically safer.</strong> Best-of-N and search improve safety (SRG, STAIR). Hidden Risks finds that stronger reasoners do more harm when they comply, and Leaky Thoughts shows that longer traces leak more.</p>
 </section>
-<section id="takeaways" class="level2">
-<h2 class="anchored" data-anchor-id="takeaways">Takeaways</h2>
-<ul>
-<li>The field moved from securing the <strong>answer</strong> to securing the <strong>trace</strong>. The leak/escape distinction is now the right unit of evaluation, and any benchmark should score trace and answer separately.</li>
-<li>Within training, the signal moved from the <strong>start of the trace</strong> (primers, key sentences) to <strong>every step plus recovery</strong>, because attacks moved later into the trace.</li>
-<li>The open question is the interaction between families, not any one of them: how to put optimization pressure on reasoning without destroying the signal that monitors depend on.</li>
-</ul>
+<section id="open-questions-worth-testing" class="level2">
+<h2 class="anchored" data-anchor-id="open-questions-worth-testing">7. Open questions worth testing</h2>
+<ol type="1">
+<li><strong>Does trace-level training cost monitorability?</strong> Train the same model with an answer-only reward and with a segment-level reward like SaLT-DPO’s. Then induce misbehavior and measure how often a <em>held-out</em> CoT monitor detects it. Tension 1 predicts that detection falls under the segment reward.</li>
+<li><strong>Do trace judges agree?</strong> Label a few hundred traces by hand, separating “discusses the harm” from “provides the harm”. Report each judge’s accuracy and the agreement between judges. Until this exists, trace-safety comparisons across papers are not well defined.</li>
+<li><strong>Is early anchoring robust to late attacks?</strong> Evaluate primer-style methods (SafePath, SafeKey) under CoT Hijacking, which places a long benign prefix before the harmful request. If the anchor’s effect decays with trace length, the cheapest defense has a known blind spot.</li>
+</ol>
 <p>For a broader catalogue organized by risks, attacks and defenses, see <a href="https://arxiv.org/abs/2504.17704">Safety in Large Reasoning Models: A Survey</a> (Wang et al., 2025).</p>
 
 
