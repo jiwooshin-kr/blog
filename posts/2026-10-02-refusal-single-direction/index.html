@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Jiwoo Shin">
+<meta name="dcterms.date" content="2026-10-02">
+<meta name="description" content="Across 13 chat models, refusal turns out to be a one-dimensional subspace: erase it and the model complies with harmful requests, add it and it refuses harmless ones. A weight edit, not a prompt, is enough to remove it.">
+
+<title>[Paper Review] Refusal in Language Models Is Mediated by a Single Direction – Jiwoo Shin</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-5d9b4afeaa93ab2447d0c22245fa662a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-a0f9fd0d421825b736dc1bbcbcba2219.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="[Paper Review] Refusal in Language Models Is Mediated by a Single Direction – Jiwoo Shin">
+<meta property="og:description" content="Across 13 chat models, refusal turns out to be a one-dimensional subspace: erase it and the model complies with harmful requests, add it and it refuses harmless ones. A weight edit, not a prompt, is enough to remove it.">
+<meta property="og:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-02-refusal-single-direction/profile.jpg">
+<meta property="og:site_name" content="Jiwoo Shin">
+<meta name="twitter:title" content="[Paper Review] Refusal in Language Models Is Mediated by a Single Direction – Jiwoo Shin">
+<meta name="twitter:description" content="Across 13 chat models, refusal turns out to be a one-dimensional subspace: erase it and the model complies with harmful requests, add it and it refuses harmless ones. A weight edit, not a prompt, is enough to remove it.">
+<meta name="twitter:image" content="https://jiwooshin-kr.github.io/blog/posts/2026-10-02-refusal-single-direction/profile.jpg">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const queryPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    const darkModeDefault = queryPrefersDark.matches;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    queryPrefersDark.addEventListener("change", e => {
+      if(window.localStorage.getItem("quarto-color-scheme") !== null)
+        return;
+      const alternate = e.matches
+      toggleColorMode(alternate);
+      localAlternateSentinel = e.matches ? 'alternate' : 'default'; // this is used alongside local storage!
+      toggleGiscusIfUsed(alternate, darkModeDefault);
+    });
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Notes to Self</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="https://jiwooshin-kr.github.io/"> 
+<span class="menu-text">About Me</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">[Paper Review] Refusal in Language Models Is Mediated by a Single Direction</h1>
+                  <div>
+        <div class="description">
+          Across 13 chat models, refusal turns out to be a one-dimensional subspace: erase it and the model complies with harmful requests, add it and it refuses harmless ones. A weight edit, not a prompt, is enough to remove it.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Paper-Review</div>
+                <div class="quarto-category">Safety</div>
+                <div class="quarto-category">Refusal</div>
+                <div class="quarto-category">Interpretability</div>
+                <div class="quarto-category">LLM</div>
+                <div class="quarto-category">AI-Assisted</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Jiwoo Shin </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">October 2, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tldr" id="toc-tldr" class="nav-link active" data-scroll-target="#tldr">TL;DR</a></li>
+  <li><a href="#why-this-result-matters" id="toc-why-this-result-matters" class="nav-link" data-scroll-target="#why-this-result-matters">Why this result matters</a></li>
+  <li><a href="#the-mechanism" id="toc-the-mechanism" class="nav-link" data-scroll-target="#the-mechanism">The mechanism</a></li>
+  <li><a href="#results-worth-remembering" id="toc-results-worth-remembering" class="nav-link" data-scroll-target="#results-worth-remembering">Results worth remembering</a></li>
+  <li><a href="#what-the-paper-does-not-claim" id="toc-what-the-paper-does-not-claim" class="nav-link" data-scroll-target="#what-the-paper-does-not-claim">What the paper does not claim</a></li>
+  <li><a href="#how-it-has-aged" id="toc-how-it-has-aged" class="nav-link" data-scroll-target="#how-it-has-aged">How it has aged</a></li>
+  <li><a href="#korean" id="toc-korean" class="nav-link" data-scroll-target="#korean">한국어 버전</a>
+  <ul class="collapse">
+  <li><a href="#한-줄-요약" id="toc-한-줄-요약" class="nav-link" data-scroll-target="#한-줄-요약">한 줄 요약</a></li>
+  <li><a href="#왜-중요한가" id="toc-왜-중요한가" class="nav-link" data-scroll-target="#왜-중요한가">왜 중요한가</a></li>
+  <li><a href="#메커니즘" id="toc-메커니즘" class="nav-link" data-scroll-target="#메커니즘">메커니즘</a></li>
+  <li><a href="#기억할-만한-결과" id="toc-기억할-만한-결과" class="nav-link" data-scroll-target="#기억할-만한-결과">기억할 만한 결과</a></li>
+  <li><a href="#논문이-주장하지-않는-것" id="toc-논문이-주장하지-않는-것" class="nav-link" data-scroll-target="#논문이-주장하지-않는-것">논문이 주장하지 않는 것</a></li>
+  <li><a href="#그-이후" id="toc-그-이후" class="nav-link" data-scroll-target="#그-이후">그 이후</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>AI-assisted post.</strong> I chose the paper and the framing. The reading, citation checks and first draft were done with the help of Claude.</p>
+</div>
+</div>
+</div>
+<blockquote class="blockquote">
+<p><strong>Paper:</strong> Andy Arditi, Oscar Obeso, Aaquib Syed, Daniel Paleka, Nina Panickssery, Wes Gurnee, Neel Nanda. <em>Refusal in Language Models Is Mediated by a Single Direction.</em> 2024. <a href="https://arxiv.org/abs/2406.11717">arXiv:2406.11717</a></p>
+</blockquote>
+<section id="tldr" class="level2">
+<h2 class="anchored" data-anchor-id="tldr">TL;DR</h2>
+<p>Chat models are trained to refuse harmful requests. This paper shows that in 13 open models from 1.8B to 72B, that behavior runs through <strong>a single direction in the residual stream</strong>. Erase the direction and the model stops refusing. Add it and the model refuses <em>harmless</em> requests. Because the direction is one-dimensional and linear, it can be removed from the weights once and for all, which turns the jailbreak into a static weight edit — no prompt engineering, no per-prompt optimization — reaching 79.2% attack success on HarmBench for Qwen 7B while MMLU, ARC and GSM8K barely move.</p>
+<p>The paper’s own framing is right: this is an <strong>existence proof</strong>, not a recipe. But the existence is the point. Safety fine-tuning across two different alignment families converges on something you can delete with one projection.</p>
+</section>
+<section id="why-this-result-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-this-result-matters">Why this result matters</h2>
+<p>Before this, the honest answer to “where does refusal live in the model?” was that nobody knew. It could have been distributed across many features, redundantly encoded, entangled with the model’s understanding of harm. That would have been reassuring: distributed behavior is hard to remove by accident.</p>
+<p>Instead, the answer is a one-dimensional subspace, and it is a one-dimensional subspace in <strong>Qwen, Yi, Gemma, Llama-2 and Llama-3</strong> — spanning two different alignment approaches. That convergence is the finding. Safety training does not build a wall; it installs a switch, and the switch is in a place you can reach if you have the weights.</p>
+</section>
+<section id="the-mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="the-mechanism">The mechanism</h2>
+<p>Five steps, and the elegance is that four of them are one line of linear algebra each.</p>
+<p><strong>1. Extract by difference in means.</strong> Run 128 harmful instructions (AdvBench, MaliciousInstruct, TDC2023) and 128 harmless ones (Alpaca) through the model. For every layer <span class="math inline">\(l\)</span> and every post-instruction token position <span class="math inline">\(i\)</span>, take the mean activation on harmful minus the mean on harmless:</p>
+<p><span class="math display">\[r_i^{(l)} = \mu_i^{(l)} - \nu_i^{(l)}\]</span></p>
+<p>That is it. No training, no probe, no optimization. A few hundred forward passes.</p>
+<p><strong>2. Pick one candidate out of all of them.</strong> That procedure yields one candidate vector per (layer, position) pair. The authors choose a single winner on a small validation set using three scores: does ablating it <strong>stop</strong> refusal (bypass), does adding it <strong>cause</strong> refusal (induce), and does it <strong>leave harmless behavior alone</strong> (KL divergence). The third criterion is what keeps the result from being a blunt instrument.</p>
+<p><strong>3. Ablate it everywhere.</strong> For every activation in the residual stream, at every layer and every position:</p>
+<p><span class="math display">\[\mathbf{x}' \leftarrow \mathbf{x} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top\mathbf{x}\]</span></p>
+<p>This is not steering at one layer. It erases the component along <span class="math inline">\(\hat{\mathbf{r}}\)</span> from the entire residual stream, so the model cannot represent that direction anywhere.</p>
+<p><strong>4. Or add it, at the selected layer.</strong> <span class="math inline">\(\mathbf{x}^{(l)\prime} \leftarrow \mathbf{x}^{(l)} + \mathbf{r}^{(l)}\)</span>. Applied to a harmless instruction, the model refuses it.</p>
+<p><strong>5. Bake it into the weights.</strong> The step that makes this practical. Every matrix that writes to the residual stream — embeddings, attention outputs, MLP outputs — gets orthogonalized against the direction:</p>
+<p><span class="math display">\[W_{\text{out}}' \leftarrow W_{\text{out}} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top W_{\text{out}}\]</span></p>
+<p>After this the model is <em>architecturally unable</em> to write the refusal direction. There is no inference-time hook to detect, no system prompt to inspect, no suspicious suffix in the input. It is a modified checkpoint that looks entirely normal.</p>
+</section>
+<section id="results-worth-remembering" class="level2">
+<h2 class="anchored" data-anchor-id="results-worth-remembering">Results worth remembering</h2>
+<p><strong>Both directions work.</strong> Ablation takes models from near-total refusal on JailbreakBench to substantial unsafe completion, across all 13. Addition makes models refuse instructions they would otherwise answer. The same vector, two signs.</p>
+<p><strong>The jailbreak is competitive.</strong> Weight orthogonalization reaches 79.2% ASR on HarmBench for Qwen 7B and 78.0% for Qwen 72B — matching prompt-specific GCG, which has to run an optimization per prompt.</p>
+<p><strong>Capabilities survive, mostly.</strong> On the largest models, MMLU, ARC and GSM8K shift by well under a point in either direction. The asterisk the authors leave in: <strong>TruthfulQA drops consistently</strong>, by 2.3 to 3.5 points. That is the one place the edit visibly costs something, and it is worth noticing <em>which</em> benchmark it is.</p>
+<p><strong>Adversarial suffixes work the same way.</strong> This is my favourite part. GCG suffixes are gibberish strings found by gradient search; nobody could say what they <em>do</em>. The paper shows they suppress the expression of the refusal direction at the final token, pushing its cosine similarity down to the level of harmless instructions — and the route is <strong>attention hijacking</strong>: the heads that normally write the refusal direction shift their attention onto the suffix region and away from the harmful instruction. A black-box-looking attack and a white-box edit turn out to act on the same mechanism from opposite ends.</p>
+</section>
+<section id="what-the-paper-does-not-claim" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-paper-does-not-claim">What the paper does not claim</h2>
+<p>The authors are unusually careful, and the limitations are load-bearing.</p>
+<ul>
+<li><strong>The refusal score is string matching.</strong> “I’m sorry”, “As an AI”, “I cannot”. That is a crude instrument, and it is why the safety score (Llama Guard 2) is reported alongside it.</li>
+<li><strong>The extraction is a heuristic.</strong> In their words, the work is “more of an existence proof that such a direction exists, rather than a careful study of how best to extract it.”</li>
+<li><strong>“Refusal direction” is a functional name.</strong> The direction “could represent other concepts such as ‘harm’ or ‘danger’, or may even resist straightforward semantic interpretation.” Later work takes this seriously and splits the model’s <em>belief that something is harmful</em> from its <em>behavior of refusing</em>; they are not the same vector.</li>
+<li><strong>Open models only.</strong> Nothing here transfers automatically to frontier proprietary systems.</li>
+</ul>
+<p>And the gap I find most interesting: <strong>the paper demonstrates the mechanism of over-refusal and never measures it.</strong> “Adding this direction elicits refusal on even harmless instructions” is, read in the other direction, a complete account of why a model refuses a benign request — the direction fires when it should not. But there is no benign benchmark here, no false-refusal rate, no study of how far you can push the dial before helpfulness collapses. The lever is demonstrated; the cost of the lever is left for other people.</p>
+</section>
+<section id="how-it-has-aged" class="level2">
+<h2 class="anchored" data-anchor-id="how-it-has-aged">How it has aged</h2>
+<p>Two years on, the single-direction claim has been productively contested. <a href="https://arxiv.org/abs/2502.17420">Concept cones</a> find multiple independent refusal directions; <a href="https://arxiv.org/abs/2602.02132">There Is More to Refusal</a> finds refusal categories occupying distinct directions over a shared core — but also reports that steering along <em>any</em> of them produces nearly identical refusal / over-refusal trade-offs. The geometry is richer than one dimension; the control surface, so far, is not.</p>
+<p>That is the shape of a good result. The headline claim gets refined, and the method it enabled — difference-in-means, pick a candidate, project it out — is now standard equipment.</p>
+<hr>
+</section>
+<section id="korean" class="level1">
+<h1>한국어 버전</h1>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>AI의 도움을 받아 작성한 글입니다.</strong> 논문 선정과 관점은 제가 정했고, 읽기, 인용 확인, 초안 작성은 Claude의 도움을 받았습니다.</p>
+</div>
+</div>
+</div>
+<blockquote class="blockquote">
+<p><strong>논문:</strong> Andy Arditi, Oscar Obeso, Aaquib Syed, Daniel Paleka, Nina Panickssery, Wes Gurnee, Neel Nanda. <em>Refusal in Language Models Is Mediated by a Single Direction.</em> 2024. <a href="https://arxiv.org/abs/2406.11717">arXiv:2406.11717</a></p>
+</blockquote>
+<section id="한-줄-요약" class="level2">
+<h2 class="anchored" data-anchor-id="한-줄-요약">한 줄 요약</h2>
+<p>chat 모델은 유해한 요청을 거절하도록 학습됩니다. 이 논문은 1.8B에서 72B까지 open 모델 13개에서 그 행동이 <strong>residual stream의 방향 하나</strong>를 통해 일어난다는 것을 보입니다. 그 방향을 지우면 모델은 거절을 멈추고, 더하면 <strong>무해한</strong> 요청까지 거절합니다. 방향이 1차원이고 선형이므로 가중치에서 아예 제거할 수 있고, 그러면 jailbreak가 <strong>정적인 가중치 수정</strong>이 됩니다. 프롬프트 설계도, 프롬프트마다 돌리는 최적화도 필요 없습니다. Qwen 7B에서 HarmBench 공격 성공률 79.2%를 기록하면서 MMLU, ARC, GSM8K는 거의 그대로입니다.</p>
+<p>논문 스스로 밝히듯 이건 <strong>존재 증명</strong>이지 완성된 방법론이 아닙니다. 하지만 존재한다는 것 자체가 핵심입니다. 서로 다른 두 정렬 방식으로 학습된 모델들이 하나같이, 투영 한 번으로 지울 수 있는 무언가에 수렴했다는 뜻이기 때문입니다.</p>
+</section>
+<section id="왜-중요한가" class="level2">
+<h2 class="anchored" data-anchor-id="왜-중요한가">왜 중요한가</h2>
+<p>이 논문 전까지 “거절은 모델 안 어디에 있는가”에 대한 정직한 답은 “모른다”였습니다. 여러 feature에 분산되어 있을 수도, 중복 인코딩되어 있을 수도, 유해성에 대한 이해와 얽혀 있을 수도 있었습니다. 그랬다면 오히려 안심할 일이었습니다. 분산된 행동은 실수로 제거하기 어렵기 때문입니다.</p>
+<p>그런데 답은 1차원 부분공간이었고, 그것도 <strong>Qwen, Yi, Gemma, Llama-2, Llama-3</strong> 전부에서 그랬습니다. 서로 다른 두 정렬 계열에 걸쳐서입니다. 이 수렴이 발견의 핵심입니다. safety 학습은 벽을 세우는 게 아니라 <strong>스위치를 다는 일</strong>이고, 가중치를 가진 사람은 그 스위치에 손이 닿습니다.</p>
+</section>
+<section id="메커니즘" class="level2">
+<h2 class="anchored" data-anchor-id="메커니즘">메커니즘</h2>
+<p>다섯 단계인데, 그중 넷이 선형대수 한 줄씩이라는 점이 우아합니다.</p>
+<p><strong>1. 평균 차이로 추출.</strong> 유해한 지시문 128개(AdvBench, MaliciousInstruct, TDC2023)와 무해한 지시문 128개(Alpaca)를 모델에 넣습니다. 모든 layer <span class="math inline">\(l\)</span>과 지시문 이후의 모든 토큰 위치 <span class="math inline">\(i\)</span>에서, 유해 쪽 평균 활성에서 무해 쪽 평균을 뺍니다.</p>
+<p><span class="math display">\[r_i^{(l)} = \mu_i^{(l)} - \nu_i^{(l)}\]</span></p>
+<p>이게 전부입니다. 학습도, probe도, 최적화도 없습니다. forward pass 수백 번이면 됩니다.</p>
+<p><strong>2. 후보 중에서 하나를 고릅니다.</strong> 위 과정은 (layer, 위치) 쌍마다 후보 벡터 하나를 만듭니다. 저자들은 작은 검증 집합에서 세 가지 점수로 승자를 고릅니다. 제거했을 때 거절이 <strong>멈추는가</strong>(bypass), 더했을 때 거절이 <strong>생기는가</strong>(induce), 그리고 <strong>무해한 동작을 건드리지 않는가</strong>(KL divergence). 세 번째 기준 덕분에 이 방법이 무딘 도구가 되지 않습니다.</p>
+<p><strong>3. 어디서든 제거합니다.</strong> residual stream의 모든 활성에 대해, 모든 layer와 모든 위치에서:</p>
+<p><span class="math display">\[\mathbf{x}' \leftarrow \mathbf{x} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top\mathbf{x}\]</span></p>
+<p>한 layer에서만 steering하는 게 아닙니다. residual stream 전체에서 <span class="math inline">\(\hat{\mathbf{r}}\)</span> 성분을 지우므로, 모델은 그 방향을 <strong>어디에서도 표현할 수 없게</strong> 됩니다.</p>
+<p><strong>4. 반대로 더할 수도 있습니다.</strong> 선택된 layer에서 <span class="math inline">\(\mathbf{x}^{(l)\prime} \leftarrow \mathbf{x}^{(l)} + \mathbf{r}^{(l)}\)</span>. 무해한 지시문에 적용하면 모델이 그걸 거절합니다.</p>
+<p><strong>5. 가중치에 새겨 넣습니다.</strong> 이 방법을 실용적으로 만드는 단계입니다. residual stream에 쓰는 모든 행렬(embedding, attention 출력, MLP 출력)을 그 방향에 직교하도록 바꿉니다.</p>
+<p><span class="math display">\[W_{\text{out}}' \leftarrow W_{\text{out}} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top W_{\text{out}}\]</span></p>
+<p>이 뒤에는 모델이 <strong>구조적으로 거절 방향을 쓸 수 없습니다.</strong> 탐지할 추론 시점 hook도, 검사할 system prompt도, 입력에 붙은 수상한 suffix도 없습니다. 겉보기에 완전히 정상인 체크포인트일 뿐입니다.</p>
+</section>
+<section id="기억할-만한-결과" class="level2">
+<h2 class="anchored" data-anchor-id="기억할-만한-결과">기억할 만한 결과</h2>
+<p><strong>양방향 모두 작동합니다.</strong> 제거하면 13개 모델 전부가 JailbreakBench에서 거의 전부 거절하던 상태에서 상당수 유해 응답을 내놓는 상태로 바뀝니다. 더하면 평소 답하던 지시문을 거절합니다. 같은 벡터, 부호만 다릅니다.</p>
+<p><strong>jailbreak 성능이 경쟁력 있습니다.</strong> 가중치 직교화는 Qwen 7B에서 HarmBench ASR 79.2%, Qwen 72B에서 78.0%입니다. 프롬프트마다 최적화를 돌려야 하는 GCG와 맞먹습니다.</p>
+<p><strong>능력은 대체로 보존됩니다.</strong> 큰 모델들에서 MMLU, ARC, GSM8K는 1점 미만으로 움직입니다. 저자들이 남긴 단서는 <strong>TruthfulQA가 일관되게 2.3~3.5점 떨어진다</strong>는 것입니다. 이 수정이 눈에 띄게 대가를 치르는 유일한 지점이고, 하필 <strong>그</strong> 벤치마크라는 점이 의미심장합니다.</p>
+<p><strong>adversarial suffix도 같은 방식으로 작동합니다.</strong> 개인적으로 가장 좋아하는 부분입니다. GCG suffix는 gradient 탐색으로 찾은 의미 없는 문자열이고, 그게 <strong>무엇을 하는지</strong>는 아무도 설명하지 못했습니다. 이 논문은 suffix가 마지막 토큰에서 거절 방향의 발현을 억제한다는 것을 보입니다. 코사인 유사도가 무해한 지시문 수준까지 떨어집니다. 경로는 <strong>attention 탈취</strong>입니다. 평소 거절 방향을 쓰던 head들이 attention을 유해한 지시문에서 떼어 내 suffix 쪽으로 옮깁니다. black-box처럼 보이던 공격과 white-box 수정이 같은 메커니즘을 양쪽에서 건드리고 있었던 것입니다.</p>
+</section>
+<section id="논문이-주장하지-않는-것" class="level2">
+<h2 class="anchored" data-anchor-id="논문이-주장하지-않는-것">논문이 주장하지 않는 것</h2>
+<p>저자들은 드물게 신중하고, 그 한계들이 실제로 중요합니다.</p>
+<ul>
+<li><strong>거절 점수는 문자열 매칭입니다.</strong> “I’m sorry”, “As an AI”, “I cannot”. 투박한 도구이고, 그래서 safety 점수(Llama Guard 2)를 함께 보고합니다.</li>
+<li><strong>추출 방식은 휴리스틱입니다.</strong> 저자들 표현으로 이 연구는 “그런 방향이 존재한다는 존재 증명에 가깝지, 그것을 어떻게 가장 잘 추출할지에 대한 면밀한 연구가 아닙니다.”</li>
+<li><strong>“거절 방향”은 기능적 이름일 뿐입니다.</strong> 그 방향이 “‘유해’ 또는 ‘위험’ 같은 다른 개념을 나타낼 수도 있고, 명확한 의미 해석을 거부할 수도 있습니다.” 이후 연구는 이 지적을 진지하게 받아들여, 모델이 <strong>무언가를 유해하다고 믿는 것</strong>과 <strong>거절하는 행동</strong>을 분리합니다. 둘은 같은 벡터가 아닙니다.</li>
+<li><strong>open 모델만 다룹니다.</strong> 상용 frontier 모델로 자동으로 옮겨지지 않습니다.</li>
+</ul>
+<p>그리고 제가 가장 흥미롭게 본 공백은 이것입니다. <strong>이 논문은 over-refusal의 메커니즘을 보여 주면서 그것을 측정하지는 않습니다.</strong> “이 방향을 더하면 무해한 지시문까지 거절하게 만든다”는 문장을 반대로 읽으면, 모델이 무해한 요청을 왜 거절하는지에 대한 완전한 설명입니다. 그 방향이 발화하지 말아야 할 때 발화하는 것입니다. 그런데 여기엔 무해한 벤치마크도, false refusal 비율도, 유용성이 무너지기 전까지 손잡이를 얼마나 돌릴 수 있는지에 대한 분석도 없습니다. 손잡이는 보여 주고, 그 손잡이의 대가는 다른 사람 몫으로 남겨 둡니다.</p>
+</section>
+<section id="그-이후" class="level2">
+<h2 class="anchored" data-anchor-id="그-이후">그 이후</h2>
+<p>2년이 지나면서 “방향 하나”라는 주장은 생산적으로 반박되어 왔습니다. <a href="https://arxiv.org/abs/2502.17420">concept cones</a>는 서로 독립적인 거절 방향이 여럿 있다고 보고하고, <a href="https://arxiv.org/abs/2602.02132">There Is More to Refusal</a>은 거절 범주마다 공통 축 위에서 서로 다른 방향을 차지한다고 봅니다. 다만 같은 논문이 <strong>그중 어느 방향으로 steering하든 refusal과 over-refusal의 trade-off는 거의 같다</strong>고 보고합니다. 기하 구조는 1차원보다 풍부하지만, 조절 수단은 아직 그렇지 않습니다.</p>
+<p>좋은 결과란 이런 모양입니다. 대표 주장은 다듬어지고, 그 논문이 가능하게 한 방법(평균 차이로 뽑고, 후보를 고르고, 투영해서 지우는 것)은 이제 기본 장비가 되었습니다.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script>
+/* GoatCounter: visitor tracking + footer counter (Total / Today / Yesterday).
+   Setup: sign up at goatcounter.com, then put your site code below.
+   Also enable "Allow adding visitor counts on your website" in
+   GoatCounter Settings so the counter API is publicly readable. */
+(function () {
+  var GC_CODE = "jiwooshin";
+  if (GC_CODE.indexOf("GOATCOUNTER") === 0) return; // not configured yet
+  var site = "https://" + GC_CODE + ".goatcounter.com";
+
+  // tracking snippet
+  var s = document.createElement("script");
+  s.async = true;
+  s.src = "https://gc.zgo.at/count.js";
+  s.setAttribute("data-goatcounter", site + "/count");
+  document.head.appendChild(s);
+
+  // footer counter: runs after the DOM is ready (this script is injected
+  // before the footer markup exists)
+  var run = function () {
+    var footer = document.querySelector(".nav-footer");
+    if (!footer) return;
+    var slot = footer.querySelector(".nav-footer-right");
+    if (!slot) {
+      slot = document.createElement("div");
+      slot.className = "nav-footer-right";
+      footer.appendChild(slot);
+    }
+    var el = document.createElement("span");
+    el.className = "visitor-stats";
+    slot.appendChild(el);
+    var d2s = function (d) {
+      var p = function (n) { return String(n).padStart(2, "0"); };
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    };
+    var now = new Date();
+    var today = d2s(now);
+    var yest = d2s(new Date(now.getTime() - 864e5));
+    // GoatCounter caches counter responses for hours, and only recognized
+    // params (start/end) form the cache key. Rotating an ancient start date
+    // by hour gives fresh numbers (max ~1h stale) while sharing the cache
+    // within each hour. Note: "end" excludes that day, hence the subtraction.
+    var ancient = "2020-01-" + String(now.getHours() + 1).padStart(2, "0");
+    var get = function (qs) {
+      return fetch(site + "/counter/TOTAL.json" + qs)
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j) return null;
+          // unique visitors (sessions), not raw pageviews
+          var n = j.count_unique != null ? j.count_unique : j.count;
+          return parseInt(String(n).replace(/[^0-9]/g, ""), 10);
+        })
+        .catch(function () { return null; });
+    };
+    Promise.all([
+      get("?start=" + ancient),                      // all-time
+      get("?start=" + ancient + "&end=" + today),    // before today
+      get("?start=" + ancient + "&end=" + yest),     // before yesterday
+    ]).then(function (v) {
+      var total = v[0], beforeToday = v[1], beforeYest = v[2];
+      if (total == null || isNaN(total)) return;
+      var fmt = function (n) { return n == null || isNaN(n) || n < 0 ? "0" : String(n); };
+      var todayN = beforeToday == null ? null : total - beforeToday;
+      var yestN = beforeToday == null || beforeYest == null ? null : beforeToday - beforeYest;
+      el.textContent =
+        "Total " + total + " · Today " + fmt(todayN) + " · Yesterday " + fmt(yestN);
+    });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
+</script>
+<script>
+/* Prev/next + related posts, built from the home listing.
+   Runs on every post page; new posts are picked up automatically. */
+(async () => {
+  const offsetMeta = document.querySelector('meta[name="quarto:offset"]');
+  if (!offsetMeta) return;
+  const indexUrl = new URL(offsetMeta.content + "index.html", window.location.href);
+
+  let doc;
+  try {
+    const res = await fetch(indexUrl.href);
+    if (!res.ok) return;
+    doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  } catch (e) {
+    return;
+  }
+
+  const norm = (p) => p.replace(/index\.html$/, "");
+  const here = norm(window.location.pathname);
+
+  // listing is already sorted date-desc
+  const items = [...doc.querySelectorAll(".quarto-listing-default .quarto-post")]
+    .map((el) => {
+      const a = el.querySelector(".listing-title a");
+      if (!a) return null;
+      const url = new URL(a.getAttribute("href"), indexUrl);
+      let cats = [];
+      try {
+        cats = decodeURIComponent(atob(el.dataset.categories || "")).split(",").filter(Boolean);
+      } catch (e) {}
+      const img = el.querySelector(".thumbnail-image");
+      const dateEl = el.querySelector(".listing-date");
+      return {
+        href: url.href,
+        path: norm(url.pathname),
+        title: a.textContent.trim(),
+        date: dateEl ? dateEl.textContent.trim() : "",
+        image: img ? new URL(img.getAttribute("src"), indexUrl).href : null,
+        cats: cats,
+      };
+    })
+    .filter(Boolean);
+
+  const idx = items.findIndex((it) => it.path === here);
+  if (idx === -1 || items.length < 2) return;
+  const current = items[idx];
+  const newer = idx > 0 ? items[idx - 1] : null;
+  const older = idx < items.length - 1 ? items[idx + 1] : null;
+
+  // related: most shared categories first; ties keep date order
+  const related = items
+    .filter((_, i) => i !== idx)
+    .map((it) => ({ it, s: it.cats.filter((c) => current.cats.includes(c)).length }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 3)
+    .map((x) => x.it);
+
+  const esc = (s) =>
+    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const navItem = (post, cls, label) =>
+    post
+      ? `<a class="post-nav-item ${cls}" href="${post.href}">
+           <span class="post-nav-label">${label}</span>
+           <span class="post-nav-title">${esc(post.title)}</span>
+         </a>`
+      : `<span></span>`;
+
+  const wrap = document.createElement("div");
+  wrap.className = "post-footer-nav";
+  wrap.innerHTML = `
+    <nav class="post-nav">
+      ${navItem(older, "post-nav-prev", "&larr; Older")}
+      ${navItem(newer, "post-nav-next", "Newer &rarr;")}
+    </nav>
+    ${
+      related.length
+        ? `<section class="related-posts">
+             <div class="related-posts-title">Related posts</div>
+             <div class="related-posts-grid">
+               ${related
+                 .map(
+                   (r) => `
+                 <a class="related-card" href="${r.href}">
+                   ${r.image ? `<img class="related-card-image" src="${r.image}" alt="">` : ""}
+                   <span class="related-card-title">${esc(r.title)}</span>
+                   <span class="related-card-date">${esc(r.date)}</span>
+                 </a>`
+                 )
+                 .join("")}
+             </div>
+           </section>`
+        : ""
+    }
+  `;
+
+  const main = document.getElementById("quarto-document-content");
+  if (main) main.appendChild(wrap);
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/jiwooshin-kr\.github\.io\/blog\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      if (authorPrefersDark) {
+          [baseTheme, altTheme] = [altTheme, baseTheme];
+      }
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "jiwooshin-kr/blog";
+    script.dataset.repoId = "R_kgDOTPVNpg";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDOTPVNps4DAq0B";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© 2026 Jiwoo Shin</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
