@@ -1,0 +1,153 @@
+---
+title: "[Paper Review] Refusal in Language Models Is Mediated by a Single Direction"
+description: "Across 13 chat models, refusal turns out to be a one-dimensional subspace: erase it and the model complies with harmful requests, add it and it refuses harmless ones. A weight edit, not a prompt, is enough to remove it."
+author: "Jiwoo Shin"
+date: "2026-10-02"
+categories: [Paper-Review, Safety, Refusal, Interpretability, LLM, AI-Assisted]
+---
+
+::: {.callout-note appearance="simple"}
+**AI-assisted post.** I chose the paper and the framing. The reading, citation checks and first draft were done with the help of Claude.
+:::
+
+> **Paper:** Andy Arditi, Oscar Obeso, Aaquib Syed, Daniel Paleka, Nina Panickssery, Wes Gurnee, Neel Nanda. *Refusal in Language Models Is Mediated by a Single Direction.* 2024. [arXiv:2406.11717](https://arxiv.org/abs/2406.11717)
+
+## TL;DR
+
+Chat models are trained to refuse harmful requests. This paper shows that in 13 open models from 1.8B to 72B, that behavior runs through **a single direction in the residual stream**. Erase the direction and the model stops refusing. Add it and the model refuses *harmless* requests. Because the direction is one-dimensional and linear, it can be removed from the weights once and for all, which turns the jailbreak into a static weight edit — no prompt engineering, no per-prompt optimization — reaching 79.2% attack success on HarmBench for Qwen 7B while MMLU, ARC and GSM8K barely move.
+
+The paper's own framing is right: this is an **existence proof**, not a recipe. But the existence is the point. Safety fine-tuning across two different alignment families converges on something you can delete with one projection.
+
+## Why this result matters
+
+Before this, the honest answer to "where does refusal live in the model?" was that nobody knew. It could have been distributed across many features, redundantly encoded, entangled with the model's understanding of harm. That would have been reassuring: distributed behavior is hard to remove by accident.
+
+Instead, the answer is a one-dimensional subspace, and it is a one-dimensional subspace in **Qwen, Yi, Gemma, Llama-2 and Llama-3** — spanning two different alignment approaches. That convergence is the finding. Safety training does not build a wall; it installs a switch, and the switch is in a place you can reach if you have the weights.
+
+## The mechanism
+
+Five steps, and the elegance is that four of them are one line of linear algebra each.
+
+**1. Extract by difference in means.** Run 128 harmful instructions (AdvBench, MaliciousInstruct, TDC2023) and 128 harmless ones (Alpaca) through the model. For every layer $l$ and every post-instruction token position $i$, take the mean activation on harmful minus the mean on harmless:
+
+$$r_i^{(l)} = \mu_i^{(l)} - \nu_i^{(l)}$$
+
+That is it. No training, no probe, no optimization. A few hundred forward passes.
+
+**2. Pick one candidate out of all of them.** That procedure yields one candidate vector per (layer, position) pair. The authors choose a single winner on a small validation set using three scores: does ablating it **stop** refusal (bypass), does adding it **cause** refusal (induce), and does it **leave harmless behavior alone** (KL divergence). The third criterion is what keeps the result from being a blunt instrument.
+
+**3. Ablate it everywhere.** For every activation in the residual stream, at every layer and every position:
+
+$$\mathbf{x}' \leftarrow \mathbf{x} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top\mathbf{x}$$
+
+This is not steering at one layer. It erases the component along $\hat{\mathbf{r}}$ from the entire residual stream, so the model cannot represent that direction anywhere.
+
+**4. Or add it, at the selected layer.** $\mathbf{x}^{(l)\prime} \leftarrow \mathbf{x}^{(l)} + \mathbf{r}^{(l)}$. Applied to a harmless instruction, the model refuses it.
+
+**5. Bake it into the weights.** The step that makes this practical. Every matrix that writes to the residual stream — embeddings, attention outputs, MLP outputs — gets orthogonalized against the direction:
+
+$$W_{\text{out}}' \leftarrow W_{\text{out}} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top W_{\text{out}}$$
+
+After this the model is *architecturally unable* to write the refusal direction. There is no inference-time hook to detect, no system prompt to inspect, no suspicious suffix in the input. It is a modified checkpoint that looks entirely normal.
+
+## Results worth remembering
+
+**Both directions work.** Ablation takes models from near-total refusal on JailbreakBench to substantial unsafe completion, across all 13. Addition makes models refuse instructions they would otherwise answer. The same vector, two signs.
+
+**The jailbreak is competitive.** Weight orthogonalization reaches 79.2% ASR on HarmBench for Qwen 7B and 78.0% for Qwen 72B — matching prompt-specific GCG, which has to run an optimization per prompt.
+
+**Capabilities survive, mostly.** On the largest models, MMLU, ARC and GSM8K shift by well under a point in either direction. The asterisk the authors leave in: **TruthfulQA drops consistently**, by 2.3 to 3.5 points. That is the one place the edit visibly costs something, and it is worth noticing *which* benchmark it is.
+
+**Adversarial suffixes work the same way.** This is my favourite part. GCG suffixes are gibberish strings found by gradient search; nobody could say what they *do*. The paper shows they suppress the expression of the refusal direction at the final token, pushing its cosine similarity down to the level of harmless instructions — and the route is **attention hijacking**: the heads that normally write the refusal direction shift their attention onto the suffix region and away from the harmful instruction. A black-box-looking attack and a white-box edit turn out to act on the same mechanism from opposite ends.
+
+## What the paper does not claim
+
+The authors are unusually careful, and the limitations are load-bearing.
+
+- **The refusal score is string matching.** "I'm sorry", "As an AI", "I cannot". That is a crude instrument, and it is why the safety score (Llama Guard 2) is reported alongside it.
+- **The extraction is a heuristic.** In their words, the work is "more of an existence proof that such a direction exists, rather than a careful study of how best to extract it."
+- **"Refusal direction" is a functional name.** The direction "could represent other concepts such as 'harm' or 'danger', or may even resist straightforward semantic interpretation." Later work takes this seriously and splits the model's *belief that something is harmful* from its *behavior of refusing*; they are not the same vector.
+- **Open models only.** Nothing here transfers automatically to frontier proprietary systems.
+
+And the gap I find most interesting: **the paper demonstrates the mechanism of over-refusal and never measures it.** "Adding this direction elicits refusal on even harmless instructions" is, read in the other direction, a complete account of why a model refuses a benign request — the direction fires when it should not. But there is no benign benchmark here, no false-refusal rate, no study of how far you can push the dial before helpfulness collapses. The lever is demonstrated; the cost of the lever is left for other people.
+
+## How it has aged
+
+Two years on, the single-direction claim has been productively contested. [Concept cones](https://arxiv.org/abs/2502.17420) find multiple independent refusal directions; [There Is More to Refusal](https://arxiv.org/abs/2602.02132) finds refusal categories occupying distinct directions over a shared core — but also reports that steering along *any* of them produces nearly identical refusal / over-refusal trade-offs. The geometry is richer than one dimension; the control surface, so far, is not.
+
+That is the shape of a good result. The headline claim gets refined, and the method it enabled — difference-in-means, pick a candidate, project it out — is now standard equipment.
+
+---
+
+# 한국어 버전 {#korean}
+
+::: {.callout-note appearance="simple"}
+**AI의 도움을 받아 작성한 글입니다.** 논문 선정과 관점은 제가 정했고, 읽기, 인용 확인, 초안 작성은 Claude의 도움을 받았습니다.
+:::
+
+> **논문:** Andy Arditi, Oscar Obeso, Aaquib Syed, Daniel Paleka, Nina Panickssery, Wes Gurnee, Neel Nanda. *Refusal in Language Models Is Mediated by a Single Direction.* 2024. [arXiv:2406.11717](https://arxiv.org/abs/2406.11717)
+
+## 한 줄 요약
+
+chat 모델은 유해한 요청을 거절하도록 학습됩니다. 이 논문은 1.8B에서 72B까지 open 모델 13개에서 그 행동이 **residual stream의 방향 하나**를 통해 일어난다는 것을 보입니다. 그 방향을 지우면 모델은 거절을 멈추고, 더하면 **무해한** 요청까지 거절합니다. 방향이 1차원이고 선형이므로 가중치에서 아예 제거할 수 있고, 그러면 jailbreak가 **정적인 가중치 수정**이 됩니다. 프롬프트 설계도, 프롬프트마다 돌리는 최적화도 필요 없습니다. Qwen 7B에서 HarmBench 공격 성공률 79.2%를 기록하면서 MMLU, ARC, GSM8K는 거의 그대로입니다.
+
+논문 스스로 밝히듯 이건 **존재 증명**이지 완성된 방법론이 아닙니다. 하지만 존재한다는 것 자체가 핵심입니다. 서로 다른 두 정렬 방식으로 학습된 모델들이 하나같이, 투영 한 번으로 지울 수 있는 무언가에 수렴했다는 뜻이기 때문입니다.
+
+## 왜 중요한가
+
+이 논문 전까지 "거절은 모델 안 어디에 있는가"에 대한 정직한 답은 "모른다"였습니다. 여러 feature에 분산되어 있을 수도, 중복 인코딩되어 있을 수도, 유해성에 대한 이해와 얽혀 있을 수도 있었습니다. 그랬다면 오히려 안심할 일이었습니다. 분산된 행동은 실수로 제거하기 어렵기 때문입니다.
+
+그런데 답은 1차원 부분공간이었고, 그것도 **Qwen, Yi, Gemma, Llama-2, Llama-3** 전부에서 그랬습니다. 서로 다른 두 정렬 계열에 걸쳐서입니다. 이 수렴이 발견의 핵심입니다. safety 학습은 벽을 세우는 게 아니라 **스위치를 다는 일**이고, 가중치를 가진 사람은 그 스위치에 손이 닿습니다.
+
+## 메커니즘
+
+다섯 단계인데, 그중 넷이 선형대수 한 줄씩이라는 점이 우아합니다.
+
+**1. 평균 차이로 추출.** 유해한 지시문 128개(AdvBench, MaliciousInstruct, TDC2023)와 무해한 지시문 128개(Alpaca)를 모델에 넣습니다. 모든 layer $l$과 지시문 이후의 모든 토큰 위치 $i$에서, 유해 쪽 평균 활성에서 무해 쪽 평균을 뺍니다.
+
+$$r_i^{(l)} = \mu_i^{(l)} - \nu_i^{(l)}$$
+
+이게 전부입니다. 학습도, probe도, 최적화도 없습니다. forward pass 수백 번이면 됩니다.
+
+**2. 후보 중에서 하나를 고릅니다.** 위 과정은 (layer, 위치) 쌍마다 후보 벡터 하나를 만듭니다. 저자들은 작은 검증 집합에서 세 가지 점수로 승자를 고릅니다. 제거했을 때 거절이 **멈추는가**(bypass), 더했을 때 거절이 **생기는가**(induce), 그리고 **무해한 동작을 건드리지 않는가**(KL divergence). 세 번째 기준 덕분에 이 방법이 무딘 도구가 되지 않습니다.
+
+**3. 어디서든 제거합니다.** residual stream의 모든 활성에 대해, 모든 layer와 모든 위치에서:
+
+$$\mathbf{x}' \leftarrow \mathbf{x} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top\mathbf{x}$$
+
+한 layer에서만 steering하는 게 아닙니다. residual stream 전체에서 $\hat{\mathbf{r}}$ 성분을 지우므로, 모델은 그 방향을 **어디에서도 표현할 수 없게** 됩니다.
+
+**4. 반대로 더할 수도 있습니다.** 선택된 layer에서 $\mathbf{x}^{(l)\prime} \leftarrow \mathbf{x}^{(l)} + \mathbf{r}^{(l)}$. 무해한 지시문에 적용하면 모델이 그걸 거절합니다.
+
+**5. 가중치에 새겨 넣습니다.** 이 방법을 실용적으로 만드는 단계입니다. residual stream에 쓰는 모든 행렬(embedding, attention 출력, MLP 출력)을 그 방향에 직교하도록 바꿉니다.
+
+$$W_{\text{out}}' \leftarrow W_{\text{out}} - \hat{\mathbf{r}}\hat{\mathbf{r}}^\top W_{\text{out}}$$
+
+이 뒤에는 모델이 **구조적으로 거절 방향을 쓸 수 없습니다.** 탐지할 추론 시점 hook도, 검사할 system prompt도, 입력에 붙은 수상한 suffix도 없습니다. 겉보기에 완전히 정상인 체크포인트일 뿐입니다.
+
+## 기억할 만한 결과
+
+**양방향 모두 작동합니다.** 제거하면 13개 모델 전부가 JailbreakBench에서 거의 전부 거절하던 상태에서 상당수 유해 응답을 내놓는 상태로 바뀝니다. 더하면 평소 답하던 지시문을 거절합니다. 같은 벡터, 부호만 다릅니다.
+
+**jailbreak 성능이 경쟁력 있습니다.** 가중치 직교화는 Qwen 7B에서 HarmBench ASR 79.2%, Qwen 72B에서 78.0%입니다. 프롬프트마다 최적화를 돌려야 하는 GCG와 맞먹습니다.
+
+**능력은 대체로 보존됩니다.** 큰 모델들에서 MMLU, ARC, GSM8K는 1점 미만으로 움직입니다. 저자들이 남긴 단서는 **TruthfulQA가 일관되게 2.3~3.5점 떨어진다**는 것입니다. 이 수정이 눈에 띄게 대가를 치르는 유일한 지점이고, 하필 **그** 벤치마크라는 점이 의미심장합니다.
+
+**adversarial suffix도 같은 방식으로 작동합니다.** 개인적으로 가장 좋아하는 부분입니다. GCG suffix는 gradient 탐색으로 찾은 의미 없는 문자열이고, 그게 **무엇을 하는지**는 아무도 설명하지 못했습니다. 이 논문은 suffix가 마지막 토큰에서 거절 방향의 발현을 억제한다는 것을 보입니다. 코사인 유사도가 무해한 지시문 수준까지 떨어집니다. 경로는 **attention 탈취**입니다. 평소 거절 방향을 쓰던 head들이 attention을 유해한 지시문에서 떼어 내 suffix 쪽으로 옮깁니다. black-box처럼 보이던 공격과 white-box 수정이 같은 메커니즘을 양쪽에서 건드리고 있었던 것입니다.
+
+## 논문이 주장하지 않는 것
+
+저자들은 드물게 신중하고, 그 한계들이 실제로 중요합니다.
+
+- **거절 점수는 문자열 매칭입니다.** "I'm sorry", "As an AI", "I cannot". 투박한 도구이고, 그래서 safety 점수(Llama Guard 2)를 함께 보고합니다.
+- **추출 방식은 휴리스틱입니다.** 저자들 표현으로 이 연구는 "그런 방향이 존재한다는 존재 증명에 가깝지, 그것을 어떻게 가장 잘 추출할지에 대한 면밀한 연구가 아닙니다."
+- **"거절 방향"은 기능적 이름일 뿐입니다.** 그 방향이 "'유해' 또는 '위험' 같은 다른 개념을 나타낼 수도 있고, 명확한 의미 해석을 거부할 수도 있습니다." 이후 연구는 이 지적을 진지하게 받아들여, 모델이 **무언가를 유해하다고 믿는 것**과 **거절하는 행동**을 분리합니다. 둘은 같은 벡터가 아닙니다.
+- **open 모델만 다룹니다.** 상용 frontier 모델로 자동으로 옮겨지지 않습니다.
+
+그리고 제가 가장 흥미롭게 본 공백은 이것입니다. **이 논문은 over-refusal의 메커니즘을 보여 주면서 그것을 측정하지는 않습니다.** "이 방향을 더하면 무해한 지시문까지 거절하게 만든다"는 문장을 반대로 읽으면, 모델이 무해한 요청을 왜 거절하는지에 대한 완전한 설명입니다. 그 방향이 발화하지 말아야 할 때 발화하는 것입니다. 그런데 여기엔 무해한 벤치마크도, false refusal 비율도, 유용성이 무너지기 전까지 손잡이를 얼마나 돌릴 수 있는지에 대한 분석도 없습니다. 손잡이는 보여 주고, 그 손잡이의 대가는 다른 사람 몫으로 남겨 둡니다.
+
+## 그 이후
+
+2년이 지나면서 "방향 하나"라는 주장은 생산적으로 반박되어 왔습니다. [concept cones](https://arxiv.org/abs/2502.17420)는 서로 독립적인 거절 방향이 여럿 있다고 보고하고, [There Is More to Refusal](https://arxiv.org/abs/2602.02132)은 거절 범주마다 공통 축 위에서 서로 다른 방향을 차지한다고 봅니다. 다만 같은 논문이 **그중 어느 방향으로 steering하든 refusal과 over-refusal의 trade-off는 거의 같다**고 보고합니다. 기하 구조는 1차원보다 풍부하지만, 조절 수단은 아직 그렇지 않습니다.
+
+좋은 결과란 이런 모양입니다. 대표 주장은 다듬어지고, 그 논문이 가능하게 한 방법(평균 차이로 뽑고, 후보를 고르고, 투영해서 지우는 것)은 이제 기본 장비가 되었습니다.
